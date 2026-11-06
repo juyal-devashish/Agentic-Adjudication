@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
+from adjud.documents import DocumentProcessor
 from adjud.events import Clock, utc_now
 from adjud.intake import IntakePipeline
 from adjud.paths import DataPaths
@@ -37,6 +38,7 @@ class Runner:
         self.pipeline = IntakePipeline(
             self.paths.root, self.paths.config, self.paths.edc_mock, self.study, self.clock
         )
+        self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -52,8 +54,20 @@ class Runner:
         return len(results)
 
     def run_case_steps(self) -> int:
-        """Automatic case steps (de-identification arrives in step 4)."""
-        return 0
+        """Automatic case steps: de-identify every case waiting in DEIDENTIFYING. A failure
+        in one case is logged and retried next tick; it never stops the others."""
+        from adjud.workflow import State
+
+        done = 0
+        for cs in self.pipeline.store.list_case_states(State.DEIDENTIFYING):
+            try:
+                summary = self.documents.process_case(cs.case_id)
+                log.info("de-identified %s run %s: %s", cs.case_id, summary["run"],
+                         summary["files"])  # fmt: skip
+                done += 1
+            except Exception:
+                log.exception("de-identification failed for %s", cs.case_id)
+        return done
 
     def run_once(self) -> None:
         self.import_inbox()

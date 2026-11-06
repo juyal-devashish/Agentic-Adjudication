@@ -40,6 +40,7 @@ packages = ["adjud"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = ["ignore:builtin type (SwigPy|swigvarlink):DeprecationWarning"]
 
 [tool.ruff]
 line-length = 100

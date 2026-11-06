@@ -18,3 +18,6 @@ requested_documents:
 ai:
   phi_detection: false       # AI-1, stretch step C. Off by default.
   model: "claude-opus-5-5"    # pinned; only used if AI-1 is switched on
+# Synthetic data only (mvp-flow-1.md §7.8 step 3): verification also searches each output
+# for the generator's seeded identifiers of the case's subject. Relative to the data dir.
+seeded_identities: flow1-testkit/identities/identities_SYNTHETIC.json

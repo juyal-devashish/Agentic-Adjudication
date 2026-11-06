@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–3 done (kit: 53/53 incl. TC-RUL and TC-INT). Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–4 done (kit: 53/53; de-identification gate passed). Tick boxes as steps are completed and committed |
 
 ---
 
@@ -97,6 +97,7 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 | P-17 | Possible duplicates | Same subject and PT, overlapping or touching dates | Kit #8 |
 | P-18 | Mislabelled file | PNG named `.pdf` processed as image with a warning | Kit #10 |
 | P-19 | Actors in events | People by user ID (`ss.anna`); automation as `system:<component>` | Kit TC-INT-11 |
+| P-21 | Partly rejected uploads | Processed files go to site review; rejected ones are listed with reasons and notified; only an all-rejected run returns the case (`deid.failed`) | Plan, step 4 |
 | P-20 | Snapshots | Versioned, never overwritten: `source/ae_snapshot_v1.json`, `_v2` … | Kit TC-INT-04 |
 
 ## 5. How we work
@@ -169,18 +170,22 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 
 **Done when:** all RUL and INT cases pass against our package, and scenarios S1–S4 work in the UI.
 
-### Step 4 — De-identification gate: rejection, text PDFs, spreadsheets
+### Step 4 — De-identification gate: rejection, text PDFs, spreadsheets ✅
 
-- [ ] `adjud/deid/` modules: `sniff` (type from content), `validate` (limits; ENCRYPTED, CORRUPT, UNSUPPORTED_TYPE; mismatch warning), `extract`, `detect` (Presidio + regex + English and German label-context rules), `policy` (allow-list, `dob_only`), `redact`, `scrub`, `verify`, `xlsx`
-- [ ] German: label rules (`geb.`, `Pat.-Nr.`, `Versichertennr.`), dd.mm.yyyy dates, umlauts; decide whether a German spaCy model is needed by measuring D12
-- [ ] XLSX: every cell incl. hidden sheets/rows/columns, identifier-header columns, comments, properties, external links, defined names; formulas over redacted cells replaced by values
-- [ ] Pipeline wired into the case workflow (DEIDENTIFYING → AWAITING_SITE_CONFIRMATION, or `deid.failed`); one report per file
-- [ ] `tools/run_corpus.py`: run our pipeline over the kit's `documents/` into `<out>/<case_key>/<expected_output>`
-- [ ] `tools/deid_check.py`: `run_corpus` then the kit harness with `--ocr --gate`; result saved to `data/metrics/`
+- [x] `adjud/deid/` modules: `sniff` (type from content), `validate` (limits; ENCRYPTED, CORRUPT, UNSUPPORTED_TYPE; mismatch warning), `extract`, `detect` (Presidio + regex + English and German label-context rules), `policy` (allow-list, `dob_only`), `redact`, `scrub`, `verify`, `xlsx`
+- [x] German: label rules (`geb.`, `Pat.-Nr.`, `Versichertennr.`), dd.mm.yyyy dates, umlauts. **Measured: no German spaCy model needed** — labels plus case-level known values remove all of D12; English NER is switched off for German pages because it flags whole clinical phrases
+- [x] XLSX: every cell incl. hidden sheets/rows/columns, identifier-header columns, comments, properties, external links, defined names; formulas over redacted cells replaced by values
+- [x] Pipeline wired into the case workflow (DEIDENTIFYING → AWAITING_SITE_CONFIRMATION, or `deid.failed`); one report per file
+- [x] `tools/run_corpus.py`: run our pipeline over the kit's `documents/` into `<out>/<case_key>/<expected_output>`
+- [x] `tools/deid_check.py`: `run_corpus` then the kit harness with `--ocr --gate`; result saved to `data/metrics/`
 
 **Kit cases:** gate passes — TC-DOC-01, 02, 06, 11, 12 (all must-redact removed), TC-DOC-03 (properties), TC-DOC-14, 15, 17 (no output). Must-keep items preserved (clinical dates, drug, eponyms, trial ID).
 
 **Done when:** `deid_check --gate` passes. Thresholds and expected files are not loosened to get there.
+
+**Result (OCR on):** gate PASSED. Text PDFs: must-redact 41/41, should-redact 26/26, must-keep 28/28. XLSX: 8/8, 1/1, 3/3. Rejected documents: no output. Pipeline time for the corpus: under 2 s.
+
+**Decision P-21:** a de-identification run with at least one processed file ends in `deid.completed` (rejected files are listed and the site gets a `processing_failed` notice); only when *no* file could be processed does the case go back with `deid.failed`.
 
 ### Step 5 — Scans, image-only and mixed PDFs
 

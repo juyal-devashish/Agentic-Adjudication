@@ -47,6 +47,7 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
         State.AWAITING_SITE_CONFIRMATION: State.DEIDENTIFYING,
         State.DEIDENTIFYING: SAME,
     },
+    "deid.started": {State.DEIDENTIFYING: SAME},
     "deid.file_processed": {State.DEIDENTIFYING: SAME},
     "deid.completed": {State.DEIDENTIFYING: State.AWAITING_SITE_CONFIRMATION},
     "deid.failed": {State.DEIDENTIFYING: State.AWAITING_DOCUMENTS},
