@@ -67,3 +67,37 @@ def test_results_and_documents_pages_render_for_a_case(demo):
     at = run("pages/results.py", role="safety_specialist", case_id=case_id)
     assert any("Chain verified" in s.value for s in at.success)
     run("pages/site_documents.py", role="safety_specialist", case_id=case_id)
+
+
+def test_site_flow_upload_process_review_and_sign(demo):
+    from adjud.documents import upload
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    pipe = runner.pipeline
+    cid = pipe.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    kit_docs = ROOT / "data" / "flow1-testkit" / "documents" / "DEMO01-101-0001_AE-001"
+    upload(
+        pipe.store,
+        cid,
+        [(n, (kit_docs / n).read_bytes()) for n in ("ecg_report.pdf", "troponin_results.xlsx")],
+        "site101.coord",
+    )
+
+    at = run("pages/site_documents.py", role="site", case_id=cid)
+    next(b for b in at.button if b.label == "Process now").click().run()
+    assert not at.exception, at.exception
+    assert "AWAITING_SITE_CONFIRMATION" in [m.value for m in at.metric]
+
+    at.text_input[-1].input("wrong")  # the signing form's password field
+    next(b for b in at.button if b.label == "Sign and submit").click().run()
+    assert any("Not submitted" in e.value for e in at.error)
+    at.text_input[-1].input("demo")
+    next(b for b in at.button if b.label == "Sign and submit").click().run()
+    assert not at.exception, at.exception
+    assert pipe.store.state(cid).state.value == "SUBMITTED"
+
+    runner.run_case_steps()  # writes the handoff
+    at = run("pages/results.py", role="safety_specialist", case_id=cid)
+    assert any("Signed by Site 101 Coordinator" in s.value for s in at.success)

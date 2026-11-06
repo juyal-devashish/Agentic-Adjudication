@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–5 done (kit: 53/53; gate passed; every image variant beats the oracle). Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–6 done (kit: 53/53; gate passed; every image variant beats the oracle; TC-DOC-M1–M4 automated). Tick boxes as steps are completed and committed |
 
 ---
 
@@ -98,6 +98,7 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 | P-18 | Mislabelled file | PNG named `.pdf` processed as image with a warning | Kit #10 |
 | P-19 | Actors in events | People by user ID (`ss.anna`); automation as `system:<component>` | Kit TC-INT-11 |
 | P-21 | Partly rejected uploads | Processed files go to site review; rejected ones are listed with reasons and notified; only an all-rejected run returns the case (`deid.failed`) | Plan, step 4 |
+| P-22 | Site decisions in the log | Unticks by finding id + masked text; added terms in a quarantined case file referenced by hash; rejected files deleted before submission | Plan, step 6 |
 | P-20 | Snapshots | Versioned, never overwritten: `source/ae_snapshot_v1.json`, `_v2` … | Kit TC-INT-04 |
 
 ## 5. How we work
@@ -214,17 +215,21 @@ Every processed corpus document verifies (0 residuals). Must-keep: 3 items are s
 
 Lessons kept in code: OCR at native resolution (upscaling a noisy fax made it worse); several OCR passes with findings combined; OCR-tolerant matching for digit identifiers (a DOB read as `18. 10, 1959` was legible but scored "removed" by the exact-match harness); deskew only on a clear estimate (an X-ray was rotated 5° by mistake); verification ignores OCR "words" inside black boxes.
 
-### Step 6 — Site review, submission and handoff
+### Step 6 — Site review, submission and handoff ✅
 
-- [ ] `adjud/signatures.py`: bcrypt demo-password check; signature records signer, meaning, time, hashes of signed files
-- [ ] **Page 2**: case header with requested documents; upload with status (*processing / ready for review / blocked / verified*, plus *rejected* with the reason); page previews with outlined redactions; findings table; untick with reason; add terms; delete file; spreadsheet table view; each change re-runs redaction and verification for the affected file
-- [ ] **Sign and submit** only when every file is verified; `submission.signed` → SUBMITTED
-- [ ] Handoff manifest per spec §11 (nothing from `original/`), `handoff.flow2_ready`, notifications
-- [ ] **Page 3**: case list by state; timeline with "chain verified ✓"; source data and eligibility; manifest and downloads; notifications; latest metrics
+- [x] `adjud/signatures.py`: bcrypt demo-password check; signature records signer, meaning, time, hashes of signed files
+- [x] **Page 2**: case header with requested documents; upload with status (*processing / ready for review / blocked / verified*, plus *rejected* with the reason); page previews with outlined redactions; findings table; untick with reason; add terms; delete file; spreadsheet table view; each change re-runs redaction and verification for the affected file
+- [x] **Sign and submit** only when every file is verified; `submission.signed` → SUBMITTED
+- [x] Handoff manifest per spec §11 (nothing from `original/`), `handoff.flow2_ready`, notifications
+- [x] **Page 3**: case list by state; timeline with "chain verified ✓"; source data and eligibility; manifest and downloads; notifications; latest metrics
 
 **Kit cases:** TC-DOC-M1–M4 (manual, plus automated tests where possible).
 
 **Done when:** S5–S9 and S12 work in the UI.
+
+**Result:** TC-DOC-M1 to M4 are automated (`tests/test_review.py`), and a headless UI test walks the site flow (process, review, wrong password refused, sign, handoff on page 3).
+
+**Decision P-22:** a site decision never writes an identifier to the event log. Unticked findings are recorded by *finding id* (hash of the normalised text) plus masked text; site-added terms are stored in a quarantined case file (`documents/site_terms/`) referenced by hash. Rejected files must be deleted before submission.
 
 ### Step 7 — Demo hardening and rehearsal
 

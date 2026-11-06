@@ -62,3 +62,18 @@ def context() -> Context:
 
 def demo_ready() -> bool:
     return (paths().edc_mock / "demographics.csv").exists()
+
+
+@st.cache_resource
+def _processor(root: str):
+    from adjud.documents import DocumentProcessor
+
+    return DocumentProcessor(_pipeline(root).store, DataPaths(Path(root)).config, STUDY)
+
+
+def processor():
+    return _processor(str(paths().root))
+
+
+def study_config() -> dict[str, Any]:
+    return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
