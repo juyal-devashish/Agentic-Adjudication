@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–2 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–3 done (kit: 53/53 incl. TC-RUL and TC-INT). Tick boxes as steps are completed and committed |
 
 ---
 
@@ -149,21 +149,21 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 
 **Done when:** the full kit runs from the repo root; COR and HAR are green; RUL and INT fail only because intake is not built yet.
 
-### Step 3 — Intake
+### Step 3 — Intake ✅
 
-- [ ] `adjud/rules.py`: `evaluate(rule_set, ctx)` and `RuleError`; all eight operators, `all`/`any` nesting with child results, "missing value" reasons, config errors for unknown lists and malformed rules. No `eval()`
-- [ ] `adjud/intake.py`: `IntakePipeline(store_root, config_dir, edc_dir)` with `import_file`, `manual_entry`, `process_inbox`, `case_for`, `case_state`, `store`
-  - [ ] CSV (BOM, comma only) and XLSX (Excel and text dates → ISO) readers
-  - [ ] Validation against the template: missing columns, invalid dates/values, unknown subject, duplicate key, wrong study, missing value; reject the whole file with row/column/code errors
-  - [ ] Normalisation of coded values; Unicode preserved
-  - [ ] Evaluation log entry for every record (rule set, version, explanation, outcome); index cache rebuildable from the log
-  - [ ] Outcomes `created`, `not_eligible`, `changed`, `unchanged`, `stale`; versioned snapshots; `source.changed`, `no_longer_eligible`, `source.stale_ignored`
-  - [ ] Related data and prior events per `related_data.yaml`; possible-duplicate flag
-  - [ ] New case goes to AWAITING_DOCUMENTS; `documents_requested` notification to `site:<id>`
-  - [ ] Manual entry with mandatory reason, `source = MANUAL`
-- [ ] `adjud/notify.py`: outbox writer, no clinical content
-- [ ] `adjud/runner.py`: inbox polling via `process_inbox`, reports to `processed/`
-- [ ] UI: sidebar (banner, role switcher, case picker) and **Page 1** (upload, Import now, per-row results with reasons, flagged cases)
+- [x] `adjud/rules.py`: `evaluate(rule_set, ctx)` and `RuleError`; all eight operators, `all`/`any` nesting with child results, "missing value" reasons, config errors for unknown lists and malformed rules. No `eval()`
+- [x] `adjud/intake.py`: `IntakePipeline(store_root, config_dir, edc_dir)` with `import_file`, `manual_entry`, `process_inbox`, `case_for`, `case_state`, `store`
+  - [x] CSV (BOM, comma only) and XLSX (Excel and text dates → ISO) readers
+  - [x] Validation against the template: missing columns, invalid dates/values, unknown subject, duplicate key, wrong study, missing value; reject the whole file with row/column/code errors
+  - [x] Normalisation of coded values; Unicode preserved
+  - [x] Evaluation log entry for every record (rule set, version, explanation, outcome); index cache rebuildable from the log
+  - [x] Outcomes `created`, `not_eligible`, `changed`, `unchanged`, `stale`; versioned snapshots; `source.changed`, `no_longer_eligible`, `source.stale_ignored`
+  - [x] Related data and prior events per `related_data.yaml`; possible-duplicate flag
+  - [x] New case goes to AWAITING_DOCUMENTS; `documents_requested` notification to `site:<id>`
+  - [x] Manual entry with mandatory reason, `source = MANUAL`
+- [x] `adjud/notify.py`: outbox writer, no clinical content
+- [x] `adjud/runner.py`: inbox polling via `process_inbox`, reports to `processed/`
+- [x] UI: sidebar (banner, role switcher, case picker) and **Page 1** (upload, Import now, per-row results with reasons, flagged cases)
 
 **Kit cases:** TC-RUL-01–09, TC-INT-01–21.
 

@@ -87,7 +87,7 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Install (incl. spaCy model from `uv.lock`) | `uv sync` |
 | Run everything in Docker (UI on :8501, runner) | `docker compose up --build` |
 | UI | `uv run streamlit run ui/app.py` |
-| Runner | `uv run python -m adjud.runner` |
+| Runner (loop / one pass) | `uv run python -m adjud.runner` / `uv run python -m adjud.runner --once` |
 | Tests | `uv run pytest` |
 | Single test | `uv run pytest tests/<file>.py -k "<test name>"` |
 | **Flow 1 test kit against our package** (acceptance) | `uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests` |
@@ -96,9 +96,8 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Lint / format | `uv run ruff check .` / `uv run ruff format .` |
 | Verify hash chains and file hashes | `uv run python -m tools.verify_log` |
 | Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
-| Generate synthetic data (step 2) | `uv run python -m tools.make_synthetic` |
 | Measure seeded-PHI removal (real API calls if AI-1 is on; ask first) (step 4) | `uv run python -m tools.deid_check` |
-| Reset the demo (step 7) | `uv run python -m tools.reset_demo` |
+| Reset the demo (wipes runtime data, loads kit EDC; `--preload` puts `01_initial.csv` in the inbox) | `uv run python -m tools.reset_demo` |
 
 Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit.
 
