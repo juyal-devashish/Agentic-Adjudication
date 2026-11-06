@@ -231,3 +231,12 @@ def test_torn_last_write_is_recovered_on_next_append(store, paths):
     assert [e.seq for e in events] == [1, 2, 3]
     assert events[2].type == "documents.uploaded"
     assert verify_chain(ChainedLog(log_path, case=CASE)).ok
+
+
+def test_torn_fragment_is_quarantined_not_lost(store):
+    make_case(store)
+    log_path = store.case_dir(CASE) / "events.jsonl"
+    with log_path.open("ab") as fh:
+        fh.write(b'{"seq":3,"at":"partial')
+    upload(store)
+    assert (log_path.parent / "events.jsonl.torn").read_bytes() == b'{"seq":3,"at":"partial\n'

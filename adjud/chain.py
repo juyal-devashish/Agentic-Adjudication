@@ -101,5 +101,20 @@ class ChainedLog:
         That fragment is a write interrupted by a crash: its caller never got an Event
         back, so nothing downstream can depend on it.
         """
-        # TODO(human): decide how to recover from the torn last write before appending.
-        raise NotImplementedError
+        # Keep the fragment for audit (crashes should be visible, not silently erased),
+        # in a sidecar that is never read as part of the chain; then cut the log back to
+        # the end of its last complete line. fsync both so a second crash stays valid.
+        assert current.torn_tail is not None
+        with self.quarantine_path.open("ab") as fh:
+            fh.write(current.torn_tail + b"\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        valid_len = self.path.stat().st_size - len(current.torn_tail)
+        with self.path.open("r+b") as fh:
+            fh.truncate(valid_len)
+            fh.flush()
+            os.fsync(fh.fileno())
+
+    @property
+    def quarantine_path(self) -> Path:
+        return self.path.with_name(self.path.name + ".torn")
