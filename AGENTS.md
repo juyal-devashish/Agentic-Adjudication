@@ -80,24 +80,28 @@ Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyM
 
 ## Commands
 
-The repository currently holds only the specs. These are the commands the MVP spec defines; update this table (and add install, lint and type-check commands) as the project is scaffolded.
+Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the repo root. Data lives in `./data` unless `ADJUD_DATA_DIR` is set.
 
 | Task | Command |
 |---|---|
-| Run everything (UI, runner, optional Mailpit) | `docker compose up` |
-| UI | `streamlit run ui/app.py` |
-| Runner | `python -m adjud.runner` |
-| Generate synthetic data | `python tools/make_synthetic.py` |
-| Rebuild all `case.json` from event logs | `python tools/rebuild_state.py` |
-| Verify hash chains and file hashes | `python tools/verify_log.py` |
-| Measure seeded-PHI removal (real API calls if AI-1 is on; ask first) | `python tools/deid_check.py` |
-| Reset the demo (plan addition) | `python tools/reset_demo.py` |
-| Tests | `pytest` |
-| Single test | `pytest tests/<file>.py -k "<test name>"` |
+| Install (incl. spaCy model from `uv.lock`) | `uv sync` |
+| Run everything in Docker (UI on :8501, runner) | `docker compose up --build` |
+| UI | `uv run streamlit run ui/app.py` |
+| Runner | `uv run python -m adjud.runner` |
+| Tests | `uv run pytest` |
+| Single test | `uv run pytest tests/<file>.py -k "<test name>"` |
+| Lint / format | `uv run ruff check .` / `uv run ruff format .` |
+| Verify hash chains and file hashes | `uv run python -m tools.verify_log` |
+| Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
+| Generate synthetic data (step 2) | `uv run python -m tools.make_synthetic` |
+| Measure seeded-PHI removal (real API calls if AI-1 is on; ask first) (step 4) | `uv run python -m tools.deid_check` |
+| Reset the demo (step 7) | `uv run python -m tools.reset_demo` |
+
+Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
 
 Notes:
-- Tesseract and the spaCy English model are installed separately from the Python packages; the Docker image should include both.
-- `./data` is mounted into the containers as a volume.
+- Tesseract is a system dependency (`brew install tesseract` locally; in the Docker image already). The spaCy model `en_core_web_lg` is a pinned dependency in `pyproject.toml`, so `uv sync` installs it.
+- `./data` is mounted into the containers. Only `data/config/` is committed; everything else under `data/` is runtime output.
 
 ## Secrets
 

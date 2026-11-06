@@ -4,7 +4,7 @@
 |---|---|
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Not started. Tick the boxes as steps are completed and committed |
+| **Status** | Step 0 done. Tick the boxes as steps are completed and committed |
 
 ---
 
@@ -77,12 +77,12 @@ From the spec's open questions (§17) and the gaps it leaves. Change any of thes
 ### Step 0 — Project setup
 
 **Deliverables**
-- [ ] `pyproject.toml` (uv), dependencies pinned: streamlit, pydantic, jsonschema, pyyaml, filelock, pymupdf, pytesseract, pillow, presidio-analyzer, spacy (`en_core_web_lg`), bcrypt, faker, reportlab (for the generator), pytest, ruff
-- [ ] Package layout: `adjud/`, `ui/`, `tools/`, `tests/`
-- [ ] `.gitignore` for runtime data under `data/` (keep `data/config/`), `.env.example`
-- [ ] `Dockerfile` with Tesseract and the spaCy model; `docker-compose.yml` with `ui` and `runner`, `./data` mounted
-- [ ] Sample config: `data/config/users.yaml` (bcrypt hashes), `data/config/DEMO01/{study,eligibility_rules,related_data,deid_policy}.yaml`
-- [ ] Update the Commands table in AGENTS.md with the real commands
+- [x] `pyproject.toml` (uv), dependencies pinned: streamlit, pydantic, jsonschema, pyyaml, filelock, pymupdf, pytesseract, pillow, presidio-analyzer, spacy (`en_core_web_lg`), bcrypt, faker, reportlab (for the generator), pytest, ruff
+- [x] Package layout: `adjud/`, `ui/`, `tools/`, `tests/`
+- [x] `.gitignore` for runtime data under `data/` (keep `data/config/`), `.env.example`
+- [x] `Dockerfile` with Tesseract and the spaCy model; `docker-compose.yml` with `ui` and `runner`, `./data` mounted
+- [x] Sample config: `data/config/users.yaml` (bcrypt hashes), `data/config/DEMO01/{study,eligibility_rules,related_data,deid_policy}.yaml`
+- [x] Update the Commands table in AGENTS.md with the real commands
 
 **Done when:** `uv run pytest` runs (zero tests is fine), `uv run ruff check` is clean and `docker compose build` succeeds.
 
