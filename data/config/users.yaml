@@ -1,21 +1,26 @@
-# Demo users for the Flow 1 POC. SYNTHETIC DEMO ONLY: there is no real authentication.
+# Demo users (from the Flow 1 test kit). SYNTHETIC DEMO ONLY: no real authentication.
 # Every demo password is "demo"; only its bcrypt hash is stored here.
 users:
-  - id: site.maria
-    name: Maria Site-User (demo)
+  - id: site101.coord
+    name: Site 101 Coordinator
+    role: site
+    site: "101"
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  - id: site102.coord
+    name: Site 102 Coordinator
+    role: site
+    site: "102"
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  - id: site104.coord
+    name: Site 104 Coordinator
     role: site
     site: "104"
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
-  - id: site.omar
-    name: Omar Site-User (demo)
-    role: site
-    site: "211"
-    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: ss.anna
-    name: Anna Safety-Specialist (demo)
+    name: Anna Safety
     role: safety_specialist
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
-  - id: admin.lee
-    name: Lee Study-Admin (demo)
+  - id: admin.sam
+    name: Sam Admin
     role: study_admin
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"

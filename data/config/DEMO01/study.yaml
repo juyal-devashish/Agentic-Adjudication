@@ -1,23 +1,20 @@
+# Study configuration (from the Flow 1 test kit, plus runner and UI settings).
 study: DEMO01
-name: Synthetic cardiovascular outcomes study (demo)
-sites: ["104", "211", "305"]
-
-intake:
-  inbox_poll_minutes: 5        # F1-01
-  runner_tick_seconds: 10
-  prior_events:                # F1-07
-    match_on: [pt_code, soc_code]   # same PT, or same SOC
-    window_days: 365
-
-documents:
+sites:
+  - "101"
+  - "102"
+  - "104"
+inbox_poll_minutes: 5        # F1-01
+runner_tick_seconds: 10
+upload_limits:
   max_file_mb: 50
+  max_dicom_study_mb: 500
   max_pdf_pages: 200
-  # Shown to the site on page 2 as "documents requested".
-  requested:
-    - discharge_summary
-    - ecg_report
-    - lab_report
-
+# Shown to the site on page 2 as "documents requested".
+requested_documents:
+  - discharge_summary
+  - ecg_report
+  - lab_results
 ai:
-  phi_detection: false         # AI-1, stretch step D. Off by default.
-  model: "claude-opus-5-5"      # pinned; only used if AI-1 is switched on
+  phi_detection: false       # AI-1, stretch step C. Off by default.
+  model: "claude-opus-5-5"    # pinned; only used if AI-1 is switched on

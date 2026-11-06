@@ -8,7 +8,7 @@ AGENTS.md (imported above) holds the shared rules for all agents: stack, git wor
 
 ## Repository state
 
-The repository holds specs only; no code exists yet. Commands in AGENTS.md are the ones the specs define. Once `pyproject.toml`, `docker-compose.yml` or a test config exists, trust those over the specs and update AGENTS.md to match.
+Check the plan's ticked boxes for progress. `adjud/` is our implementation; `data/flow1-testkit/adjud/` is the kit's *reference* intake code, kept only so the kit is self-contained. Don't import from it or edit it.
 
 ## Which document governs what
 
@@ -18,6 +18,7 @@ The project builds **Flow 1 only**.
 |---|---|
 | [docs/plan-mvp-flow-one.md](docs/plan-mvp-flow-one.md) | What to build next: step order, core vs stretch scope, decisions taken, done criteria. Check which boxes are ticked before starting work |
 | [docs/mvp-flow-1.md](docs/mvp-flow-1.md) | Required behavior; wins over the other specs where they differ |
+| [docs/flow-1-testcases.md](docs/flow-1-testcases.md) + [data/flow1-testkit/](data/flow1-testkit/README.md) | Acceptance tests (TC-RUL, TC-INT, TC-DOC, TC-COR, TC-HAR), the synthetic corpus with ground truth, and the scoring harness. Where the kit encodes a decision the spec left open, the kit wins (plan §4, P-12 to P-20) |
 | [docs/mvp-spec.md](docs/mvp-spec.md) | Shared storage design (§4) only. Its Flow 2–4 content and its own states and build order don't apply |
 | [docs/spec.md](docs/spec.md) | Background and requirement IDs (INT-, DOC-, AI-G…). Don't build its production stack |
 

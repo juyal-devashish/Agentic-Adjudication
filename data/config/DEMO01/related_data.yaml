@@ -1,20 +1,22 @@
-# Which mock-EDC tables and fields are pulled into a new case (F1-06).
-# Demographics deliberately exclude identifiers: no name, DOB, address or MRN.
 version: 1
-tables:
-  demographics:
-    file: demographics.csv
-    key: subject_id
-    fields: [subject_id, site_id, sex, age, race, first_dose_date, arm]
-  medical_history:
-    file: medical_history.csv
-    key: subject_id
-    fields: [subject_id, term, pt_code, start_date, ongoing]
-  conmeds:
-    file: conmeds.csv
-    key: subject_id
-    fields: [subject_id, drug, indication, start_date, end_date]
-  labs:
-    file: labs.csv
-    key: subject_id
-    fields: [subject_id, test, value, unit, collected_date]
+demographics:
+  fields:
+  - sex
+  - age
+  - first_dose_date
+medical_history:
+  all: true
+conmeds:
+  ongoing_at_onset: true
+labs:
+  tests:
+  - TROPONIN_T
+  - CK_MB
+  - LDL
+  - HBA1C
+  window_days: 30
+prior_events:
+  match_on:
+  - pt_code
+  - soc_code
+  window_days: 365

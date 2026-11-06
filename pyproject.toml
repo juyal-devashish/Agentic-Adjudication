@@ -9,9 +9,11 @@ dependencies = [
     "faker>=40.44.0",
     "filelock>=4.2.9",
     "jsonschema>=4.26.0",
+    "openpyxl>=3.1.5",
     "pillow>=13.0.0",
     "presidio-analyzer>=2.2.366",
     "pydantic>=2.14.3",
+    "pydicom>=3.0.2",
     "pymupdf>=2.1",
     "pytesseract>=0.3.13",
     "pyyaml>=6.0.3",
@@ -22,6 +24,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "numpy>=2.4.6",
+    "pypdf>=7.0.0",
     "pytest>=9.2.0",
     "ruff>=0.17.4",
 ]

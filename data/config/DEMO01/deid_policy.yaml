@@ -1,76 +1,42 @@
-# De-identification policy (mvp-flow-1.md §7.4, §7.9).
+# De-identification policy (from the Flow 1 test kit; mvp-flow-1.md §7.4, §7.9).
+# Detector settings are added in step 4.
 version: 1
-
-# dob_only (default, P-01) | shift | redact_all. Only dob_only is implemented in core.
-date_policy: dob_only
-
-# Presidio entities to look for. DATE_TIME findings are filtered by date_policy.
-entities:
-  - PERSON
-  - LOCATION
-  - PHONE_NUMBER
-  - EMAIL_ADDRESS
-  - DATE_TIME
-  - US_SSN
-  - UK_NHS
-  - IBAN_CODE
+date_policy: dob_only        # P-01: clinical dates are kept, dates of birth redacted
+must_redact:
+  - PATIENT_NAME
+  - DOB
   - MRN
-  - POSTAL_CODE
-
-min_score: 0.4
-
-# Custom regex recognisers (added to Presidio).
-custom_patterns:
-  - entity: MRN
-    name: hospital_mrn
-    regex: '\bMRN[-:\s]*\d{6,10}\b'
-    score: 0.9
-  - entity: MRN
-    name: hospital_number
-    regex: '\bH\d{7}\b'
-    score: 0.7
-  - entity: POSTAL_CODE
-    name: uk_postcode
-    regex: '\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b'
-    score: 0.6
-  - entity: POSTAL_CODE
-    name: us_zip
-    regex: '\b\d{5}(?:-\d{4})?\b'
-    score: 0.3
-
-# Label-context rules: a value right after one of these labels is treated as PHI
-# of the given type, even in an unusual format.
+  - INSURANCE_NO
+  - ADDRESS
+  - PHONE
+  - EMAIL
+  - NEXT_OF_KIN
+  - CASE_REFERENCE
+should_redact:               # reported, not gated
+  - STAFF_NAME
+  - STAFF_CONTACT
+  - FACILITY
+allow_list:                  # never redacted; "*" is a wildcard
+  - DEMO01-*
+  - Zelvoran
+  - Wolff-Parkinson-White
+  - Holter
+  - Parkinson
+  - Hodgkin
+  - Addison
+  - NIHSS
+  - TIMI
 context_labels:
-  PERSON: ["Name", "Patient name", "Patient", "Next of kin", "NOK"]
-  DATE_OF_BIRTH: ["DOB", "D.O.B.", "Date of birth", "Born"]
-  MRN: ["MRN", "Hospital number", "Hospital no", "Patient ID"]
-  LOCATION: ["Address", "Home address"]
-  PHONE_NUMBER: ["Phone", "Tel", "Telephone", "Mobile"]
-  EMAIL_ADDRESS: ["Email", "E-mail"]
-
-# Never redacted: needed for adjudication. Matched case-insensitively.
-allow_list:
-  study_id_pattern: '\bDEMO01-\d{3}-\d{4}\b'
-  site_pattern: '\bSite\s+\d{3}\b'
-  terms:
-    # investigational product and common drugs
-    - Cardiozan
-    - aspirin
-    - clopidogrel
-    - atorvastatin
-    - metoprolol
-    - heparin
-    # medical eponyms that look like names
-    - Parkinson
-    - Hodgkin
-    - Wolff-Parkinson-White
-    - Brugada
-    - Killip
-    - Q wave
-    # hospital departments
-    - Cardiology
-    - Emergency Department
-    - Intensive Care Unit
-    - Coronary Care Unit
-    - Troponin
-    - ECG
+  - Name
+  - Patient
+  - DOB
+  - Date of birth
+  - born
+  - MRN
+  - Hospital no
+  - NHS No
+  - Address
+  - Tel
+  - geb.
+  - Pat.-Nr.
+  - Versichertennr.

@@ -90,6 +90,9 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Runner | `uv run python -m adjud.runner` |
 | Tests | `uv run pytest` |
 | Single test | `uv run pytest tests/<file>.py -k "<test name>"` |
+| **Flow 1 test kit against our package** (acceptance) | `uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests` |
+| Kit, fast subset (no OCR, no regeneration) | `uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests -m "not ocr and not slow"` |
+| Single kit test case | `uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests -k "int04"` |
 | Lint / format | `uv run ruff check .` / `uv run ruff format .` |
 | Verify hash chains and file hashes | `uv run python -m tools.verify_log` |
 | Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
@@ -97,10 +100,11 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Measure seeded-PHI removal (real API calls if AI-1 is on; ask first) (step 4) | `uv run python -m tools.deid_check` |
 | Reset the demo (step 7) | `uv run python -m tools.reset_demo` |
 
-Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit.
 
 Notes:
-- Tesseract is a system dependency (`brew install tesseract` locally; in the Docker image already). The spaCy model `en_core_web_lg` is a pinned dependency in `pyproject.toml`, so `uv sync` installs it.
+- **The test kit (`data/flow1-testkit/`) is the acceptance test. Never edit it to make a test pass.** Its conftest would load the kit's own reference `adjud`; always run it with `-p tests.kit_plugin`, which pins our package. If a kit decision should change, record it in the plan's decisions table first.
+- Tesseract is a system dependency with English and German (`brew install tesseract tesseract-lang` locally; in the Docker image already). The spaCy model `en_core_web_lg` is a pinned dependency in `pyproject.toml`, so `uv sync` installs it.
 - `./data` is mounted into the containers. Only `data/config/` is committed; everything else under `data/` is runtime output.
 
 ## Secrets

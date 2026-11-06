@@ -1,24 +1,30 @@
-# Eligibility rules (mvp-flow-1.md §6.1). Evaluated by adjud/rules.py; never by eval().
 rule_set: DEMO01-ELIG
 version: 1
+context: AE record merged with the subject's demographics (first_dose_date)
 all:
-  - id: R1
-    description: Serious adverse event
-    field: serious
-    equals: "Y"
-  - id: R2
-    description: Preferred term is in the adjudicable list
-    field: pt_code
-    in_list: adjudicable_pts
-  - any:
-      - id: R3a
-        description: Onset on or after first dose
-        field: onset_date
-        on_or_after_field: first_dose_date
-      - id: R3b
-        description: Fatal outcome (always adjudicated)
-        field: outcome
-        equals: FATAL
+- id: R1
+  description: Serious adverse event
+  field: serious
+  equals: Y
+- id: R2
+  description: Preferred term is in the adjudicable list
+  field: pt_code
+  in_list: adjudicable_pts
+- id: R3
+  description: Treatment-emergent, or fatal
+  any:
+  - id: R3a
+    description: Onset on or after first dose
+    field: onset_date
+    on_or_after_field: first_dose_date
+  - id: R3b
+    description: Fatal outcome (always adjudicated)
+    field: outcome
+    equals: FATAL
 lists:
-  # Synthetic examples: myocardial infarction, stroke, sudden death.
-  adjudicable_pts: ["10028596", "10042316", "10011906"]
+  adjudicable_pts:
+  - '90000101'
+  - '90000102'
+  - '90000201'
+  - '90000202'
+  - '90000301'

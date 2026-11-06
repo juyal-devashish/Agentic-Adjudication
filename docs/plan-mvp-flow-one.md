@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–1b done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–2 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -137,13 +137,13 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 
 **Done when:** our tests pass and the kit's TC-INT-14 and TC-INT-15 could run against the store (they also need intake, step 3).
 
-### Step 2 — Adopt the test kit
+### Step 2 — Adopt the test kit ✅
 
-- [ ] Commit `data/flow1-testkit/` (un-ignore it; exclude it from ruff)
-- [ ] Replace `data/config/` with the kit's config, keeping our additions: bcrypt hashes for demo users, detector settings (regex recognisers) in `deid_policy.yaml`, requested documents in `study.yaml`
-- [ ] Add the kit's dependencies: `openpyxl`, `pydicom` (runtime), `pypdf`, `numpy` (dev)
-- [ ] `tests/kit_plugin.py` and the kit commands in AGENTS.md
-- [ ] Install Tesseract German (`brew install tesseract-lang` locally; `tesseract-ocr-deu` in the Dockerfile)
+- [x] Commit `data/flow1-testkit/` (un-ignore it; exclude it from ruff)
+- [x] Replace `data/config/` with the kit's config, keeping our additions: bcrypt hashes for demo users, detector settings (regex recognisers) in `deid_policy.yaml`, requested documents in `study.yaml`
+- [x] Add the kit's dependencies: `openpyxl`, `pydicom` (runtime), `pypdf`, `numpy` (dev)
+- [x] `tests/kit_plugin.py` and the kit commands in AGENTS.md
+- [x] Install Tesseract German (`brew install tesseract-lang` locally; `tesseract-ocr-deu` in the Dockerfile)
 
 **Kit cases:** TC-COR-01–12 and TC-HAR-01–09 pass (they test the kit itself, so they pass before our code exists).
 

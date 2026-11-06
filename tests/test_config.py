@@ -1,37 +1,44 @@
-"""Smoke test: committed config files parse and hold the keys later steps rely on."""
+"""Smoke test: committed config parses, matches the test kit where it should, and holds
+the keys later steps rely on."""
 
 from pathlib import Path
 
 import bcrypt
 import yaml
 
-CONFIG = Path(__file__).resolve().parents[1] / "data" / "config"
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG = ROOT / "data" / "config"
+KIT_CONFIG = ROOT / "data" / "flow1-testkit" / "config"
 
 
-def load(rel: str) -> dict:
-    return yaml.safe_load((CONFIG / rel).read_text())
+def load(base: Path, rel: str) -> dict:
+    return yaml.safe_load((base / rel).read_text())
+
+
+def test_rules_and_related_data_are_the_kits():
+    for rel in ("DEMO01/eligibility_rules.yaml", "DEMO01/related_data.yaml"):
+        assert load(CONFIG, rel) == load(KIT_CONFIG, rel), rel
+
+
+def test_users_are_the_kits_with_bcrypt_hashes():
+    ours = load(CONFIG, "users.yaml")["users"]
+    kit = load(KIT_CONFIG, "users.yaml")["users"]
+    assert [{k: u[k] for k in ("id", "role")} for u in ours] == [
+        {k: u[k] for k in ("id", "role")} for u in kit
+    ]
+    for u in ours:
+        assert bcrypt.checkpw(b"demo", u["password_hash"].encode())
 
 
 def test_study_config_has_ai_off_by_default():
-    study = load("DEMO01/study.yaml")
+    study = load(CONFIG, "DEMO01/study.yaml")
     assert study["study"] == "DEMO01"
     assert study["ai"]["phi_detection"] is False
+    assert study["sites"] == load(KIT_CONFIG, "DEMO01/study.yaml")["sites"]
 
 
-def test_eligibility_rules_parse():
-    rules = load("DEMO01/eligibility_rules.yaml")
-    assert rules["rule_set"] == "DEMO01-ELIG"
-    assert rules["version"] == 1
-    assert "adjudicable_pts" in rules["lists"]
-
-
-def test_deid_policy_default_date_policy():
-    assert load("DEMO01/deid_policy.yaml")["date_policy"] == "dob_only"
-
-
-def test_demo_users_have_valid_bcrypt_hashes():
-    users = load("users.yaml")["users"]
-    roles = {u["role"] for u in users}
-    assert roles == {"site", "safety_specialist", "study_admin"}
-    for u in users:
-        assert bcrypt.checkpw(b"demo", u["password_hash"].encode())
+def test_deid_policy_matches_kit_categories():
+    ours, kit = load(CONFIG, "DEMO01/deid_policy.yaml"), load(KIT_CONFIG, "DEMO01/deid_policy.yaml")
+    assert ours["date_policy"] == "dob_only"
+    for key in ("must_redact", "should_redact", "allow_list", "context_labels"):
+        assert ours[key] == kit[key], key
