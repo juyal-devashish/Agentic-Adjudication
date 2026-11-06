@@ -11,7 +11,7 @@ Each file ends as one of:
   blocked    output written, but verification found a residual (or could not check
              image content yet); the site must act before submitting
   rejected   no output (encrypted, corrupt, unsupported, too large)
-  pending    accepted, but its type is processed in a later step (images: step 5)
+  pending    accepted, but no processor exists for its type
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import PurePath
 from typing import Any
 
 from adjud.deid.detect import KnownValues
-from adjud.deid.pdf import learn_pdf, redact_pdf, verify_pdf
+from adjud.deid.pdf import learn_image, learn_pdf, redact_image, redact_pdf, verify_pdf
 from adjud.deid.policy import Policy
 from adjud.deid.sniff import check_upload
 from adjud.deid.xlsx import learn_xlsx, redact_xlsx, verify_xlsx
@@ -87,6 +87,8 @@ def deidentify_case(
             continue
         if c.kind == "pdf":
             learn_pdf(d.content, policy, known)
+        elif c.kind == "image":
+            learn_image(d.content, policy, known)
         elif c.kind == "xlsx":
             learn_xlsx(d.content, policy, known)
 
@@ -97,10 +99,17 @@ def deidentify_case(
                         pages=c.pages)  # fmt: skip
         if c.rejected:
             res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
-        elif c.kind == "pdf":
-            out = redact_pdf(d.content, policy, known, extra_terms=d.extra_terms)
-            ver = verify_pdf(out.output, policy, known, keep=d.keep, seeded=seeded)
+        elif c.kind in ("pdf", "image"):
+            redact = redact_pdf if c.kind == "pdf" else redact_image
+            out = redact(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep)
+            ver = verify_pdf(
+                out.output, policy, known, keep=d.keep, seeded=seeded, extra_terms=d.extra_terms
+            )
             res.output, res.output_name = out.output, output_name(d.name, c.kind)
+            res.pages = out.pages
+            res.warnings += out.notes
+            if out.unverifiable_pages:
+                res.warnings.append(f"OCR unavailable: pages {out.unverifiable_pages} unchecked")
             res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
             res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
             res.verification = ver.summary()
@@ -114,6 +123,6 @@ def deidentify_case(
             res.verification = ver.summary()
             res.status = "verified" if ver.passed else "blocked"
         else:
-            res.message = "Scanned images are processed by OCR (plan step 5)."
+            res.message = f"No processor for {c.kind} files."
         results.append(res)
     return results
