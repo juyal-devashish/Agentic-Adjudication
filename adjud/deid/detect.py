@@ -186,8 +186,11 @@ def _parse_value(
             return None
         name = m.group("name").rstrip(",")
         tokens = name.split(" ")
-        for i, tok in enumerate(tokens):  # a name never runs into the next label
-            if tok.strip(".,:").casefold() in stop_words:
+        cursor = m.start("name")
+        for i, tok in enumerate(tokens):  # a name never runs into the next label:
+            cursor = rest.index(tok, cursor) + len(tok)  # a label word, or any word
+            followed_by_colon = rest[cursor : cursor + 1] == ":"  # with a colon ("DOS:")
+            if tok.strip(".,:").casefold() in stop_words or followed_by_colon:
                 name = " ".join(tokens[:i]).rstrip(",")
                 break
         if not name:

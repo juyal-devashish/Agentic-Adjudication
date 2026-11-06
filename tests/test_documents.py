@@ -143,3 +143,25 @@ def test_no_seeded_identity_in_stored_reports_or_logs(setup):
     blob = re.sub(r"sha256:[0-9a-f]{64}", "", blob)
     for field in ("last", "mrn", "phone", "email", "address", "kin"):
         assert s[field] not in blob, field
+
+
+def test_mislabelled_image_is_ocred_and_rebuilt_as_an_image_only_page(setup):
+    import pymupdf
+
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-104-0006", "AE-007")
+    upload(
+        pipe.store,
+        cid,
+        files("DEMO01-104-0006_AE-007", "entlassungsbrief.pdf", "roentgen_thorax.pdf"),
+        "site104.coord",
+    )
+    summary = proc.process_case(cid)
+    assert summary["files"]["roentgen_thorax.pdf"] == "verified", summary
+    done = documents_of(pipe.store, cid).processed["roentgen_thorax.pdf"]
+    assert any(w.startswith("EXTENSION_MISMATCH") for w in done["warnings"])
+    out = pipe.store.get_file(cid, done["output"]["path"])
+    with pymupdf.open(stream=out, filetype="pdf") as doc:
+        assert doc.page_count == 1
+        assert doc[0].get_text().strip() == ""  # image-only: no hidden text layer
+        assert doc[0].get_images()

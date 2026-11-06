@@ -177,3 +177,8 @@ def test_name_after_a_label_stops_at_the_next_label():
 
 def test_recent_date_after_a_birth_label_is_not_a_date_of_birth():
     assert "08.01.2026" in redacted("geb. 08.01.2026 aufgenommen")
+
+
+def test_a_word_followed_by_a_colon_is_a_label_not_a_name():
+    assert redacted("Patient:\tDOS:\nMRN:") == "Patient:\tDOS:\nMRN:"
+    assert "ROBERTS" not in redacted("Patient:\tROBERTS, Philip\tTel: 01632 960001")

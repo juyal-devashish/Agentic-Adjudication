@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–4 done (kit: 53/53; de-identification gate passed). Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–5 done (kit: 53/53; gate passed; every image variant beats the oracle). Tick boxes as steps are completed and committed |
 
 ---
 
@@ -187,16 +187,32 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 
 **Decision P-21:** a de-identification run with at least one processed file ends in `deid.completed` (rejected files are listed and the site gets a `processing_failed` notice); only when *no* file could be processed does the case go back with `deid.failed`.
 
-### Step 5 — Scans, image-only and mixed PDFs
+### Step 5 — Scans, image-only and mixed PDFs ✅
 
-- [ ] Normalise images to PDF pages; orientation detection (Tesseract OSD) before OCR
-- [ ] Dual extraction on every page (text layer + 300 dpi OCR), boxes mapped to PDF coordinates
-- [ ] Image and scanned pages flattened with black boxes and rebuilt as image-only pages
-- [ ] Verification re-OCRs the output
+- [x] Normalise images to PDF pages; orientation detection (Tesseract OSD) before OCR
+- [x] Dual extraction on every page (text layer + 300 dpi OCR), boxes mapped to PDF coordinates
+- [x] Image and scanned pages flattened with black boxes and rebuilt as image-only pages
+- [x] Verification re-OCRs the output
 
 **Kit cases (measured, not gated):** TC-DOC-04, 07, 08, 09, 10, 13, 16. Target: beat the kit's oracle reference (`metrics/reference_oracle_run.txt`) on every scan, image-banner and rotated variant, without losing must-keep items. The text-PDF gate from step 4 still passes.
 
 **Done when:** the rates are measured and saved, and they beat the oracle on image content.
+
+**Result (OCR on), must-redact removed vs the kit's oracle:**
+
+| Variant | Oracle | Ours |
+|---|---|---|
+| 300 dpi scan (D04) | 0% | 100% |
+| Image-only PDF (D07) | 0% | 100% |
+| Low-quality JPEG (D08) | 40% | 100% |
+| Mixed PDF, image banner (D09) | 0% | 100% |
+| Rotated page (D10) | 0% | 100% |
+| German 150 dpi scan (D13) | 14% | 100% |
+| PNG named .pdf (D16) | 0% | 100% |
+
+Every processed corpus document verifies (0 residuals). Must-keep: 3 items are scored "lost" (two dates in D13, the trial ID in D10); a visual check shows them intact, so this is the harness's own OCR misreading our output (kit README: "Treat small differences on scans as noise"). Corpus run time ≈ 30 s.
+
+Lessons kept in code: OCR at native resolution (upscaling a noisy fax made it worse); several OCR passes with findings combined; OCR-tolerant matching for digit identifiers (a DOB read as `18. 10, 1959` was legible but scored "removed" by the exact-match harness); deskew only on a clear estimate (an X-ray was rotated 5° by mistake); verification ignores OCR "words" inside black boxes.
 
 ### Step 6 — Site review, submission and handoff
 
