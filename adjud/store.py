@@ -230,6 +230,52 @@ class FileCaseStore:
     def intake_log(self) -> ChainedLog:
         return intake_log(self.paths, self.clock)
 
+    # --- intake index (a cache, rebuildable from the evaluation log) --------------------
+
+    @property
+    def index_path(self) -> Path:
+        return self.paths.intake / "index.json"
+
+    def load_index(self) -> dict[str, dict[str, Any]]:
+        """Latest known state per AE key: case_id, last_modified, record hash, eligible."""
+        if not self.index_path.exists():
+            return {}
+        return json.loads(self.index_path.read_bytes())
+
+    def save_index(self, index: dict[str, dict[str, Any]]) -> None:
+        write_atomic(self.index_path, json_bytes(index), overwrite=True)
+
+    def rebuild_index(self) -> dict[str, dict[str, Any]]:
+        """Recreate the index purely from the evaluation log. Stale and unchanged
+        records never move the index, so they are skipped."""
+        index: dict[str, dict[str, Any]] = {}
+        for e in read_log(self.evaluations_path):
+            if e["outcome"] in ("stale", "unchanged"):
+                continue
+            entry = index.get(e["key"], {"case_id": None})
+            entry.update(
+                {
+                    "last_modified": e["last_modified"],
+                    "hash": e["record_hash"],
+                    "eligible": e["eligible"],
+                }
+            )
+            if e.get("case_id") and not entry.get("case_id"):
+                entry["case_id"] = e["case_id"]
+            index[e["key"]] = entry
+        return index
+
+    def find_case_by_key(self, key: str) -> str | None:
+        """Case whose case.created event carries this AE key. Slow path, used only when
+        the index has no entry, so a crash between case creation and the evaluation
+        log never leads to a second case for the same AE."""
+        for case_id in self.list_cases():
+            events = self.events(case_id)
+            if events and events[0]["type"] == "case.created":
+                if events[0]["data"].get("key") == key:
+                    return case_id
+        return None
+
 
 __all__ = [
     "CaseExists",
