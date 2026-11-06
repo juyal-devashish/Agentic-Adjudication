@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import date
 from functools import lru_cache
 from typing import Any
 
@@ -27,7 +28,8 @@ NAME_TOKEN = r"(?:[A-ZÄÖÜ][a-zäöüß'’-]+|[A-ZÄÖÜ]{2,}(?:-[A-ZÄÖÜ]{
 HONORIFIC_WORDS = frozenset({"Mr", "Mrs", "Ms", "Miss", "Mx", "Dr", "Prof", "Herr", "Frau", "Med"})
 HONORIFIC = r"(?:(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Herr|Frau)\.?(?: med\.)? )"
 NAME_RE = re.compile(rf"{HONORIFIC}?(?P<name>{NAME_TOKEN}(?:,? {NAME_TOKEN}){{0,3}})")
-DATE_RE = re.compile(r"\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{4}-\d{2}-\d{2}|\d{8}")
+# Dates as printed, plus OCR variants with stray spaces or a comma ("18. 10, 1959").
+DATE_RE = re.compile(r"\d{1,2} ?[./,] ?\d{1,2} ?[./,] ?\d{2,4}|\d{4}-\d{2}-\d{2}|\d{8}")
 ID_RE = re.compile(r"[A-Z0-9][A-Z0-9/-]{2,}(?: \d{3,4}){0,2}")
 PHONE_RE = re.compile(r"\+?\d[\d ()/-]{5,}\d")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
@@ -123,12 +125,40 @@ class KnownValues:
             for value, cat in self.values.items()
             for s, e in find_all(text, value)
         ]
+        for value, cat in self.values.items():
+            if (fuzzy := _ocr_tolerant(value)) is not None:
+                for m in fuzzy.finditer(text):
+                    out.append(
+                        Finding(m.start(), m.end(), cat, "known", m.group(), source=unit.source)
+                    )
         for tok, cat in self.name_tokens.items():
             # Title or UPPER case only, so a surname like "Ward" does not hit "ward".
             pat = rf"(?<![\w])(?:[A-Z]\. ?)?(?:{re.escape(tok)}|{re.escape(tok.upper())})(?![\w])"
             for m in re.finditer(pat, text):
                 out.append(Finding(m.start(), m.end(), cat, "known", m.group(), source=unit.source))
         return out
+
+
+_OCR_DIGIT = {"0": "0Oo", "1": "1lI|", "2": "2Z", "5": "5S", "6": "6b", "8": "8B", "9": "9g"}
+_OCR_SEP = r"[\s.,/\\|:'-]{0,3}"
+
+
+@lru_cache(maxsize=1024)
+def _ocr_tolerant(value: str) -> re.Pattern[str] | None:
+    """For digit-heavy identifiers (DOB, MRN, phone, insurance no.): a pattern that also
+    matches common OCR damage: spaces inside digit groups, a separator read as a
+    different mark or dropped, and look-alike characters (0/O, 1/l, 5/S, 8/B)."""
+    digits = re.findall(r"\d+", value)
+    if sum(map(len, digits)) < 6 or len(re.sub(r"[\d\s./,:-]", "", value)) > 3:
+        return None
+    groups = []
+    for g in digits:
+        groups.append(" ?".join(f"[{re.escape(_OCR_DIGIT.get(d, d))}]" for d in g))
+    prefix = re.escape(value[: value.index(digits[0])].strip()) if value[0].isalpha() else ""
+    body = _OCR_SEP.join(groups)
+    if prefix:  # a letter prefix is often lost by OCR ("J769144633" -> "769144633")
+        body = rf"(?:{prefix}\s?-?\s?)?" + body
+    return re.compile(rf"(?<![\w]){body}(?![\w])")
 
 
 # --- detectors ------------------------------------------------------------------------------
@@ -146,13 +176,22 @@ def _label_regex(labels: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile(rf"(?<![\w.-])(?:{'|'.join(alts)})", re.IGNORECASE)
 
 
-def _parse_value(kind: str, text: str, pos: int) -> tuple[int, int] | None:
+def _parse_value(
+    kind: str, text: str, pos: int, stop_words: frozenset[str] = frozenset()
+) -> tuple[int, int] | None:
     rest = text[pos:]
     if kind in ("name", "staff"):
         m = NAME_RE.match(rest)
         if not m:
             return None
         name = m.group("name").rstrip(",")
+        tokens = name.split(" ")
+        for i, tok in enumerate(tokens):  # a name never runs into the next label
+            if tok.strip(".,:").casefold() in stop_words:
+                name = " ".join(tokens[:i]).rstrip(",")
+                break
+        if not name:
+            return None
         if all(t.strip(".,") in NAME_STOPWORDS for t in name.split()):
             return None
         start = pos + (m.start() if kind == "staff" else m.start("name"))
@@ -170,17 +209,29 @@ def _parse_value(kind: str, text: str, pos: int) -> tuple[int, int] | None:
     return pos + m.start(), pos + m.start() + len(value)
 
 
+def _plausible_dob(value: str, min_age_years: int) -> bool:
+    years = re.findall(r"\d{4}", value.replace(" ", ""))
+    if not years:
+        return True  # 2-digit years: cannot tell, keep it as a DOB
+    return int(years[-1]) <= date.today().year - min_age_years
+
+
 def detect_labels(unit: TextUnit, policy: Policy) -> list[Finding]:
     out = []
+    stop_words = policy.label_words()
     for category, labels in policy.labels.items():
         kind = PARSER_BY_CATEGORY.get(category)
         if kind is None:
             continue
         for m in _label_regex(tuple(labels)).finditer(unit.text):
-            span = _parse_value(kind, unit.text, m.end())
-            if span:
-                s, e = span
-                out.append(Finding(s, e, category, "label", unit.text[s:e], source=unit.source))
+            span = _parse_value(kind, unit.text, m.end(), stop_words)
+            if not span:
+                continue
+            s, e = span
+            value = unit.text[s:e]
+            if category == "DOB" and not _plausible_dob(value, policy.dob_min_age_years):
+                continue
+            out.append(Finding(s, e, category, "label", value, source=unit.source))
     return out
 
 
@@ -194,7 +245,9 @@ def detect_patterns(unit: TextUnit, policy: Policy) -> list[Finding]:
 
 def detect_address_segments(unit: TextUnit, policy: Policy) -> list[Finding]:
     out = []
-    for m in re.finditer(r"[^\t\n·|]+", unit.text):
+    # Segments end at a column gap, a line end, "·", "|" or a spaced dash (OCR often
+    # reads "·" as "-").
+    for m in re.finditer(r"(?:[^\t\n·| ]|[ ](?![-–—][ ]))+", unit.text):
         seg = m.group()
         if len(seg.split()) <= policy.address_max_words and policy.postcode.search(seg):
             lead = len(seg) - len(seg.lstrip())

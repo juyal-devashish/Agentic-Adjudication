@@ -49,6 +49,7 @@ class Policy:
     ner_entities: list[str]
     ner_min_score: float
     ner_languages: list[str]
+    dob_min_age_years: int = 1
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -80,12 +81,19 @@ class Policy:
             ner_entities=list(ner.get("entities", [])),
             ner_min_score=float(ner.get("min_score", 0.5)),
             ner_languages=list(ner.get("languages", ["en"])),
+            dob_min_age_years=int(d.get("dob_min_age_years", 1)),
             raw=d,
         )
 
     @classmethod
     def for_study(cls, config_dir: Path, study: str) -> Policy:
         return cls.load(Path(config_dir) / study / "deid_policy.yaml")
+
+    def label_words(self) -> frozenset[str]:
+        """First word of every label, case-folded: a name value stops at one of these."""
+        return frozenset(
+            lab.split()[0].strip(":.").casefold() for v in self.labels.values() for lab in v
+        )
 
     def requirement(self, category: str) -> str:
         if category in self.must_redact:

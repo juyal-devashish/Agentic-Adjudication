@@ -111,7 +111,8 @@ def learn_pdf(content: bytes, policy: Policy, known: KnownValues) -> None:
         for page, unit in zip(doc, page_units(doc), strict=True):
             learn(unit, policy, known)
             if needs_ocr(page) and ocr.available():
-                learn(ocr_pdf_page(content, page).unit, policy, known)
+                for u in ocr_pdf_page(content, page).units:
+                    learn(u, policy, known)
         for unit in metadata_units(doc):
             learn(unit, policy, known)
 
@@ -120,7 +121,8 @@ def learn_image(content: bytes, policy: Policy, known: KnownValues) -> None:
     if not ocr.available():
         return
     for n, (frame, dpi) in enumerate(image_frames(content)):
-        learn(ocr_image_frame(content, n, frame, dpi).unit, policy, known)
+        for u in ocr_image_frame(content, n, frame, dpi).units:
+            learn(u, policy, known)
 
 
 # --- pass 2: redact --------------------------------------------------------------------------
@@ -185,9 +187,11 @@ def redact_pdf(
             outcome.findings += text_findings
             if needs_ocr(page) and ocr.available():
                 op = ocr_pdf_page(content, page)
-                img_findings = _findings(op.unit, policy, known, extra, keep_set)
-                outcome.findings += img_findings
-                rects = [r for s, e in merge_spans(img_findings) for r in op.unit.rects_for(s, e)]
+                rects = []
+                for u in op.units:
+                    img_findings = _findings(u, policy, known, extra, keep_set)
+                    outcome.findings += img_findings
+                    rects += [r for s, e in merge_spans(img_findings) for r in u.rects_for(s, e)]
                 scale = op.dpi / 72  # text-layer boxes -> pixels (geometry kept, see above)
                 rects += [
                     (x0 * scale, y0 * scale, x1 * scale, y1 * scale)
@@ -234,11 +238,13 @@ def redact_image(
                 _image_page(out, frame, float(dpi or RENDER_DPI))
                 continue
             op = ocr_image_frame(content, n, frame, dpi)
-            findings = _findings(op.unit, policy, known, extra, keep_set)
-            for f in findings:
-                f.source = f"page:{n + 1}"
-            outcome.findings += findings
-            rects = [r for s, e in merge_spans(findings) for r in op.unit.rects_for(s, e)]
+            rects = []
+            for u in op.units:
+                findings = _findings(u, policy, known, extra, keep_set)
+                for f in findings:
+                    f.source = f"page:{n + 1}"
+                outcome.findings += findings
+                rects += [r for s, e in merge_spans(findings) for r in u.rects_for(s, e)]
             _image_page(out, ocr.black_out(op.image, rects), op.dpi)
             outcome.ocr_pages.append(n + 1)
             outcome.notes += [f"page {n + 1}: {note}" for note in op.notes]
@@ -293,7 +299,7 @@ def verify_pdf(
             units = [unit]
             if needs_ocr(page):
                 if ocr.available():
-                    units.append(ocr.ocr_unit(_render(page), source=unit.source))
+                    units += ocr.ocr_units(_render(page), RENDER_DPI, source=unit.source)
                 else:
                     result.unverified_pages.append(page.number + 1)
             for u in units:

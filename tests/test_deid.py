@@ -153,3 +153,27 @@ def test_lab_reference_column_is_not_treated_as_an_identifier():
     learn_xlsx(buf.getvalue(), POLICY, known)
     out = load_workbook(io.BytesIO(redact_xlsx(buf.getvalue(), POLICY, known).output)).active
     assert [c.value for c in out[2]] == [REDACTED, "TROPONIN_T", 1240, "< 14"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Wexmoor Road, Halbridge HB4 7QT · Department of Cardiology\nnext line",
+        "Wexmoor Road, Halbridge HB4 7QT - Cardiac Catheter Laboratory",  # OCR read "·" as "-"
+        "Wexmoor Road, Halbridge HB4 7QT\tDepartment of Cardiology",
+    ],
+)
+def test_letterhead_address_segment_stops_at_separators_and_line_ends(text):
+    from adjud.deid.detect import detect_address_segments
+
+    found = [f.text for f in detect_address_segments(TextUnit.from_string(text), POLICY)]
+    assert found == ["Wexmoor Road, Halbridge HB4 7QT"]
+
+
+def test_name_after_a_label_stops_at_the_next_label():
+    out = redacted("Name: DOB: 12/05/1957")
+    assert "DOB" in out and "12/05/1957" not in out
+
+
+def test_recent_date_after_a_birth_label_is_not_a_date_of_birth():
+    assert "08.01.2026" in redacted("geb. 08.01.2026 aufgenommen")

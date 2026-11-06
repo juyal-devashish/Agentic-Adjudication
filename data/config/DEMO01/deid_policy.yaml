@@ -93,3 +93,8 @@ ner:
   entities: [PERSON, LOCATION]
   min_score: 0.5
   languages: [en]
+
+# A date after a date-of-birth label is only taken as a DOB if the person would be at least
+# this old. Stops a clinical date that OCR places next to "geb." in a redacted output from
+# being reported as a date of birth (adult study).
+dob_min_age_years: 1
