@@ -1,0 +1,21 @@
+services:
+  ui:
+    build: .
+    command: streamlit run ui/app.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+
+  runner:
+    build: .
+    command: python -m adjud.runner
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
