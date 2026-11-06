@@ -1,0 +1,119 @@
+"""De-identify all documents of one case (mvp-flow-1.md §7.2).
+
+Two passes over the case's files:
+  1. learn: every labelled or pattern-matched identifier in any file is remembered
+     (KnownValues), so a name found in one document's banner is also removed from
+     another document's footer, body text or image banner;
+  2. per file: validate -> redact -> scrub -> verify from scratch.
+
+Each file ends as one of:
+  verified   output written, verification found nothing
+  blocked    output written, but verification found a residual (or could not check
+             image content yet); the site must act before submitting
+  rejected   no output (encrypted, corrupt, unsupported, too large)
+  pending    accepted, but its type is processed in a later step (images: step 5)
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import PurePath
+from typing import Any
+
+from adjud.deid.detect import KnownValues
+from adjud.deid.pdf import learn_pdf, redact_pdf, verify_pdf
+from adjud.deid.policy import Policy
+from adjud.deid.sniff import check_upload
+from adjud.deid.xlsx import learn_xlsx, redact_xlsx, verify_xlsx
+
+
+@dataclass
+class DocInput:
+    name: str
+    content: bytes
+    extra_terms: list[str] = field(default_factory=list)  # site-added terms (F1-22)
+    keep: list[str] = field(default_factory=list)  # texts the site un-redacted (F1-21)
+
+
+@dataclass
+class DocResult:
+    name: str
+    kind: str
+    status: str  # verified | blocked | rejected | pending
+    output_name: str | None = None
+    output: bytes | None = None
+    reject_code: str | None = None
+    message: str | None = None
+    warnings: list[str] = field(default_factory=list)
+    findings: list[dict[str, Any]] = field(default_factory=list)
+    residuals: list[dict[str, Any]] = field(default_factory=list)
+    verification: dict[str, Any] = field(default_factory=dict)
+    pages: int | None = None
+
+    def report(self) -> dict[str, Any]:
+        """The JSON report written next to the redacted file (no identifiers in it)."""
+        return {
+            "name": self.name,
+            "kind": self.kind,
+            "status": self.status,
+            "output_name": self.output_name,
+            "reject_code": self.reject_code,
+            "message": self.message,
+            "warnings": self.warnings,
+            "pages": self.pages,
+            "findings": self.findings,
+            "residuals": self.residuals,
+            "verification": self.verification,
+        }
+
+
+def output_name(name: str, kind: str) -> str:
+    """Images come back as PDFs; everything else keeps its name."""
+    p = PurePath(name)
+    return f"{p.stem}.pdf" if kind in ("image", "pdf") else p.name
+
+
+def deidentify_case(
+    docs: list[DocInput], policy: Policy, *, known: KnownValues | None = None,
+    seeded: list[str] | None = None, max_file_mb: int = 50, max_pdf_pages: int = 200,
+) -> list[DocResult]:  # fmt: skip
+    known = known or KnownValues()
+    checks = {d.name: check_upload(d.name, d.content, max_file_mb=max_file_mb,
+                                   max_pdf_pages=max_pdf_pages) for d in docs}  # fmt: skip
+
+    for d in docs:  # pass 1: learn from every accepted file
+        c = checks[d.name]
+        if c.rejected:
+            continue
+        if c.kind == "pdf":
+            learn_pdf(d.content, policy, known)
+        elif c.kind == "xlsx":
+            learn_xlsx(d.content, policy, known)
+
+    results = []
+    for d in docs:  # pass 2: redact and verify
+        c = checks[d.name]
+        res = DocResult(name=d.name, kind=c.kind, status="pending", warnings=list(c.warnings),
+                        pages=c.pages)  # fmt: skip
+        if c.rejected:
+            res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
+        elif c.kind == "pdf":
+            out = redact_pdf(d.content, policy, known, extra_terms=d.extra_terms)
+            ver = verify_pdf(out.output, policy, known, keep=d.keep, seeded=seeded)
+            res.output, res.output_name = out.output, output_name(d.name, c.kind)
+            res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
+            res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
+            res.verification = ver.summary()
+            res.status = "verified" if ver.passed else "blocked"
+        elif c.kind == "xlsx":
+            out = redact_xlsx(d.content, policy, known)
+            ver = verify_xlsx(out.output, policy, known)
+            res.output, res.output_name = out.output, output_name(d.name, c.kind)
+            res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
+            res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
+            res.verification = ver.summary()
+            res.status = "verified" if ver.passed else "blocked"
+        else:
+            res.message = "Scanned images are processed by OCR (plan step 5)."
+        results.append(res)
+    return results
