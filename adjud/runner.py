@@ -40,6 +40,7 @@ class Runner:
             self.paths.root, self.paths.config, self.paths.edc_mock, self.study, self.clock
         )
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
+        self.last_inbox: float | None = None
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -88,14 +89,18 @@ class Runner:
         self.import_inbox()
         self.run_case_steps()
 
+    def tick(self, now: float) -> None:
+        """One loop iteration at monotonic time `now`. The inbox is checked on the very
+        first tick and then every `inbox_poll_minutes`."""
+        if self.last_inbox is None or now - self.last_inbox >= self.inbox_poll_seconds:
+            self.import_inbox()
+            self.last_inbox = now
+        self.run_case_steps()
+
     def run_forever(self) -> None:
-        last_inbox = 0.0
         while True:
             try:
-                if time.monotonic() - last_inbox >= self.inbox_poll_seconds:
-                    self.import_inbox()
-                    last_inbox = time.monotonic()
-                self.run_case_steps()
+                self.tick(time.monotonic())
             except Exception:  # keep the loop alive; the failed step is retried next tick
                 log.exception("runner step failed")
             time.sleep(self.tick_seconds)

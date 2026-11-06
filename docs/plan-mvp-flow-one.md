@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–6 done (kit: 53/53; gate passed; every image variant beats the oracle; TC-DOC-M1–M4 automated). Tick boxes as steps are completed and committed |
+| **Status** | Core steps 0–7 done; live rehearsal by the presenter outstanding. Kit 53/53, gate passed, every image variant beats the oracle. Stretch steps A–D not started. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -233,13 +233,16 @@ Lessons kept in code: OCR at native resolution (upscaling a noisy fax made it wo
 
 ### Step 7 — Demo hardening and rehearsal
 
-- [ ] `tools/reset_demo.py`: fresh `data/` from the kit (config, EDC, first inbox file, documents ready to upload)
-- [ ] `docker compose up` runs the full demo on a clean machine
-- [ ] Short `README.md`: what this is, synthetic-data warning, how to run, demo script
-- [ ] Demo script (§7) rehearsed end to end at least twice from a reset
-- [ ] Final metrics run saved for page 3
+- [x] `tools/reset_demo.py`: fresh `data/` from the kit (config, EDC, first inbox file, documents ready to upload in `data/demo_uploads/`); corpus metrics are kept
+- [x] `docker compose up` runs the full demo from a reset (verified: UI healthy in 2 s, runner imports on its first tick, Tesseract eng+deu, gate passes inside the container)
+- [x] Short `README.md`: what this is, synthetic-data warning, how to run, demo script
+- [x] Demo script (§7) rehearsed automatically from a reset (`tests/test_demo_script.py`, runs with every test run)
+- [ ] Demo script rehearsed **live in the UI by the presenter**, twice, through `docker compose up`
+- [x] Final metrics run saved for page 3 (`data/metrics/latest.json`, kept across resets)
 
 **Done when:** the core demo runs from reset to the last scenario without touching code, in about 20 minutes, and the whole kit is green.
+
+**Found while hardening:** the runner waited for the first inbox poll until the machine's monotonic clock passed 5 minutes, so on a fresh Docker VM the preloaded file was not imported at start. Fixed (`Runner.tick`, regression test).
 
 ### Stretch steps (A–D)
 
@@ -267,12 +270,12 @@ Kit documents are named by case key; see the kit README table.
 
 ## 8. Success check before the demo
 
-- [ ] Whole kit green: TC-RUL, TC-INT, TC-COR, TC-HAR (`-p tests.kit_plugin`)
-- [ ] `deid_check --gate` passes (text PDFs 100%, no metadata/properties identifiers, rejected documents have no output)
-- [ ] Scan, image-banner and rotated-page rates measured and beating the oracle reference
-- [ ] No file can be submitted while verification finds a residual
-- [ ] Every hash in the handoff manifest matches its file
-- [ ] The core demo script runs from reset
+- [x] Whole kit green: TC-RUL, TC-INT, TC-COR, TC-HAR (`-p tests.kit_plugin`)
+- [x] `deid_check --gate` passes (text PDFs 100%, no metadata/properties identifiers, rejected documents have no output)
+- [x] Scan, image-banner and rotated-page rates measured and beating the oracle reference
+- [x] No file can be submitted while verification finds a residual
+- [x] Every hash in the handoff manifest matches its file
+- [x] The core demo script runs from reset (automated rehearsal); live rehearsal still to do
 
 ## 9. Risks
 

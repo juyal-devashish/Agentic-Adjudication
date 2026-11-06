@@ -85,6 +85,7 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Task | Command |
 |---|---|
 | Install (incl. spaCy model from `uv.lock`) | `uv sync` |
+| Reset demo data in Docker | `docker compose run --rm runner python -m tools.reset_demo --preload` |
 | Run everything in Docker (UI on :8501, runner) | `docker compose up --build` |
 | UI | `uv run streamlit run ui/app.py` |
 | Runner (loop / one pass) | `uv run python -m adjud.runner` / `uv run python -m adjud.runner --once` |
@@ -96,7 +97,8 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Lint / format | `uv run ruff check .` / `uv run ruff format .` |
 | Verify hash chains and file hashes | `uv run python -m tools.verify_log` |
 | Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
-| Measure seeded-PHI removal (real API calls if AI-1 is on; ask first) (step 4) | `uv run python -m tools.deid_check` |
+| Measure de-identification on the kit corpus with the kit's harness and gate (~30 s; real API calls if AI-1 is on: ask first) | `uv run python -m tools.deid_check` |
+| Run only our pipeline over the kit corpus (outputs + per-file reports) | `uv run python -m tools.run_corpus` |
 | Reset the demo (wipes runtime data, loads kit EDC; `--preload` puts `01_initial.csv` in the inbox) | `uv run python -m tools.reset_demo` |
 
 Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit.

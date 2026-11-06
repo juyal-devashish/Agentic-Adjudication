@@ -83,3 +83,25 @@ def test_case_created_event_records_actor_source_and_snapshot_hash(pipe):
     assert first["data"]["source"] == "FILE"
     assert first["data"]["snapshot"]["path"] == "source/ae_snapshot_v1.json"
     assert pipe.case_state(created["case_id"])["state"] == "AWAITING_DOCUMENTS"
+
+
+def test_runner_checks_the_inbox_on_its_first_tick_then_on_its_interval(tmp_path):
+    """Regression: with a fresh machine (monotonic clock < poll interval) the first
+    import used to wait until the clock passed the interval."""
+    from adjud.paths import DataPaths
+    from adjud.runner import Runner
+
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(KIT.parent / "config")
+    (data / "edc_mock").symlink_to(KIT / "edc_mock")
+    runner = Runner(DataPaths(data))
+    (data / "inbox").mkdir()
+    shutil.copy(SCEN / "01_initial.csv", data / "inbox")
+    runner.tick(now=5.0)  # 5 s after boot
+    assert len(runner.pipeline.store.list_cases()) == 11
+    shutil.copy(SCEN / "03_updates.csv", data / "inbox")
+    runner.tick(now=60.0)  # before the 5-minute interval: not imported yet
+    assert (data / "inbox" / "03_updates.csv").exists()
+    runner.tick(now=5.0 + 300)
+    assert not (data / "inbox" / "03_updates.csv").exists()

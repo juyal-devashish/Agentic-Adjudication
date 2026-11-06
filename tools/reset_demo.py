@@ -4,8 +4,8 @@
     uv run python -m tools.reset_demo --preload    # also put 01_initial.csv in the inbox
 
 Only these runtime folders under the data dir are removed: cases, intake, inbox,
-processed, outbox, metrics, logs, edc_mock, demo_uploads. data/config/ and
-data/flow1-testkit/ are never touched.
+processed, outbox, logs, edc_mock, demo_uploads. data/config/, data/flow1-testkit/ and
+data/metrics/ (corpus measurements shown on page 3, not case data) are kept.
 
 data/demo_uploads/ gets copies of the kit's import files (inbox_files/) and source
 documents (one folder per case key), ready to drag into the UI during the demo.
@@ -25,7 +25,6 @@ RUNTIME = (
     "inbox",
     "processed",
     "outbox",
-    "metrics",
     "logs",
     "edc_mock",
     "demo_uploads",

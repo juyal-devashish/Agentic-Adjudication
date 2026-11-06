@@ -101,3 +101,13 @@ def test_site_flow_upload_process_review_and_sign(demo):
     runner.run_case_steps()  # writes the handoff
     at = run("pages/results.py", role="safety_specialist", case_id=cid)
     assert any("Signed by Site 101 Coordinator" in s.value for s in at.success)
+
+
+def test_reset_keeps_corpus_metrics_and_stages_demo_files(demo):
+    (demo.metrics).mkdir(exist_ok=True)
+    (demo.metrics / "latest.json").write_text("{}")
+    reset(demo)
+    assert (demo.metrics / "latest.json").exists()
+    assert (demo.root / "demo_uploads" / "inbox_files" / "01_initial.csv").exists()
+    assert (demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001").is_dir()
+    assert not any(demo.inbox.iterdir())
