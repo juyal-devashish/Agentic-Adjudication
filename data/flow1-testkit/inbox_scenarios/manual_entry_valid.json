@@ -1,0 +1,23 @@
+{
+  "record": {
+    "study_id": "DEMO01",
+    "site_id": "104",
+    "subject_id": "DEMO01-104-0012",
+    "ae_id": "AE-M01",
+    "ae_term": "Ischaemic stroke",
+    "llt_code": "90000201",
+    "pt_code": "90000201",
+    "soc_code": "90010002",
+    "meddra_version": "SYN-1.0",
+    "onset_date": "2026-08-20",
+    "end_date": "",
+    "serious": "Y",
+    "seriousness_criteria": "HOSPITALISATION",
+    "outcome": "RECOVERING",
+    "severity": "SEVERE",
+    "relatedness_investigator": "NOT_RELATED",
+    "last_modified": "2026-08-21T09:00:00Z"
+  },
+  "reason": "Reported by the site by phone; EDC entry pending",
+  "actor": "ss.anna"
+}

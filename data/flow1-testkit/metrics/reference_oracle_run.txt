@@ -1,0 +1,53 @@
+OCR: on
+group                                                         rate  counts
+all|must_keep                                                  96%  preserved=48, not_measurable=1, lost=2
+all|must_redact                                                66%  removed=58, residual=30, not_measurable=4
+all|should_redact                                              74%  removed=31, residual=11, not_measurable=5
+category=ADDRESS|must_redact                                  100%  removed=6, not_measurable=3
+category=CASE_REFERENCE|must_redact                            67%  removed=2, residual=1
+category=CLINICAL_DATE|must_keep                               91%  preserved=20, lost=2
+category=CLINICAL_TERM|must_keep                              100%  preserved=4
+category=DOB|must_redact                                       56%  removed=9, residual=7
+category=DRUG|must_keep                                       100%  preserved=6
+category=EMAIL|must_redact                                    100%  removed=2
+category=EPONYM|must_keep                                     100%  preserved=5
+category=FACILITY|should_redact                                77%  removed=20, residual=6, not_measurable=5
+category=INSURANCE_NO|must_redact                             100%  removed=3
+category=LAB_VALUE|must_keep                                  100%  preserved=3
+category=MRN|must_redact                                       56%  removed=10, residual=8
+category=NEXT_OF_KIN|must_redact                              100%  removed=2
+category=PATIENT_NAME|must_redact                              61%  removed=17, residual=11, not_measurable=1
+category=PHONE|must_redact                                     70%  removed=7, residual=3
+category=STAFF_NAME|should_redact                              69%  removed=11, residual=5
+category=SUBJECT_ID|must_keep                                 100%  preserved=10, not_measurable=1
+variant=dicom|must_keep                                       100%  preserved=2
+variant=dicom|must_redact                                      75%  removed=6, not_measurable=1, residual=2
+variant=dicom|should_redact                                   100%  removed=2
+variant=image_pdf_200dpi|must_keep                            100%  preserved=2
+variant=image_pdf_200dpi|must_redact                            0%  residual=4, not_measurable=1
+variant=image_pdf_200dpi|should_redact                          0%  residual=2, not_measurable=1
+variant=image_pdf_rotated_90|must_keep                        100%  preserved=2
+variant=image_pdf_rotated_90|must_redact                        0%  residual=3
+variant=image_pdf_rotated_90|should_redact                      0%  residual=3
+variant=mixed_pdf_image_header|must_keep                      100%  preserved=2
+variant=mixed_pdf_image_header|must_redact                      0%  residual=4
+variant=mixed_pdf_image_header|should_redact                   50%  residual=1, removed=1
+variant=scan_jpg_150dpi_lowq|must_keep                        100%  preserved=1
+variant=scan_jpg_150dpi_lowq|must_redact                       40%  residual=3, removed=2
+variant=scan_jpg_150dpi_lowq|should_redact                     50%  removed=1, not_measurable=1, residual=1
+variant=scan_png_150dpi|must_keep                              60%  preserved=3, lost=2
+variant=scan_png_150dpi|must_redact                            14%  residual=6, removed=1, not_measurable=1
+variant=scan_png_150dpi|should_redact                           0%  not_measurable=2, residual=1
+variant=scan_png_300dpi|must_keep                             100%  not_measurable=1, preserved=4
+variant=scan_png_300dpi|must_redact                             0%  residual=5, not_measurable=1
+variant=scan_png_300dpi|should_redact                           0%  residual=3
+variant=text_pdf|must_keep                                    100%  preserved=28
+variant=text_pdf|must_redact                                  100%  removed=41
+variant=text_pdf|should_redact                                100%  removed=26
+variant=wrong_extension_png|must_keep                         100%  preserved=1
+variant=wrong_extension_png|must_redact                         0%  residual=3
+variant=wrong_extension_png|should_redact                        -  not_measurable=1
+variant=xlsx|must_keep                                        100%  preserved=3
+variant=xlsx|must_redact                                      100%  removed=8
+variant=xlsx|should_redact                                    100%  removed=1
+GATE: PASSED {'text_pdf_must_redact_all_removed': True, 'no_identifiers_in_metadata': True, 'rejected_documents_have_no_output': True}

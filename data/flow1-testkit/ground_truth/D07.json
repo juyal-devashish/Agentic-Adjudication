@@ -1,0 +1,122 @@
+{
+  "doc_id": "D07",
+  "case_key": "DEMO01-102-0003_AE-003",
+  "subject_id": "DEMO01-102-0003",
+  "file": "documents/DEMO01-102-0003_AE-003/autopsy_request_scan.pdf",
+  "variant": "image_pdf_200dpi",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "autopsy_request_scan.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I003",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I005",
+      "value": "231 Robert Station, Lake Reecehaven S4 0FT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I006",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I007",
+      "value": "2026/00417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I008",
+      "value": "19/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I009",
+      "value": "DEMO01-102-0003",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I010",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

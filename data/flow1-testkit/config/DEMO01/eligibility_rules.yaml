@@ -1,0 +1,30 @@
+rule_set: DEMO01-ELIG
+version: 1
+context: AE record merged with the subject's demographics (first_dose_date)
+all:
+- id: R1
+  description: Serious adverse event
+  field: serious
+  equals: Y
+- id: R2
+  description: Preferred term is in the adjudicable list
+  field: pt_code
+  in_list: adjudicable_pts
+- id: R3
+  description: Treatment-emergent, or fatal
+  any:
+  - id: R3a
+    description: Onset on or after first dose
+    field: onset_date
+    on_or_after_field: first_dose_date
+  - id: R3b
+    description: Fatal outcome (always adjudicated)
+    field: outcome
+    equals: FATAL
+lists:
+  adjudicable_pts:
+  - '90000101'
+  - '90000102'
+  - '90000201'
+  - '90000202'
+  - '90000301'

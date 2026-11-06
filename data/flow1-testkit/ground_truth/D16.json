@@ -1,0 +1,67 @@
+{
+  "doc_id": "D16",
+  "case_key": "DEMO01-104-0006_AE-007",
+  "subject_id": "DEMO01-104-0006",
+  "file": "documents/DEMO01-104-0006_AE-007/roentgen_thorax.pdf",
+  "variant": "wrong_extension_png",
+  "language": "de",
+  "expected_handling": "process",
+  "expected_output": "roentgen_thorax.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "STIFFEL, Carlo",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I002",
+      "value": "18.10.1959",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I003",
+      "value": "8859641",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "Klinikum Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I005",
+      "value": "08.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

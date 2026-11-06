@@ -1,0 +1,10 @@
+pt_code,pt_term,soc_code,soc_term,adjudicable_in_demo
+90000101,Myocardial infarction,90010001,Cardiac disorders (synthetic),Y
+90000102,Unstable angina,90010001,Cardiac disorders (synthetic),Y
+90000201,Ischaemic stroke,90010002,Nervous system disorders (synthetic),Y
+90000202,Transient ischaemic attack,90010002,Nervous system disorders (synthetic),Y
+90000301,Sudden cardiac death,90010001,Cardiac disorders (synthetic),Y
+90000401,Headache,90010002,Nervous system disorders (synthetic),N
+90000402,Nausea,90010003,Gastrointestinal disorders (synthetic),N
+90000403,Pneumonia,90010004,Infections (synthetic),N
+90000404,Atrial fibrillation,90010001,Cardiac disorders (synthetic),N

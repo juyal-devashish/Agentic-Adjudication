@@ -1,0 +1,304 @@
+{
+  "generated_with_seed": 20261105,
+  "ocr_baseline": true,
+  "documents": [
+    {
+      "doc_id": "D01",
+      "case_key": "DEMO01-101-0001_AE-001",
+      "subject_id": "DEMO01-101-0001",
+      "file": "documents/DEMO01-101-0001_AE-001/discharge_summary.pdf",
+      "variant": "text_pdf",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "discharge_summary.pdf",
+      "ground_truth": "ground_truth/D01.json",
+      "counts": {
+        "must_redact": 13,
+        "should_redact": 5,
+        "must_keep": 9
+      }
+    },
+    {
+      "doc_id": "D02",
+      "case_key": "DEMO01-101-0001_AE-001",
+      "subject_id": "DEMO01-101-0001",
+      "file": "documents/DEMO01-101-0001_AE-001/ecg_report.pdf",
+      "variant": "text_pdf",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "ecg_report.pdf",
+      "ground_truth": "ground_truth/D02.json",
+      "counts": {
+        "must_redact": 3,
+        "should_redact": 3,
+        "must_keep": 2
+      }
+    },
+    {
+      "doc_id": "D03",
+      "case_key": "DEMO01-101-0001_AE-001",
+      "subject_id": "DEMO01-101-0001",
+      "file": "documents/DEMO01-101-0001_AE-001/troponin_results.xlsx",
+      "variant": "xlsx",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "troponin_results.xlsx",
+      "ground_truth": "ground_truth/D03.json",
+      "counts": {
+        "must_redact": 8,
+        "should_redact": 1,
+        "must_keep": 3
+      }
+    },
+    {
+      "doc_id": "D04",
+      "case_key": "DEMO01-101-0002_AE-002",
+      "subject_id": "DEMO01-101-0002",
+      "file": "documents/DEMO01-101-0002_AE-002/discharge_summary_scan.png",
+      "variant": "scan_png_300dpi",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "discharge_summary_scan.pdf",
+      "ground_truth": "ground_truth/D04.json",
+      "counts": {
+        "must_redact": 6,
+        "should_redact": 3,
+        "must_keep": 5
+      }
+    },
+    {
+      "doc_id": "D05",
+      "case_key": "DEMO01-101-0002_AE-002",
+      "subject_id": "DEMO01-101-0002",
+      "file": "documents/DEMO01-101-0002_AE-002/ct_head.dcm",
+      "variant": "dicom",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "ct_head.dcm",
+      "ground_truth": "ground_truth/D05.json",
+      "counts": {
+        "must_redact": 9,
+        "should_redact": 2,
+        "must_keep": 2
+      }
+    },
+    {
+      "doc_id": "D06",
+      "case_key": "DEMO01-102-0003_AE-003",
+      "subject_id": "DEMO01-102-0003",
+      "file": "documents/DEMO01-102-0003_AE-003/death_summary.pdf",
+      "variant": "text_pdf",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "death_summary.pdf",
+      "ground_truth": "ground_truth/D06.json",
+      "counts": {
+        "must_redact": 12,
+        "should_redact": 10,
+        "must_keep": 7
+      }
+    },
+    {
+      "doc_id": "D07",
+      "case_key": "DEMO01-102-0003_AE-003",
+      "subject_id": "DEMO01-102-0003",
+      "file": "documents/DEMO01-102-0003_AE-003/autopsy_request_scan.pdf",
+      "variant": "image_pdf_200dpi",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "autopsy_request_scan.pdf",
+      "ground_truth": "ground_truth/D07.json",
+      "counts": {
+        "must_redact": 5,
+        "should_redact": 3,
+        "must_keep": 2
+      }
+    },
+    {
+      "doc_id": "D08",
+      "case_key": "DEMO01-102-0004_AE-005",
+      "subject_id": "DEMO01-102-0004",
+      "file": "documents/DEMO01-102-0004_AE-005/summary_letter_lowquality.jpg",
+      "variant": "scan_jpg_150dpi_lowq",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "summary_letter_lowquality.pdf",
+      "ground_truth": "ground_truth/D08.json",
+      "counts": {
+        "must_redact": 5,
+        "should_redact": 3,
+        "must_keep": 1
+      }
+    },
+    {
+      "doc_id": "D09",
+      "case_key": "DEMO01-102-0004_AE-005",
+      "subject_id": "DEMO01-102-0004",
+      "file": "documents/DEMO01-102-0004_AE-005/referral_letter_mixed.pdf",
+      "variant": "mixed_pdf_image_header",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "referral_letter_mixed.pdf",
+      "ground_truth": "ground_truth/D09.json",
+      "counts": {
+        "must_redact": 4,
+        "should_redact": 2,
+        "must_keep": 2
+      }
+    },
+    {
+      "doc_id": "D10",
+      "case_key": "DEMO01-101-0005_AE-006",
+      "subject_id": "DEMO01-101-0005",
+      "file": "documents/DEMO01-101-0005_AE-006/angiography_report_rotated.pdf",
+      "variant": "image_pdf_rotated_90",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "angiography_report_rotated.pdf",
+      "ground_truth": "ground_truth/D10.json",
+      "counts": {
+        "must_redact": 3,
+        "should_redact": 3,
+        "must_keep": 2
+      }
+    },
+    {
+      "doc_id": "D11",
+      "case_key": "DEMO01-101-0005_AE-006",
+      "subject_id": "DEMO01-101-0005",
+      "file": "documents/DEMO01-101-0005_AE-006/clinic_letter.pdf",
+      "variant": "text_pdf",
+      "language": "en",
+      "expected_handling": "process",
+      "expected_output": "clinic_letter.pdf",
+      "ground_truth": "ground_truth/D11.json",
+      "counts": {
+        "must_redact": 5,
+        "should_redact": 5,
+        "must_keep": 5
+      }
+    },
+    {
+      "doc_id": "D12",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/entlassungsbrief.pdf",
+      "variant": "text_pdf",
+      "language": "de",
+      "expected_handling": "process",
+      "expected_output": "entlassungsbrief.pdf",
+      "ground_truth": "ground_truth/D12.json",
+      "counts": {
+        "must_redact": 8,
+        "should_redact": 3,
+        "must_keep": 5
+      }
+    },
+    {
+      "doc_id": "D13",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/entlassungsbrief_scan_150dpi.png",
+      "variant": "scan_png_150dpi",
+      "language": "de",
+      "expected_handling": "process",
+      "expected_output": "entlassungsbrief_scan_150dpi.pdf",
+      "ground_truth": "ground_truth/D13.json",
+      "counts": {
+        "must_redact": 8,
+        "should_redact": 3,
+        "must_keep": 5
+      }
+    },
+    {
+      "doc_id": "D14",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/befund_verschluesselt.pdf",
+      "variant": "encrypted_pdf",
+      "language": "de",
+      "expected_handling": "reject:ENCRYPTED",
+      "expected_output": null,
+      "ground_truth": "ground_truth/D14.json",
+      "counts": {
+        "must_redact": 0,
+        "should_redact": 0,
+        "must_keep": 0
+      }
+    },
+    {
+      "doc_id": "D15",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/ekg_beschaedigt.pdf",
+      "variant": "corrupt_pdf",
+      "language": "de",
+      "expected_handling": "reject:CORRUPT",
+      "expected_output": null,
+      "ground_truth": "ground_truth/D15.json",
+      "counts": {
+        "must_redact": 0,
+        "should_redact": 0,
+        "must_keep": 0
+      }
+    },
+    {
+      "doc_id": "D16",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/roentgen_thorax.pdf",
+      "variant": "wrong_extension_png",
+      "language": "de",
+      "expected_handling": "process",
+      "expected_output": "roentgen_thorax.pdf",
+      "ground_truth": "ground_truth/D16.json",
+      "counts": {
+        "must_redact": 3,
+        "should_redact": 1,
+        "must_keep": 1
+      }
+    },
+    {
+      "doc_id": "D17",
+      "case_key": "DEMO01-104-0006_AE-007",
+      "subject_id": "DEMO01-104-0006",
+      "file": "documents/DEMO01-104-0006_AE-007/notizen.txt",
+      "variant": "unsupported_txt",
+      "language": "de",
+      "expected_handling": "reject:UNSUPPORTED_TYPE",
+      "expected_output": null,
+      "ground_truth": "ground_truth/D17.json",
+      "counts": {
+        "must_redact": 0,
+        "should_redact": 0,
+        "must_keep": 0
+      }
+    }
+  ],
+  "cases": {
+    "DEMO01-101-0001_AE-001": {
+      "subject_id": "DEMO01-101-0001",
+      "ae_id": "AE-001"
+    },
+    "DEMO01-101-0002_AE-002": {
+      "subject_id": "DEMO01-101-0002",
+      "ae_id": "AE-002"
+    },
+    "DEMO01-102-0003_AE-003": {
+      "subject_id": "DEMO01-102-0003",
+      "ae_id": "AE-003"
+    },
+    "DEMO01-102-0004_AE-005": {
+      "subject_id": "DEMO01-102-0004",
+      "ae_id": "AE-005"
+    },
+    "DEMO01-101-0005_AE-006": {
+      "subject_id": "DEMO01-101-0005",
+      "ae_id": "AE-006"
+    },
+    "DEMO01-104-0006_AE-007": {
+      "subject_id": "DEMO01-104-0006",
+      "ae_id": "AE-007"
+    }
+  }
+}

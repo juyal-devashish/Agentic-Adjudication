@@ -3,8 +3,9 @@
 | | |
 |---|---|
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
+| **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Step 0 done. Tick the boxes as steps are completed and committed |
+| **Status** | Steps 0–1 done; step 1 being aligned to the kit interface (1b). Tick boxes as steps are completed and committed |
 
 ---
 
@@ -12,219 +13,249 @@
 
 One demo, end to end, on a laptop with `docker compose up`:
 
-> A synthetic AE file is dropped in the inbox → eligible rows become case folders with an explained result for every row → the site is notified → the site uploads a text PDF and a scan → PHI is removed destructively and verified by code → the site reviews, corrects and signs → a hashed handoff manifest for Flow 2 is written → the timeline shows a verified audit trail and the metrics page shows how much PHI was removed.
+> A synthetic AE file is dropped in the inbox → eligible rows become case folders with an explained result for every row → the site is notified → the site uploads documents (text PDFs, scans, a spreadsheet) → PHI is removed destructively and verified by code → the site reviews, corrects and signs → a hashed handoff manifest for Flow 2 is written → the timeline shows a verified audit trail and the metrics page shows how much PHI was removed.
 
-"Really simple" means: **all Must requirements of the spec, nothing more, until the core demo works.** Shoulds and Coulds become optional stretch steps after the demo is rehearsable.
+"Really simple" means: **what the test kit checks, plus the spec's Musts, nothing more until the core demo works.** Remaining Shoulds and Coulds are stretch steps.
 
-## 2. Scope
+## 2. The test kit is the acceptance test
 
-### 2.1 Core (required for the demo)
+The kit (`data/flow1-testkit/`) replaces the generator and scorer we had planned to write ourselves:
 
-| Area | Included | Spec |
+| Kit part | What it gives us | Used in |
 |---|---|---|
-| Storage | `CaseStore`, hash-chained `events.jsonl`, `case.json` cache, intake log, rebuild and verify tools | §5, F1-NF-03/04 |
-| Intake | CSV import from `inbox/` + **Import now**, whole-file rejection, eligibility rules, evaluation log, idempotency, `source.changed`, related data, prior events | F1-01 to F1-07 |
-| Documents | PDF (text and scanned), PNG, JPG, TIFF; dual extraction (text layer + OCR); Presidio + regex + context rules; allow-list; `dob_only` date policy; destructive redaction; metadata scrub; verification | §7.1 to §7.5, §7.8 |
-| Site review | Previews, findings table, untick with reason, add terms, re-run, **Sign and submit** gated on verification | F1-20 to F1-24, F1-26 |
-| Handoff | `flow2_manifest.json` with hashes; `handoff.flow2_ready` event | §11 |
-| Notifications | JSON + `.eml` in `outbox/`, no clinical content | §10 |
-| Measurement | Synthetic generator with ground truth; `deid_check.py` metrics | §13 |
-| UI | Three Streamlit pages, banner, role switcher, case picker | §9 |
+| `config/` | Study config: rules with synthetic `9xxxxxxx` codes, related-data filters, de-identification categories, users, synthetic dictionary | Adopted as `data/config/` (step 2) |
+| `edc_mock/`, `inbox_scenarios/`, `expected/` | Mock EDC, 10 import files + 2 manual entries, expected results | Intake (step 3) |
+| `documents/`, `ground_truth/`, `identities/` | 17 documents for 6 cases with seeded PHI and per-item ground truth | De-identification (steps 4–5) |
+| `tools/deid_check.py` | Scoring harness with the pass/fail **gate** | Steps 4–5, metrics page |
+| `tests/` | 53 tests: TC-RUL, TC-INT (run against **our** `adjud` package), TC-COR, TC-HAR (check the kit itself) | Every step |
+| `adjud/` | A reference intake implementation | Reference only. Our own package replaces it |
 
-### 2.2 Stretch (only after the core demo is rehearsed, in this order)
+**How the kit tests run against our code.** The kit's `conftest.py` puts the kit folder first on `sys.path`, which would load the kit's reference `adjud`. `tests/kit_plugin.py` imports our `adjud` modules first, so the kit tests exercise our implementation unchanged:
 
-| Stretch | Spec | Demo scenario |
+```bash
+uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests            # all kit tests
+uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests -m "not ocr and not slow"
+```
+
+The kit is not modified. If our team decides a kit decision differently (README "Decisions the tests encode"), the change goes into the kit's expected files with a note here.
+
+## 3. Scope
+
+### 3.1 Core (required for the demo)
+
+| Area | Included | Spec | Kit cases |
+|---|---|---|---|
+| Storage | `CaseStore`, hash-chained `events.jsonl`, `case.json` cache, intake log + rebuildable index, rebuild and verify tools | §5, F1-NF-03/04 | TC-INT-14, 15 |
+| Intake | CSV **and XLSX** import, whole-file rejection with row-level errors, eligibility rules, evaluation log, idempotency, `source.changed`, `no_longer_eligible`, stale rows, related data, prior events, **manual entry**, **possible-duplicate flag**, inbox processing | F1-01 to F1-09 | TC-RUL-01–09, TC-INT-01–21 |
+| Documents: rejection | Type from content; encrypted, corrupt, unsupported rejected; mislabelled PNG processed with a warning | §7.2 | TC-DOC-14–17 |
+| Documents: text PDFs | English **and German**; Presidio + regex + label-context rules; allow-list; `dob_only`; destructive redaction; metadata scrub; verification | §7.3–7.5, §7.8 | TC-DOC-01, 02, 06, 11, 12 (gated) |
+| Documents: XLSX | Every cell incl. hidden sheets/rows/columns, comments, properties, defined names, formula results | §7.6 | TC-DOC-03 (properties gated) |
+| Documents: scans | PNG/JPG/TIFF/image-only PDFs, dual extraction, OCR with orientation detection, image-only output pages | §7.1, §7.3, §7.5 | TC-DOC-04, 07–10, 13, 16 (measured) |
+| Site review | Previews, findings table, untick with reason, add terms, re-run, **Sign and submit** gated on verification | F1-20 to F1-24, F1-26 | TC-DOC-M1–M3 |
+| Handoff | `flow2_manifest.json` with hashes; `handoff.flow2_ready` | §11 | TC-DOC-M4 |
+| Notifications | JSON (+ `.eml`) in `outbox/`, no clinical content | §10 | TC-INT-16, 17 |
+| Measurement | Kit harness on our pipeline's output; results on page 3 | §13 | TC-HAR, gate |
+| UI | Three Streamlit pages, banner, role switcher, case picker | §9 | — |
+
+### 3.2 Stretch (only after the core demo is rehearsed, in this order)
+
+| Stretch | Spec | Kit / scenario |
 |---|---|---|
-| A. Manual AE entry and case withdrawal | F1-08, F1-11 | S4 |
-| B. XLSX documents (including hidden sheets/columns) | §7.6 | S9 |
-| C. DICOM header de-identification, then pixels | §7.7 | S10 |
-| D. AI-1 as an extra detector (needs an approved API key) | §8 | S11 |
-| E. File-type label per upload (F1-25), duplicate flag (F1-09), XLSX AE import | F1-25, F1-09, F1-02 | — |
+| A. Case withdrawal by the Safety Specialist | F1-11 | — |
+| B. DICOM header de-identification, then burned-in pixels | §7.7 | TC-DOC-05, S10 |
+| C. AI-1 as an extra detector (needs an approved API key) | §8 | S11 |
+| D. File-type label per upload; `.eml` copies; Mailpit | F1-25, §10 | — |
 
-### 2.3 Not in this POC
+DICOM is not gated by the kit, but a missing output counts against the measured rates, so until stretch B the DICOM rates show as "missing".
 
-Everything from Flow 2 on; DOCX; the SQLite EDC adapter (F1-10); the `shift` and `redact_all` date policies (shown as options in config, not implemented unless time allows); hand-drawn redaction boxes; Mailpit (outbox only); languages other than English.
+### 3.3 Not in this POC
 
-## 3. Decisions taken for the POC
+Everything from Flow 2 on; DOCX; the SQLite EDC adapter (F1-10); the `shift` and `redact_all` date policies; hand-drawn redaction boxes; languages other than English and German.
 
-From the spec's open questions (§17) and the gaps it leaves. Change any of these by editing this table first.
+## 4. Decisions
 
-| # | Decision | Default used |
-|---|---|---|
-| P-01 | Date policy (Q-F1-01) | `dob_only` |
-| P-02 | PHI definition (Q-F1-02) | EU personal data + HIPAA Safe Harbor list |
-| P-03 | Known identifiers typed in by site (Q-F1-03) | Not in core; skipped |
-| P-04 | Document languages (Q-F1-05) | English only |
-| P-05 | Related EDC data (Q-F1-06) | Demographics without identifiers, medical history, con meds, labs |
-| P-06 | AE import format | CSV only in core |
-| P-07 | Study | One study, `DEMO01` |
-| P-08 | Python tooling | Python 3.12, `uv` + `pyproject.toml`, `ruff` for lint and format, `pytest` |
-| P-09 | Time in code | Clock injected everywhere, so tests use a fixed time |
-| P-10 | Runner | One process, one case at a time; every step safe to re-run after a crash |
-| P-11 | Demo reset | Add `tools/reset_demo.py` (not in the spec) to wipe runtime data and regenerate the corpus |
+From the spec's open questions (§17), the kit's encoded decisions (kit README) and the gaps both leave. Change any of these by editing this table first.
 
-## 4. How we work
+| # | Decision | Value | Source |
+|---|---|---|---|
+| P-01 | Date policy (Q-F1-01) | `dob_only`: clinical dates must be kept | Spec default, kit #11 |
+| P-02 | PHI definition (Q-F1-02) | Kit categories: must-redact = patient name, DOB, MRN, insurance no., address, phone, e-mail, next of kin, case reference; should-redact (reported, not gated) = staff names/contacts, facilities | Kit `deid_policy.yaml` |
+| P-03 | Known identifiers typed in by site (Q-F1-03) | Not in core | Plan |
+| P-04 | Document languages (Q-F1-05) | **English and German** (site 104). Tesseract `eng` + `deu` | Kit corpus |
+| P-05 | Related EDC data (Q-F1-06) | Demographics (sex, age, first dose); all medical history; con meds ongoing at onset (end = onset counts); labs in list within ±30 days | Kit `related_data.yaml`, #7 |
+| P-06 | AE import format | CSV (UTF-8, BOM allowed, comma only; semicolon rejected) and XLSX | Kit #2 |
+| P-07 | Study | One study, `DEMO01`; sites 101, 102, 104 | Kit |
+| P-08 | Python tooling | Python 3.12, `uv`, `ruff`, `pytest` | Plan |
+| P-09 | Time in code | Clock injected everywhere | Plan |
+| P-10 | Runner | One process; every step safe to re-run after a crash | Plan |
+| P-11 | Demo reset | `tools/reset_demo.py` loads kit scenarios and documents into a fresh `data/` | Plan |
+| P-12 | Uncoded AE | Not eligible (R2 "missing value") | Kit #1 |
+| P-13 | Coded values | Trimmed, case-insensitive (`" y "` → `Y`) | Kit #3 |
+| P-14 | AE stops qualifying | Flag `no_longer_eligible`, never withdraw | Kit #4 |
+| P-15 | Older `last_modified` | Ignored as stale, logged; equal timestamp with different content = changed | Kit #5 |
+| P-16 | Prior events | Strictly before onset, ≤ 365 days (365 included); PT match, else SOC | Kit #6 |
+| P-17 | Possible duplicates | Same subject and PT, overlapping or touching dates | Kit #8 |
+| P-18 | Mislabelled file | PNG named `.pdf` processed as image with a warning | Kit #10 |
+| P-19 | Actors in events | People by user ID (`ss.anna`); automation as `system:<component>` | Kit TC-INT-11 |
+| P-20 | Snapshots | Versioned, never overwritten: `source/ae_snapshot_v1.json`, `_v2` … | Kit TC-INT-04 |
 
-- One step at a time, in order. Each step lists its **deliverables**, **tests** and **done when** criteria. A step is done only when its criteria pass on a clean checkout.
-- Work on a branch per step (`step-1-skeleton`, …), commit after each file or logical change, and merge to `main` when the step is done (see [AGENTS.md](../AGENTS.md)).
-- Each step ends with something you can show: a command output, a page, or a metrics file.
-- Tests never call an AI API, and all synthetic data comes from a fixed seed.
+## 5. How we work
+
+- One step at a time, in order. Each step lists **deliverables**, the **kit cases** it must turn green, and **done when**. A step is done only when its criteria pass on a clean checkout.
+- A branch per step (`step-3-intake`, …); commit and push after each substantial change; merge to `main` when the step is done (see [AGENTS.md](../AGENTS.md)).
+- After every step, run the **whole** kit and our own tests, not just the new ones.
+- Tests never call an AI API. Synthetic data only.
 
 ---
 
-## 5. Steps
+## 6. Steps
 
-### Step 0 — Project setup
+### Step 0 — Project setup ✅
 
-**Deliverables**
-- [x] `pyproject.toml` (uv), dependencies pinned: streamlit, pydantic, jsonschema, pyyaml, filelock, pymupdf, pytesseract, pillow, presidio-analyzer, spacy (`en_core_web_lg`), bcrypt, faker, reportlab (for the generator), pytest, ruff
+- [x] `pyproject.toml` (uv) with pinned dependencies, spaCy `en_core_web_lg`, ruff, pytest
 - [x] Package layout: `adjud/`, `ui/`, `tools/`, `tests/`
-- [x] `.gitignore` for runtime data under `data/` (keep `data/config/`), `.env.example`
-- [x] `Dockerfile` with Tesseract and the spaCy model; `docker-compose.yml` with `ui` and `runner`, `./data` mounted
-- [x] Sample config: `data/config/users.yaml` (bcrypt hashes), `data/config/DEMO01/{study,eligibility_rules,related_data,deid_policy}.yaml`
-- [x] Update the Commands table in AGENTS.md with the real commands
+- [x] `.gitignore`, `.env.example`
+- [x] `Dockerfile` (Tesseract) and `docker-compose.yml`
+- [x] Sample config and demo users
+- [x] Real commands in AGENTS.md
 
-**Done when:** `uv run pytest` runs (zero tests is fine), `uv run ruff check` is clean and `docker compose build` succeeds.
+### Step 1 — Storage skeleton ✅
 
-### Step 1 — Storage skeleton
+- [x] `adjud/events.py`, `adjud/chain.py` (hash chain, lock, torn-write recovery with quarantine)
+- [x] `adjud/store.py`: `FileCaseStore` (lock, transition check, file-reference check, never overwrite, atomic writes)
+- [x] `adjud/workflow.py`: Flow 1 states, transition table, replay
+- [x] `tools/rebuild_state.py`, `tools/verify_log.py` (cases and intake log)
+- [x] Tests: chain, tamper, rebuild byte-identical, refusals, orphan file, torn write
 
-**Deliverables**
-- [ ] `adjud/events.py`: `Event` model, canonical JSON, SHA-256 hash, genesis `prev_hash`
-- [ ] `adjud/store.py`: `CaseStore` protocol + `FileCaseStore` (per-case `filelock`, temp file + atomic rename, files before events, never overwrite)
-- [ ] `adjud/workflow.py`: Flow 1 states and transition table (spec §4), `apply_event()`, `replay()`; invalid transitions are refused before anything is written
-- [ ] Intake log `data/intake/evaluations.jsonl` with the same hash chain
-- [ ] `tools/rebuild_state.py` and `tools/verify_log.py` covering cases **and** the intake log
+### Step 1b — Align storage with the kit interface
 
-**Tests**
-- Chain links correctly; editing any field of any event is detected; deleting or changing a referenced file is detected
-- Deleting all `case.json` and rebuilding gives byte-identical files
-- Illegal transitions are refused and leave the log unchanged
-- A write interrupted between file and event leaves a consistent case (orphan file, no event)
+- [ ] `ChainedLog` stores flat records (`{seq, at, …fields, prev_hash, hash}`): case events keep the `Event` shape; intake entries are flat evaluation records
+- [ ] `adjud.store` exposes `read_log(path)` and `verify_log(path) -> (ok, message)` with the failing line number
+- [ ] `FileCaseStore` exposes the kit's view: `root`, `events(id) -> list[dict]`, `list_cases() -> list[str]`, `get_json`, `put_json`, `case_dir`, `evaluations_path`, `load_index`, `rebuild_index`
+- [ ] Workflow table gains `case.flagged` and `source.stale_ignored` (no state change)
+- [ ] Our step 1 tests still pass
 
-**Done when:** all tests pass and both tools run against a hand-built sample case.
+**Done when:** our tests pass and the kit's TC-INT-14 and TC-INT-15 could run against the store (they also need intake, step 3).
 
-### Step 2 — Synthetic data generator
+### Step 2 — Adopt the test kit
 
-**Deliverables**
-- [ ] `tools/make_synthetic.py --seed N`:
-  - `edc_mock/` CSVs for ~20 subjects (demographics, medical_history, conmeds, labs, ae)
-  - `inbox` AE file of ~30 rows mixing eligible and non-eligible, plus an **expected-results file**
-  - a second AE file with one changed row (for S3) and a malformed file (for whole-file rejection)
-  - per eligible event: discharge summary, ECG report, lab report as text PDFs with seeded fake PHI (names, DOB, address, phone, email, MRN), including in tables, headers and footers
-  - scan variants of the same pages: 300 dpi, 150 dpi, skew/rotation/noise
-  - a mixed PDF: text body with an image header containing the patient's name
-  - clinical look-alikes (drug names, eponyms such as "Parkinson", admission dates) to measure over-redaction
-  - `ground_truth.json`: every seeded identifier with its type, file and page
-- [ ] Spreadsheet and DICOM variants are **not** generated in core (stretch B/C)
+- [ ] Commit `data/flow1-testkit/` (un-ignore it; exclude it from ruff)
+- [ ] Replace `data/config/` with the kit's config, keeping our additions: bcrypt hashes for demo users, detector settings (regex recognisers) in `deid_policy.yaml`, requested documents in `study.yaml`
+- [ ] Add the kit's dependencies: `openpyxl`, `pydicom` (runtime), `pypdf`, `numpy` (dev)
+- [ ] `tests/kit_plugin.py` and the kit commands in AGENTS.md
+- [ ] Install Tesseract German (`brew install tesseract-lang` locally; `tesseract-ocr-deu` in the Dockerfile)
 
-**Tests:** same seed gives identical output (by hash); ground truth matches what was written into the files.
+**Kit cases:** TC-COR-01–12 and TC-HAR-01–09 pass (they test the kit itself, so they pass before our code exists).
 
-**Done when:** one command produces the full corpus in under a minute.
+**Done when:** the full kit runs from the repo root; COR and HAR are green; RUL and INT fail only because intake is not built yet.
 
 ### Step 3 — Intake
 
-**Deliverables**
-- [ ] `adjud/rules.py`: interpreter for `equals`, `not_equals`, `in_list`, `not_in_list`, `exists`, `on_or_after_field`, `before_field`, `within_days_of_field`, with `all`/`any` nesting. No `eval()`. Every rule result has `passed`, `actual`, `expected`
-- [ ] `adjud/intake.py`: validate the CSV against the template (spec.md §11.2) and reject the whole file with a row-level report in `processed/`; evaluate every row into the intake log; create cases; idempotency on (study, subject, AE ID); newer `last_modified` → new snapshot, rules re-run, `source.changed`
-- [ ] Related data from `related_data.yaml`; prior similar events (same PT or SOC within 365 days)
-- [ ] `adjud/notify.py`: JSON + `.eml` to `outbox/`, study / case ID / action / link only
-- [ ] `adjud/runner.py`: loop (10 s tick, inbox every 5 min, both configurable); takes cases from EVENT_CREATED to AWAITING_DOCUMENTS
-- [ ] UI: `ui/app.py` sidebar (banner, role switcher, case picker) and **Page 1** (upload, Import now, per-row result with rule-by-rule reasons, cases flagged `source.changed`)
+- [ ] `adjud/rules.py`: `evaluate(rule_set, ctx)` and `RuleError`; all eight operators, `all`/`any` nesting with child results, "missing value" reasons, config errors for unknown lists and malformed rules. No `eval()`
+- [ ] `adjud/intake.py`: `IntakePipeline(store_root, config_dir, edc_dir)` with `import_file`, `manual_entry`, `process_inbox`, `case_for`, `case_state`, `store`
+  - [ ] CSV (BOM, comma only) and XLSX (Excel and text dates → ISO) readers
+  - [ ] Validation against the template: missing columns, invalid dates/values, unknown subject, duplicate key, wrong study, missing value; reject the whole file with row/column/code errors
+  - [ ] Normalisation of coded values; Unicode preserved
+  - [ ] Evaluation log entry for every record (rule set, version, explanation, outcome); index cache rebuildable from the log
+  - [ ] Outcomes `created`, `not_eligible`, `changed`, `unchanged`, `stale`; versioned snapshots; `source.changed`, `no_longer_eligible`, `source.stale_ignored`
+  - [ ] Related data and prior events per `related_data.yaml`; possible-duplicate flag
+  - [ ] New case goes to AWAITING_DOCUMENTS; `documents_requested` notification to `site:<id>`
+  - [ ] Manual entry with mandatory reason, `source = MANUAL`
+- [ ] `adjud/notify.py`: outbox writer, no clinical content
+- [ ] `adjud/runner.py`: inbox polling via `process_inbox`, reports to `processed/`
+- [ ] UI: sidebar (banner, role switcher, case picker) and **Page 1** (upload, Import now, per-row results with reasons, flagged cases)
 
-**Tests:** each rule operator passing and failing; nested `all`/`any`; eligibility matches the generator's expected results 100%; re-import creates no cases; changed row gives `source.changed` and nothing is withdrawn; malformed file imports nothing; notifications contain no clinical fields.
+**Kit cases:** TC-RUL-01–09, TC-INT-01–21.
 
-**Done when:** scenarios **S1, S2, S3** work in the UI.
+**Done when:** all RUL and INT cases pass against our package, and scenarios S1–S4 work in the UI.
 
-### Step 4 — Text PDF de-identification (core of the POC)
+### Step 4 — De-identification gate: rejection, text PDFs, spreadsheets
 
-**Deliverables**
-- [ ] `adjud/deid/` split into small modules: `validate` (type from content, limits, encrypted → `deid.failed`), `extract` (PyMuPDF words with boxes), `detect` (Presidio + custom regex from `deid_policy.yaml` + label-context rules), `policy` (allow-list, `dob_only`), `redact` (redaction annotations + `apply_redactions` with images removed under boxes), `scrub` (`Document.scrub()` + clean save), `verify` (re-extract from output, re-run all detectors, check metadata empty, search seeded identifiers for synthetic data)
-- [ ] One report per file in `documents/reports/`; one summary event per step
-- [ ] Runner takes cases from DEIDENTIFYING to AWAITING_SITE_CONFIRMATION (or back to AWAITING_DOCUMENTS on `deid.failed`); a crash mid-file resumes by redoing that file
-- [ ] `tools/deid_check.py`: run the corpus, write `data/metrics/<run>.json` (recall per identifier type, document variant and detector; over-redaction; verification catch rate; metadata residuals; time per page)
+- [ ] `adjud/deid/` modules: `sniff` (type from content), `validate` (limits; ENCRYPTED, CORRUPT, UNSUPPORTED_TYPE; mismatch warning), `extract`, `detect` (Presidio + regex + English and German label-context rules), `policy` (allow-list, `dob_only`), `redact`, `scrub`, `verify`, `xlsx`
+- [ ] German: label rules (`geb.`, `Pat.-Nr.`, `Versichertennr.`), dd.mm.yyyy dates, umlauts; decide whether a German spaCy model is needed by measuring D12
+- [ ] XLSX: every cell incl. hidden sheets/rows/columns, identifier-header columns, comments, properties, external links, defined names; formulas over redacted cells replaced by values
+- [ ] Pipeline wired into the case workflow (DEIDENTIFYING → AWAITING_SITE_CONFIRMATION, or `deid.failed`); one report per file
+- [ ] `tools/run_corpus.py`: run our pipeline over the kit's `documents/` into `<out>/<case_key>/<expected_output>`
+- [ ] `tools/deid_check.py`: `run_corpus` then the kit harness with `--ocr --gate`; result saved to `data/metrics/`
 
-**Tests:** underlying characters are gone (not just covered) after redaction; metadata, attachments, links and JavaScript are removed; allow-listed terms survive; a planted residual is caught by verification; encrypted PDF fails cleanly.
+**Kit cases:** gate passes — TC-DOC-01, 02, 06, 11, 12 (all must-redact removed), TC-DOC-03 (properties), TC-DOC-14, 15, 17 (no output). Must-keep items preserved (clinical dates, drug, eponyms, trial ID).
 
-**Done when:** `deid_check.py` shows **100% of seeded identifiers removed from text PDFs and zero metadata residuals** (spec §15 gate). Don't loosen the detectors' test thresholds to get there.
+**Done when:** `deid_check --gate` passes. Thresholds and expected files are not loosened to get there.
 
-### Step 5 — Scans and mixed PDFs
+### Step 5 — Scans, image-only and mixed PDFs
 
-**Deliverables**
-- [ ] Normalise: PNG/JPG/TIFF → PDF pages; orientation correction from Tesseract OSD
-- [ ] OCR every page at 300 dpi, map word boxes to PDF coordinates, merge with text-layer findings
-- [ ] Scanned and image pages are flattened with black boxes and rebuilt as image-only pages (no hidden text layer)
+- [ ] Normalise images to PDF pages; orientation detection (Tesseract OSD) before OCR
+- [ ] Dual extraction on every page (text layer + 300 dpi OCR), boxes mapped to PDF coordinates
+- [ ] Image and scanned pages flattened with black boxes and rebuilt as image-only pages
 - [ ] Verification re-OCRs the output
-- [ ] `deid_check.py` reports scan and mixed-PDF metrics separately
 
-**Tests:** the name in the mixed PDF's image header is found and removed; output scan pages contain no text layer; text-PDF gate from step 4 still holds.
+**Kit cases (measured, not gated):** TC-DOC-04, 07, 08, 09, 10, 13, 16. Target: beat the kit's oracle reference (`metrics/reference_oracle_run.txt`) on every scan, image-banner and rotated variant, without losing must-keep items. The text-PDF gate from step 4 still passes.
 
-**Done when:** scan recall and over-redaction per variant are measured and written to metrics (reported, not gated), and **S6** works from the runner.
+**Done when:** the rates are measured and saved, and they beat the oracle on image content.
 
 ### Step 6 — Site review, submission and handoff
 
-**Deliverables**
-- [ ] `adjud/signatures.py`: bcrypt demo-password check; signature records signer, meaning, time and hashes of the signed files
-- [ ] **Page 2**: case header; upload area with file status (*processing / ready for review / blocked / verified*); page previews with outlined redactions; findings table (page, category, detector, confidence, partly masked text); untick with mandatory reason; add terms (all pages and files); delete file; each change re-runs redaction and verification for the affected file
-- [ ] **Sign and submit** enabled only when every file is verified; `submission.signed` → SUBMITTED
-- [ ] Handoff: `handoff/flow2_manifest.json` per spec §11 (nothing from `original/`), `handoff.flow2_ready`, notifications to site and Safety Specialist
-- [ ] **Page 3**: case list by state; timeline with "chain verified ✓"; source data and eligibility result; manifest and redacted-file downloads; notifications; latest de-identification metrics
+- [ ] `adjud/signatures.py`: bcrypt demo-password check; signature records signer, meaning, time, hashes of signed files
+- [ ] **Page 2**: case header with requested documents; upload with status (*processing / ready for review / blocked / verified*, plus *rejected* with the reason); page previews with outlined redactions; findings table; untick with reason; add terms; delete file; spreadsheet table view; each change re-runs redaction and verification for the affected file
+- [ ] **Sign and submit** only when every file is verified; `submission.signed` → SUBMITTED
+- [ ] Handoff manifest per spec §11 (nothing from `original/`), `handoff.flow2_ready`, notifications
+- [ ] **Page 3**: case list by state; timeline with "chain verified ✓"; source data and eligibility; manifest and downloads; notifications; latest metrics
 
-**Tests:** submit refused while any file is blocked; untick without a reason is refused; every correction is an event; every hash in the manifest matches its file; the manifest never references `original/`.
+**Kit cases:** TC-DOC-M1–M4 (manual, plus automated tests where possible).
 
-**Done when:** scenarios **S5, S7, S8, S12** work in the UI.
+**Done when:** S5–S9 and S12 work in the UI.
 
 ### Step 7 — Demo hardening and rehearsal
 
-**Deliverables**
-- [ ] `tools/reset_demo.py`: wipe runtime data, regenerate the corpus, pre-load the inbox
+- [ ] `tools/reset_demo.py`: fresh `data/` from the kit (config, EDC, first inbox file, documents ready to upload)
 - [ ] `docker compose up` runs the full demo on a clean machine
-- [ ] Short `README.md`: what this is, synthetic-data warning, how to run, the demo script
-- [ ] Demo script (§6 below) rehearsed end to end at least twice from a reset
+- [ ] Short `README.md`: what this is, synthetic-data warning, how to run, demo script
+- [ ] Demo script (§7) rehearsed end to end at least twice from a reset
 - [ ] Final metrics run saved for page 3
 
-**Done when:** the core demo runs from reset to the last scenario without touching code, in about 20 minutes.
+**Done when:** the core demo runs from reset to the last scenario without touching code, in about 20 minutes, and the whole kit is green.
 
-### Stretch steps (A–E)
+### Stretch steps (A–D)
 
-Each follows the same pattern: deliverables, tests, the matching scenario, and a fresh rehearsal. The spec sections are listed in §2.2. AI-1 (D) runs only with an approved key, only on synthetic data, through `adjud/ai/gateway.py`, and its value is shown by a `deid_check.py` run with AI off vs on.
+Same pattern: deliverables, tests, the matching scenario, a fresh rehearsal, the whole kit still green. AI-1 (C) runs only with an approved key, only on synthetic data, through `adjud/ai/gateway.py`, and its value is shown by a harness run with AI off vs on.
 
 ---
 
-## 6. Demo script (core)
+## 7. Demo script (core)
 
-| Order | Scenario | Role | What the audience sees |
-|---|---|---|---|
-| 1 | S1 Import mixed AE file | Study admin | Eligible vs not, rule-by-rule reasons |
-| 2 | S2 Import the same file again | Study admin | No new cases |
-| 3 | S3 Import an updated row | Study admin | `source.changed` flag; nothing withdrawn |
-| 4 | S5 Upload text PDF, review, submit | Site user | Redactions, findings, signature, handoff manifest |
-| 5 | S6 Upload a poor scan | Site user | OCR redaction, image-only output page |
-| 6 | S7 Residual name caught | Site user | Submit blocked; site adds the term; passes |
-| 7 | S8 Untick a drug name | Site user | Correction with reason in the timeline |
-| 8 | Metrics | Safety Specialist | Recall per document type, metadata residuals = 0 |
-| 9 | S12 Tamper and rebuild | Study admin | `verify_log.py` detects the edit; state rebuilt |
+Kit documents are named by case key; see the kit README table.
 
-Stretch scenarios S4, S9, S10 and S11 slot in after step 7 of the script when built.
+| Order | Scenario | Role | Kit input | What the audience sees |
+|---|---|---|---|---|
+| 1 | S1 Import mixed AE file | Study admin | `01_initial.csv` | 22 rows: 11 cases, 11 not eligible, rule-by-rule reasons (incl. fatal-before-dose, uncoded term) |
+| 2 | S2 Import the same file again | Study admin | `02_reimport_identical.csv` | No new cases |
+| 3 | S3 Import updates | Study admin | `03_updates.csv` | Changed, downgraded (flagged, not withdrawn), stale, new |
+| 4 | S4 Manual AE entry | Safety Specialist | `manual_entry_valid.json` | Source MANUAL, reason in the log |
+| 5 | S5 Text PDFs, review, submit | Site 101 | AE-001: D01, D02, D03 | Redactions in banner, table, footer; hidden spreadsheet PHI removed; signature; manifest |
+| 6 | S6 Poor scans | Site 102 | AE-005: D08, D09 | OCR redaction; image-banner PHI found despite a clean text layer |
+| 7 | S7 Residual caught | Site | any | Submit blocked; site adds the term; passes |
+| 8 | S8 Untick a drug name | Site | any | Correction with reason in the timeline |
+| 9 | Rejections | Site 104 | AE-007: D14, D15, D17, D16 | Encrypted/corrupt/unsupported rejected with reasons; mislabelled PNG handled |
+| 10 | Metrics | Safety Specialist | harness run | Gate passed; recall per variant vs the oracle |
+| 11 | S12 Tamper and rebuild | Study admin | — | `verify_log` detects the edit at its line; state rebuilt |
 
-## 7. Success check before the demo
+## 8. Success check before the demo
 
-Mapped to spec §15:
-
-- [ ] Eligibility matches the expected-results file 100%, with a reason on every non-eligible row
-- [ ] Re-import creates no cases; updated rows are flagged
-- [ ] Text PDFs: 100% of seeded identifiers removed, confirmed by verification
-- [ ] Zero metadata residuals in every output file
-- [ ] Scan recall and over-redaction measured and shown (not gated)
+- [ ] Whole kit green: TC-RUL, TC-INT, TC-COR, TC-HAR (`-p tests.kit_plugin`)
+- [ ] `deid_check --gate` passes (text PDFs 100%, no metadata/properties identifiers, rejected documents have no output)
+- [ ] Scan, image-banner and rotated-page rates measured and beating the oracle reference
 - [ ] No file can be submitted while verification finds a residual
 - [ ] Every hash in the handoff manifest matches its file
 - [ ] The core demo script runs from reset
 
-## 8. Risks
+## 9. Risks
 
 | Risk | Effect | Mitigation |
 |---|---|---|
-| Presidio name detection misses or over-flags on clinical text | Text-PDF gate fails, or drug names redacted | Label-context rules, allow-list in `deid_policy.yaml`; tune config, never the test |
-| OCR box alignment drifts on skewed scans | Redaction box misses part of a word | Pad boxes; verification re-OCR catches residuals and blocks submission |
-| Tesseract and spaCy model setup differs between laptop and Docker | Demo fails on the day | Rehearse only through `docker compose up` |
-| Processing too slow for a live demo | Long waits on stage | Measure time per page from step 5; pre-process large scans before the demo; keep demo files small |
-| Streamlit reruns cause double actions | Duplicate events | Every UI write goes through `CaseStore`, which refuses illegal transitions; disable buttons after use |
+| Presidio misses German names (English model) | D12 gate fails | German label rules first; add `de_core_news` model only if D12 still misses |
+| Presidio over-flags clinical text | Must-keep items (dates, drug, eponyms) lost | Allow-list and `dob_only` policy; tune config, never the kit |
+| OCR box alignment drifts on skewed/rotated scans | Box misses part of a word | Orientation detection, padded boxes; verification re-OCR blocks submission |
+| Tesseract language packs differ between laptop and Docker | Different German results on the day | Rehearse only through `docker compose up` |
+| Kit's `sys.path` loads its reference `adjud` | Kit tests silently test the wrong code | `tests/kit_plugin.py` pre-imports ours; a plugin test asserts `adjud.__file__` is in our package |
+| Processing too slow for a live demo | Long waits | Measure time per page; pre-process large scans before the demo |
+| Streamlit reruns cause double actions | Duplicate events | All writes go through `CaseStore`, which refuses illegal transitions |

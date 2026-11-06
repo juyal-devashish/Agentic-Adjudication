@@ -40,7 +40,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["docs"]
+extend-exclude = ["docs", "data"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]

@@ -1,0 +1,411 @@
+{
+  "_readme": "Expected intake results. Keys are study|subject|ae_id. Case IDs are assigned by the implementation, so cases are identified by key. Row numbers count the header as row 1.",
+  "sequence": [
+    "01_initial.csv",
+    "02_reimport_identical.csv",
+    "03_updates.csv",
+    "06_xlsx_format.xlsx",
+    "07_duplicate_candidate.csv",
+    "09_utf8_bom.csv"
+  ],
+  "scenarios": {
+    "01_initial.csv": {
+      "status": "ACCEPTED",
+      "records": 22,
+      "new_cases": 11,
+      "not_eligible": 11,
+      "evaluations": [
+        {
+          "key": "DEMO01|DEMO01-101-0001|AE-001",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Case A, documents provided"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0002|AE-002",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Case B, documents provided"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0003|AE-003",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Case C, documents provided"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0003|AE-004",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Same subject, prior event for AE-003"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0004|AE-005",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Onset before first dose but fatal: eligible via R3b. Case D"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0005|AE-006",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Onset equals first dose date (boundary). Case E"
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0006|AE-007",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "German site. Case F"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0007|AE-008",
+          "eligible": false,
+          "failed_rules": [
+            "R1"
+          ],
+          "note": "Not serious"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0008|AE-009",
+          "eligible": false,
+          "failed_rules": [
+            "R2"
+          ],
+          "note": "Not an adjudicable term"
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0009|AE-010",
+          "eligible": false,
+          "failed_rules": [
+            "R2"
+          ],
+          "note": "Not an adjudicable term"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0010|AE-011",
+          "eligible": false,
+          "failed_rules": [
+            "R3"
+          ],
+          "note": "Before first dose and not fatal"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0011|AE-012",
+          "eligible": false,
+          "failed_rules": [
+            "R2"
+          ],
+          "note": "Uncoded: pt_code missing"
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0012|AE-013",
+          "eligible": false,
+          "failed_rules": [
+            "R1",
+            "R2"
+          ],
+          "note": "Not serious, not adjudicable"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0013|AE-014",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Serious flag ' y ' must normalise to Y"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0014|AE-015",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Outcome 'fatal' must normalise to FATAL"
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0015|AE-016",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Non-ASCII verbatim term"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0016|AE-017",
+          "eligible": false,
+          "failed_rules": [
+            "R1",
+            "R2"
+          ],
+          "note": ""
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0018|AE-018",
+          "eligible": false,
+          "failed_rules": [
+            "R2"
+          ],
+          "note": "Cardiac SOC but not adjudicable"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0019|AE-019",
+          "eligible": true,
+          "failed_rules": [],
+          "note": ""
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0020|AE-020",
+          "eligible": false,
+          "failed_rules": [
+            "R1",
+            "R2"
+          ],
+          "note": ""
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0002|AE-021",
+          "eligible": false,
+          "failed_rules": [
+            "R2"
+          ],
+          "note": "Same subject as case B, after onset"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0017|AE-022",
+          "eligible": false,
+          "failed_rules": [
+            "R1",
+            "R2"
+          ],
+          "note": ""
+        }
+      ]
+    },
+    "02_reimport_identical.csv": {
+      "status": "ACCEPTED",
+      "records": 22,
+      "new_cases": 0,
+      "changed": 0,
+      "unchanged": 22
+    },
+    "03_updates.csv": {
+      "status": "ACCEPTED",
+      "records": 6,
+      "outcomes": [
+        {
+          "key": "DEMO01|DEMO01-101-0001|AE-001",
+          "outcome": "changed",
+          "eligible_now": true,
+          "note": "End date corrected; still eligible"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0005|AE-006",
+          "outcome": "changed",
+          "eligible_now": false,
+          "note": "Downgraded to non-serious: case flagged, NOT withdrawn"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0013|AE-014",
+          "outcome": "unchanged",
+          "eligible_now": true,
+          "note": "Identical row"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0007|AE-008",
+          "outcome": "created",
+          "eligible_now": true,
+          "note": "Was not eligible, now serious: new case"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0004|AE-005",
+          "outcome": "stale",
+          "eligible_now": true,
+          "note": "Older last_modified than stored: ignored"
+        },
+        {
+          "key": "DEMO01|DEMO01-101-0016|AE-023",
+          "outcome": "created",
+          "eligible_now": true,
+          "note": "New AE"
+        }
+      ],
+      "new_cases": 2,
+      "changed": 2,
+      "unchanged": 1,
+      "stale": 1,
+      "flags": {
+        "DEMO01|DEMO01-101-0005|AE-006": [
+          "source_changed",
+          "no_longer_eligible"
+        ],
+        "DEMO01|DEMO01-101-0001|AE-001": [
+          "source_changed"
+        ]
+      }
+    },
+    "04_invalid_missing_column.csv": {
+      "status": "REJECTED",
+      "records_imported": 0,
+      "errors": [
+        {
+          "row": 1,
+          "column": "last_modified",
+          "code": "MISSING_COLUMN"
+        }
+      ]
+    },
+    "05_invalid_rows.csv": {
+      "status": "REJECTED",
+      "records_imported": 0,
+      "errors": [
+        {
+          "row": 3,
+          "column": "onset_date",
+          "code": "INVALID_DATE"
+        },
+        {
+          "row": 4,
+          "column": "serious",
+          "code": "INVALID_VALUE"
+        },
+        {
+          "row": 5,
+          "column": "subject_id",
+          "code": "UNKNOWN_SUBJECT"
+        },
+        {
+          "row": 6,
+          "column": "ae_id",
+          "code": "DUPLICATE_KEY"
+        },
+        {
+          "row": 7,
+          "column": "seriousness_criteria",
+          "code": "MISSING_VALUE"
+        },
+        {
+          "row": 8,
+          "column": "study_id",
+          "code": "WRONG_STUDY"
+        }
+      ]
+    },
+    "06_xlsx_format.xlsx": {
+      "status": "ACCEPTED",
+      "records": 3,
+      "new_cases": 2,
+      "evaluations": [
+        {
+          "key": "DEMO01|DEMO01-102-0017|AE-024",
+          "eligible": true,
+          "failed_rules": [],
+          "note": "Dates stored as Excel date cells"
+        },
+        {
+          "key": "DEMO01|DEMO01-104-0018|AE-025",
+          "eligible": false,
+          "failed_rules": [
+            "R1"
+          ],
+          "note": "Onset stored as text"
+        },
+        {
+          "key": "DEMO01|DEMO01-102-0020|AE-026",
+          "eligible": true,
+          "failed_rules": [],
+          "note": ""
+        }
+      ]
+    },
+    "07_duplicate_candidate.csv": {
+      "status": "ACCEPTED",
+      "records": 1,
+      "new_cases": 1,
+      "flags": {
+        "DEMO01|DEMO01-101-0019|AE-027": [
+          "possible_duplicate"
+        ]
+      },
+      "possible_duplicate_of": {
+        "DEMO01|DEMO01-101-0019|AE-027": "DEMO01|DEMO01-101-0019|AE-019"
+      }
+    },
+    "08_header_only.csv": {
+      "status": "ACCEPTED",
+      "records": 0,
+      "new_cases": 0
+    },
+    "09_utf8_bom.csv": {
+      "status": "ACCEPTED",
+      "records": 1,
+      "new_cases": 1
+    },
+    "10_semicolon_delimited.csv": {
+      "status": "REJECTED",
+      "records_imported": 0,
+      "errors_include_code": "MISSING_COLUMN"
+    },
+    "manual_entry_valid.json": {
+      "status": "ACCEPTED",
+      "new_cases": 1,
+      "source": "MANUAL"
+    },
+    "manual_entry_missing_reason.json": {
+      "status": "REJECTED",
+      "errors_include_code": "MISSING_REASON"
+    }
+  },
+  "prior_events": {
+    "DEMO01|DEMO01-101-0001|AE-001": [
+      {
+        "ae_id": "H-001",
+        "match": "PT"
+      },
+      {
+        "ae_id": "H-002",
+        "match": "SOC"
+      }
+    ],
+    "DEMO01|DEMO01-101-0002|AE-002": [
+      {
+        "ae_id": "H-005",
+        "match": "PT"
+      }
+    ],
+    "DEMO01|DEMO01-102-0003|AE-003": [
+      {
+        "ae_id": "AE-004",
+        "match": "SOC"
+      }
+    ],
+    "DEMO01|DEMO01-102-0003|AE-004": [],
+    "DEMO01|DEMO01-101-0019|AE-027": [
+      {
+        "ae_id": "AE-019",
+        "match": "PT"
+      }
+    ]
+  },
+  "related_data": {
+    "DEMO01|DEMO01-101-0001|AE-001": {
+      "medical_history": 2,
+      "conmeds": [
+        "Aspirin",
+        "Clopidogrel"
+      ],
+      "labs": [
+        [
+          "TROPONIN_T",
+          "2026-03-14"
+        ],
+        [
+          "TROPONIN_T",
+          "2026-03-16"
+        ],
+        [
+          "HBA1C",
+          "2026-03-04"
+        ]
+      ],
+      "demographics": {
+        "sex": "M",
+        "age": "70",
+        "first_dose_date": "2025-03-10"
+      }
+    }
+  }
+}

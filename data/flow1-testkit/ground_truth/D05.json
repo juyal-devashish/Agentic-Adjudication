@@ -1,0 +1,145 @@
+{
+  "doc_id": "D05",
+  "case_key": "DEMO01-101-0002_AE-002",
+  "subject_id": "DEMO01-101-0002",
+  "file": "documents/DEMO01-101-0002_AE-002/ct_head.dcm",
+  "variant": "dicom",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "ct_head.dcm",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Carr^Leslie",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientName (0010,0010)"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientID (0010,0020)"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "19610813",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientBirthDate (0010,0030)"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "17 Catherine Estates, Griffithsview S0U 0UT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientAddress (0010,1040)"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "01632 960002",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "private tag (0011,1001)"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "ACC26-04417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "AccessionNumber (0008,0050)"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "InstitutionName (0008,0080)"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "Hart^Amelia",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "ReferringPhysicianName (0008,0090)"
+      ]
+    },
+    {
+      "id": "I009",
+      "value": "20260402",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "dicom_header",
+      "locations": [
+        "StudyDate (0008,0020)"
+      ]
+    },
+    {
+      "id": "I010",
+      "value": "CT HEAD WITHOUT CONTRAST",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "dicom_header",
+      "locations": [
+        "StudyDescription (0008,1030)"
+      ]
+    },
+    {
+      "id": "I011",
+      "value": "CARR^LESLIE",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I012",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I013",
+      "value": "1961-08-13",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

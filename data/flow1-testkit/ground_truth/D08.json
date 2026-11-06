@@ -1,0 +1,111 @@
+{
+  "doc_id": "D08",
+  "case_key": "DEMO01-102-0004_AE-005",
+  "subject_id": "DEMO01-102-0004",
+  "file": "documents/DEMO01-102-0004_AE-005/summary_letter_lowquality.jpg",
+  "variant": "scan_jpg_150dpi_lowq",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "summary_letter_lowquality.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I003",
+      "value": "SMITH, Rita",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "12/05/1957",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I005",
+      "value": "HN-MV37589",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I006",
+      "value": "01632 960004",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I007",
+      "value": "Rita Smith",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I008",
+      "value": "20/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I009",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

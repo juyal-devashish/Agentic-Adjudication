@@ -1,0 +1,162 @@
+{
+  "doc_id": "D11",
+  "case_key": "DEMO01-101-0005_AE-006",
+  "subject_id": "DEMO01-101-0005",
+  "file": "documents/DEMO01-101-0005_AE-006/clinic_letter.pdf",
+  "variant": "text_pdf",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "clinic_letter.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "Dr Thomas Reed",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "Halbridge Health Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "Pamela Jones",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "12/12/1966",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "6 Parker Club, Lake Glenn B6 5US",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "1572429",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I009",
+      "value": "DEMO01-101-0005",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I010",
+      "value": "02/06/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I011",
+      "value": "12/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I012",
+      "value": "Hodgkin",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I013",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I014",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I015",
+      "value": "pamela.jones5@example.org",
+      "category": "EMAIL",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "footer"
+      ]
+    }
+  ]
+}

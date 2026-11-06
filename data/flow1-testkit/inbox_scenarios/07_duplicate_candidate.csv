@@ -1,0 +1,2 @@
+study_id,site_id,subject_id,ae_id,ae_term,llt_code,pt_code,soc_code,meddra_version,onset_date,end_date,serious,seriousness_criteria,outcome,severity,relatedness_investigator,last_modified
+DEMO01,101,DEMO01-101-0019,AE-027,Transient ischaemic attack,90000202,90000202,90010002,SYN-1.0,2026-02-11,2026-02-12,Y,HOSPITALISATION,RECOVERED,SEVERE,NOT_RELATED,2026-02-13T09:00:00Z

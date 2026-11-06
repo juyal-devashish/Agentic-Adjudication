@@ -1,0 +1,22 @@
+subject_id,condition,start_year,ongoing
+DEMO01-101-0001,Hypertension,2012,Y
+DEMO01-101-0001,Type 2 diabetes mellitus,2018,Y
+DEMO01-101-0002,Hyperlipidaemia,2009,Y
+DEMO01-102-0003,Hypertension,2018,Y
+DEMO01-102-0004,Hyperlipidaemia,2018,Y
+DEMO01-101-0005,Asthma,2010,Y
+DEMO01-104-0006,Osteoarthritis,2015,Y
+DEMO01-101-0007,Hyperlipidaemia,2010,Y
+DEMO01-102-0008,Hypertension,2014,Y
+DEMO01-104-0009,Asthma,2015,Y
+DEMO01-101-0010,Hypertension,2020,Y
+DEMO01-102-0011,Hypertension,2020,Y
+DEMO01-104-0012,Hyperlipidaemia,2020,Y
+DEMO01-101-0013,Hyperlipidaemia,2022,Y
+DEMO01-102-0014,Osteoarthritis,2008,Y
+DEMO01-104-0015,Osteoarthritis,2013,Y
+DEMO01-101-0016,Osteoarthritis,2006,Y
+DEMO01-102-0017,Osteoarthritis,2006,Y
+DEMO01-104-0018,Osteoarthritis,2019,Y
+DEMO01-101-0019,Osteoarthritis,2016,Y
+DEMO01-102-0020,Hyperlipidaemia,2012,Y

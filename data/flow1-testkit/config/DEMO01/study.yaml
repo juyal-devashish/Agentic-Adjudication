@@ -1,0 +1,13 @@
+study: DEMO01
+sites:
+- '101'
+- '102'
+- '104'
+inbox_poll_minutes: 5
+upload_limits:
+  max_file_mb: 50
+  max_dicom_study_mb: 500
+  max_pdf_pages: 200
+ai:
+  phi_detection: false
+  model: <pinned model id>

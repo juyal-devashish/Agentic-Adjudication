@@ -1,0 +1,20 @@
+note: Demo users only. Password for every user is 'demo' (bcrypt hash in a real MVP).
+users:
+- id: site101.coord
+  name: Site 101 Coordinator
+  role: site
+  site: '101'
+- id: site102.coord
+  name: Site 102 Coordinator
+  role: site
+  site: '102'
+- id: site104.coord
+  name: Site 104 Coordinator
+  role: site
+  site: '104'
+- id: ss.anna
+  name: Anna Safety
+  role: safety_specialist
+- id: admin.sam
+  name: Sam Admin
+  role: study_admin

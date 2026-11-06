@@ -1,0 +1,100 @@
+{
+  "doc_id": "D10",
+  "case_key": "DEMO01-101-0005_AE-006",
+  "subject_id": "DEMO01-101-0005",
+  "file": "documents/DEMO01-101-0005_AE-006/angiography_report_rotated.pdf",
+  "variant": "image_pdf_rotated_90",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "angiography_report_rotated.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I003",
+      "value": "Pamela Jones",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I004",
+      "value": "12/12/1966",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I005",
+      "value": "1572429",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I006",
+      "value": "13/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I007",
+      "value": "DEMO01-101-0005",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I008",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    }
+  ]
+}

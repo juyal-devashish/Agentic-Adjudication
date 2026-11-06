@@ -1,0 +1,97 @@
+{
+  "doc_id": "D09",
+  "case_key": "DEMO01-102-0004_AE-005",
+  "subject_id": "DEMO01-102-0004",
+  "file": "documents/DEMO01-102-0004_AE-005/referral_letter_mixed.pdf",
+  "variant": "mixed_pdf_image_header",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "referral_letter_mixed.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "SMITH, Rita",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I002",
+      "value": "12/05/1957",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I003",
+      "value": "HN-MV37589",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "01632 960004",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I005",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I006",
+      "value": "19/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "DEMO01-102-0004",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "signature"
+      ]
+    }
+  ]
+}

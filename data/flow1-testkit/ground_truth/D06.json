@@ -1,0 +1,302 @@
+{
+  "doc_id": "D06",
+  "case_key": "DEMO01-102-0003_AE-003",
+  "subject_id": "DEMO01-102-0003",
+  "file": "documents/DEMO01-102-0003_AE-003/death_summary.pdf",
+  "variant": "text_pdf",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "death_summary.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "WARD, Graeme",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I009",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I010",
+      "value": "231 Robert Station, Lake Reecehaven S4 0FT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I011",
+      "value": "DEMO01-102-0003",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I012",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I013",
+      "value": "17/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I014",
+      "value": "2950 ng/L",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I015",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I016",
+      "value": "18/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I017",
+      "value": "TIMI",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I018",
+      "value": "19/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I019",
+      "value": "Brenda Ward",
+      "category": "NEXT_OF_KIN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I020",
+      "value": "Dr Helen Marsh",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I021",
+      "value": "Corrington Medical Practice",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I022",
+      "value": "2026/00417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I023",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "signature"
+      ]
+    },
+    {
+      "id": "I024",
+      "value": "G. Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "footer_last_page_only"
+      ]
+    },
+    {
+      "id": "I025",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "footer_last_page_only"
+      ]
+    },
+    {
+      "id": "I026",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ]
+    },
+    {
+      "id": "I027",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ]
+    },
+    {
+      "id": "I028",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ]
+    },
+    {
+      "id": "I029",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ]
+    }
+  ]
+}

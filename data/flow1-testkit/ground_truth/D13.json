@@ -1,0 +1,188 @@
+{
+  "doc_id": "D13",
+  "case_key": "DEMO01-104-0006_AE-007",
+  "subject_id": "DEMO01-104-0006",
+  "file": "documents/DEMO01-104-0006_AE-007/entlassungsbrief_scan_150dpi.png",
+  "variant": "scan_png_150dpi",
+  "language": "de",
+  "expected_handling": "process",
+  "expected_output": "entlassungsbrief_scan_150dpi.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Klinikum Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I002",
+      "value": "Uferstraße 40, 50999 Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I003",
+      "value": "STIFFEL, Carlo",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "18.10.1959",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I005",
+      "value": "8859641",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I006",
+      "value": "J769144633",
+      "category": "INSURANCE_NO",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I007",
+      "value": "Salih-Schmiedecke-Allee 364, 95220 Großenhain",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I008",
+      "value": "+49 221 5550006",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I009",
+      "value": "DEMO01-104-0006",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I010",
+      "value": "Carlo Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I011",
+      "value": "08.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I012",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I013",
+      "value": "Parkinson",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I014",
+      "value": "09.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I015",
+      "value": "Dr. med. Katrin Albers",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I016",
+      "value": "C. Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

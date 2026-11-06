@@ -1,0 +1,166 @@
+{
+  "doc_id": "D04",
+  "case_key": "DEMO01-101-0002_AE-002",
+  "subject_id": "DEMO01-101-0002",
+  "file": "documents/DEMO01-101-0002_AE-002/discharge_summary_scan.png",
+  "variant": "scan_png_300dpi",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "discharge_summary_scan.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I003",
+      "value": "CARR, Leslie",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I004",
+      "value": "13/08/1961",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I005",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I006",
+      "value": "17 Catherine Estates, Griffithsview S0U 0UT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I007",
+      "value": "01632 960002",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I008",
+      "value": "DEMO01-101-0002",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": false
+    },
+    {
+      "id": "I009",
+      "value": "Leslie Carr",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I010",
+      "value": "02/04/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I011",
+      "value": "NIHSS",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I012",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I013",
+      "value": "09/04/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    },
+    {
+      "id": "I014",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "ocr_visible_in_original": true
+    }
+  ]
+}

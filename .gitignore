@@ -16,6 +16,7 @@ build/
 # Runtime data: everything under data/ except committed config
 data/*
 !data/config/
+!data/flow1-testkit/
 !data/.gitkeep
 
 # OS / editor

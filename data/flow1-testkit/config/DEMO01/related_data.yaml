@@ -1,0 +1,22 @@
+version: 1
+demographics:
+  fields:
+  - sex
+  - age
+  - first_dose_date
+medical_history:
+  all: true
+conmeds:
+  ongoing_at_onset: true
+labs:
+  tests:
+  - TROPONIN_T
+  - CK_MB
+  - LDL
+  - HBA1C
+  window_days: 30
+prior_events:
+  match_on:
+  - pt_code
+  - soc_code
+  window_days: 365

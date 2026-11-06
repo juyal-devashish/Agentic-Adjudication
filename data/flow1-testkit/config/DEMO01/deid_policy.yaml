@@ -1,0 +1,40 @@
+version: 1
+date_policy: dob_only
+must_redact:
+- PATIENT_NAME
+- DOB
+- MRN
+- INSURANCE_NO
+- ADDRESS
+- PHONE
+- EMAIL
+- NEXT_OF_KIN
+- CASE_REFERENCE
+should_redact:
+- STAFF_NAME
+- STAFF_CONTACT
+- FACILITY
+allow_list:
+- DEMO01-*
+- Zelvoran
+- Wolff-Parkinson-White
+- Holter
+- Parkinson
+- Hodgkin
+- Addison
+- NIHSS
+- TIMI
+context_labels:
+- Name
+- Patient
+- DOB
+- Date of birth
+- born
+- MRN
+- Hospital no
+- NHS No
+- Address
+- Tel
+- geb.
+- Pat.-Nr.
+- Versichertennr.

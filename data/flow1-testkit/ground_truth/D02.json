@@ -1,0 +1,92 @@
+{
+  "doc_id": "D02",
+  "case_key": "DEMO01-101-0001_AE-001",
+  "subject_id": "DEMO01-101-0001",
+  "file": "documents/DEMO01-101-0001_AE-001/ecg_report.pdf",
+  "variant": "text_pdf",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "ecg_report.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "14/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "signature"
+      ]
+    }
+  ]
+}

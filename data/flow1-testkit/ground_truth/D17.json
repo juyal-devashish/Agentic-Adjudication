@@ -1,0 +1,11 @@
+{
+  "doc_id": "D17",
+  "case_key": "DEMO01-104-0006_AE-007",
+  "subject_id": "DEMO01-104-0006",
+  "file": "documents/DEMO01-104-0006_AE-007/notizen.txt",
+  "variant": "unsupported_txt",
+  "language": "de",
+  "expected_handling": "reject:UNSUPPORTED_TYPE",
+  "expected_output": null,
+  "items": []
+}

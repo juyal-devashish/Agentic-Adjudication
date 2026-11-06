@@ -1,0 +1,132 @@
+{
+  "doc_id": "D03",
+  "case_key": "DEMO01-101-0001_AE-001",
+  "subject_id": "DEMO01-101-0001",
+  "file": "documents/DEMO01-101-0001_AE-001/troponin_results.xlsx",
+  "variant": "xlsx",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "troponin_results.xlsx",
+  "items": [
+    {
+      "id": "I001",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_column"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "9 Victoria Ridges, South Joel W95 2AN",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "01632 960001",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "cells",
+      "locations": [
+        "formula_cached_value"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "07700 900101",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "comments",
+      "locations": [
+        "cell_comment"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "properties",
+      "locations": [
+        "document_properties"
+      ]
+    },
+    {
+      "id": "I009",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "properties",
+      "locations": [
+        "document_properties"
+      ]
+    },
+    {
+      "id": "I010",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ]
+    },
+    {
+      "id": "I011",
+      "value": "1240",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ]
+    },
+    {
+      "id": "I012",
+      "value": "TROPONIN_T",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ]
+    }
+  ]
+}

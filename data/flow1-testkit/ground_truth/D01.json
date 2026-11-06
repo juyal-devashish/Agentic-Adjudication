@@ -1,0 +1,283 @@
+{
+  "doc_id": "D01",
+  "case_key": "DEMO01-101-0001_AE-001",
+  "subject_id": "DEMO01-101-0001",
+  "file": "documents/DEMO01-101-0001_AE-001/discharge_summary.pdf",
+  "variant": "text_pdf",
+  "language": "en",
+  "expected_handling": "process",
+  "expected_output": "discharge_summary.pdf",
+  "items": [
+    {
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I003",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I004",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ]
+    },
+    {
+      "id": "I005",
+      "value": "ROBERTS, Philip",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I006",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I007",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner",
+        "footer"
+      ]
+    },
+    {
+      "id": "I008",
+      "value": "999 711 7031",
+      "category": "INSURANCE_NO",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I009",
+      "value": "9 Victoria Ridges, South Joel W95 2AN",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I010",
+      "value": "01632 960001",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I011",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ]
+    },
+    {
+      "id": "I012",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I013",
+      "value": "14/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I014",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I015",
+      "value": "Wolff-Parkinson-White",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I016",
+      "value": "1240 ng/L",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I017",
+      "value": "16/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ]
+    },
+    {
+      "id": "I018",
+      "value": "P. Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "footer"
+      ]
+    },
+    {
+      "id": "I019",
+      "value": "P. Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "footer"
+      ]
+    },
+    {
+      "id": "I020",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "footer"
+      ]
+    },
+    {
+      "id": "I021",
+      "value": "15/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I022",
+      "value": "Holter",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I023",
+      "value": "21/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I024",
+      "value": "Wendy Roberts",
+      "category": "NEXT_OF_KIN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I025",
+      "value": "07700 900101",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I026",
+      "value": "philip.roberts1@example.org",
+      "category": "EMAIL",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ]
+    },
+    {
+      "id": "I027",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "signature"
+      ]
+    }
+  ]
+}

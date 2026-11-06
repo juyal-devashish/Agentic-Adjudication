@@ -1,0 +1,11 @@
+{
+  "doc_id": "D15",
+  "case_key": "DEMO01-104-0006_AE-007",
+  "subject_id": "DEMO01-104-0006",
+  "file": "documents/DEMO01-104-0006_AE-007/ekg_beschaedigt.pdf",
+  "variant": "corrupt_pdf",
+  "language": "de",
+  "expected_handling": "reject:CORRUPT",
+  "expected_output": null,
+  "items": []
+}

@@ -1,0 +1,2833 @@
+{
+  "ocr": true,
+  "documents": [
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D14",
+      "variant": "encrypted_pdf",
+      "status": "rejected_ok"
+    },
+    {
+      "doc_id": "D15",
+      "variant": "corrupt_pdf",
+      "status": "rejected_ok"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "status": "scored",
+      "unverified_channels": [],
+      "metadata_identifier_hits": []
+    },
+    {
+      "doc_id": "D17",
+      "variant": "unsupported_txt",
+      "status": "rejected_ok"
+    }
+  ],
+  "items": [
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I003",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I004",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I005",
+      "value": "ROBERTS, Philip",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I006",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I007",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner",
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I008",
+      "value": "999 711 7031",
+      "category": "INSURANCE_NO",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I009",
+      "value": "9 Victoria Ridges, South Joel W95 2AN",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I010",
+      "value": "01632 960001",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I011",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I012",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I013",
+      "value": "14/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I014",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I015",
+      "value": "Wolff-Parkinson-White",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I016",
+      "value": "1240 ng/L",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I017",
+      "value": "16/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I018",
+      "value": "P. Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I019",
+      "value": "P. Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I020",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I021",
+      "value": "15/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I022",
+      "value": "Holter",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I023",
+      "value": "21/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I024",
+      "value": "Wendy Roberts",
+      "category": "NEXT_OF_KIN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I025",
+      "value": "07700 900101",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I026",
+      "value": "philip.roberts1@example.org",
+      "category": "EMAIL",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D01",
+      "variant": "text_pdf",
+      "id": "I027",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "signature"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I003",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I004",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I005",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I006",
+      "value": "14/03/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I007",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D02",
+      "variant": "text_pdf",
+      "id": "I008",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "signature"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I001",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_column"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I002",
+      "value": "24/07/1955",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I003",
+      "value": "9 Victoria Ridges, South Joel W95 2AN",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I004",
+      "value": "01632 960001",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "hidden",
+      "locations": [
+        "hidden_sheet"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I005",
+      "value": "2929647",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I006",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "cells",
+      "locations": [
+        "formula_cached_value"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I007",
+      "value": "07700 900101",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "comments",
+      "locations": [
+        "cell_comment"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I008",
+      "value": "Philip Roberts",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "properties",
+      "locations": [
+        "document_properties"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I009",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "properties",
+      "locations": [
+        "document_properties"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I010",
+      "value": "DEMO01-101-0001",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I011",
+      "value": "1240",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D03",
+      "variant": "xlsx",
+      "id": "I012",
+      "value": "TROPONIN_T",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "cells",
+      "locations": [
+        "visible_cell"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I003",
+      "value": "CARR, Leslie",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I004",
+      "value": "13/08/1961",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I005",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I006",
+      "value": "17 Catherine Estates, Griffithsview S0U 0UT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I007",
+      "value": "01632 960002",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I008",
+      "value": "DEMO01-101-0002",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I009",
+      "value": "Leslie Carr",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I010",
+      "value": "02/04/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I011",
+      "value": "NIHSS",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I012",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I013",
+      "value": "09/04/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D04",
+      "variant": "scan_png_300dpi",
+      "id": "I014",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I001",
+      "value": "Carr^Leslie",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientName (0010,0010)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I002",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientID (0010,0020)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I003",
+      "value": "19610813",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientBirthDate (0010,0030)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I004",
+      "value": "17 Catherine Estates, Griffithsview S0U 0UT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "PatientAddress (0010,1040)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I005",
+      "value": "01632 960002",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "private tag (0011,1001)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I006",
+      "value": "ACC26-04417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "AccessionNumber (0008,0050)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I007",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "InstitutionName (0008,0080)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I008",
+      "value": "Hart^Amelia",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "dicom_header",
+      "locations": [
+        "ReferringPhysicianName (0008,0090)"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I009",
+      "value": "20260402",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "dicom_header",
+      "locations": [
+        "StudyDate (0008,0020)"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I010",
+      "value": "CT HEAD WITHOUT CONTRAST",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "dicom_header",
+      "locations": [
+        "StudyDescription (0008,1030)"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I011",
+      "value": "CARR^LESLIE",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I012",
+      "value": "1193399",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D05",
+      "variant": "dicom",
+      "id": "I013",
+      "value": "1961-08-13",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "pixels",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I003",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I004",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I005",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I006",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I007",
+      "value": "WARD, Graeme",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I008",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I009",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I010",
+      "value": "231 Robert Station, Lake Reecehaven S4 0FT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I011",
+      "value": "DEMO01-102-0003",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I012",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I013",
+      "value": "17/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I014",
+      "value": "2950 ng/L",
+      "category": "LAB_VALUE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I015",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I016",
+      "value": "18/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I017",
+      "value": "TIMI",
+      "category": "CLINICAL_TERM",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I018",
+      "value": "19/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I019",
+      "value": "Brenda Ward",
+      "category": "NEXT_OF_KIN",
+      "requirement": "must_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I020",
+      "value": "Dr Helen Marsh",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I021",
+      "value": "Corrington Medical Practice",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:2",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I022",
+      "value": "2026/00417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I023",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:3",
+      "locations": [
+        "signature"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I024",
+      "value": "G. Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "footer_last_page_only"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I025",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:3",
+      "locations": [
+        "footer_last_page_only"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I026",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I027",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I028",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D06",
+      "variant": "text_pdf",
+      "id": "I029",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "metadata",
+      "locations": [
+        "pdf_metadata"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I003",
+      "value": "Graeme Ward",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I004",
+      "value": "26/05/1948",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I005",
+      "value": "231 Robert Station, Lake Reecehaven S4 0FT",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I006",
+      "value": "HN-RW46238",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I007",
+      "value": "2026/00417",
+      "category": "CASE_REFERENCE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I008",
+      "value": "19/05/2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I009",
+      "value": "DEMO01-102-0003",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D07",
+      "variant": "image_pdf_200dpi",
+      "id": "I010",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I001",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I002",
+      "value": "12 Fenwick Lane, Corrington CR9 2LP",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I003",
+      "value": "SMITH, Rita",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I004",
+      "value": "12/05/1957",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I005",
+      "value": "HN-MV37589",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I006",
+      "value": "01632 960004",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I007",
+      "value": "Rita Smith",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I008",
+      "value": "20/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D08",
+      "variant": "scan_jpg_150dpi_lowq",
+      "id": "I009",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I001",
+      "value": "SMITH, Rita",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I002",
+      "value": "12/05/1957",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I003",
+      "value": "HN-MV37589",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I004",
+      "value": "01632 960004",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I005",
+      "value": "Northvale Heart Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "image_header"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I006",
+      "value": "19/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I007",
+      "value": "DEMO01-102-0004",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D09",
+      "variant": "mixed_pdf_image_header",
+      "id": "I008",
+      "value": "Dr Rupert Okafor",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "signature"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I003",
+      "value": "Pamela Jones",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I004",
+      "value": "12/12/1966",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I005",
+      "value": "1572429",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I006",
+      "value": "13/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I007",
+      "value": "DEMO01-101-0005",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D10",
+      "variant": "image_pdf_rotated_90",
+      "id": "I008",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I001",
+      "value": "St Aldric General Hospital",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I002",
+      "value": "Wexmoor Road, Halbridge HB4 7QT",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I003",
+      "value": "Dr Thomas Reed",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I004",
+      "value": "Halbridge Health Centre",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I005",
+      "value": "Pamela Jones",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I006",
+      "value": "12/12/1966",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I007",
+      "value": "6 Parker Club, Lake Glenn B6 5US",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I008",
+      "value": "1572429",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I009",
+      "value": "DEMO01-101-0005",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "table"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I010",
+      "value": "02/06/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I011",
+      "value": "12/05/2025",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I012",
+      "value": "Hodgkin",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I013",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I014",
+      "value": "Dr Amelia Hart",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D11",
+      "variant": "text_pdf",
+      "id": "I015",
+      "value": "pamela.jones5@example.org",
+      "category": "EMAIL",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I001",
+      "value": "Klinikum Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I002",
+      "value": "Uferstraße 40, 50999 Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "letterhead"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I003",
+      "value": "STIFFEL, Carlo",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I004",
+      "value": "18.10.1959",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I005",
+      "value": "8859641",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I006",
+      "value": "J769144633",
+      "category": "INSURANCE_NO",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I007",
+      "value": "Salih-Schmiedecke-Allee 364, 95220 Großenhain",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I008",
+      "value": "+49 221 5550006",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I009",
+      "value": "DEMO01-104-0006",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "banner"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I010",
+      "value": "Carlo Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I011",
+      "value": "08.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I012",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I013",
+      "value": "Parkinson",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I014",
+      "value": "09.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I015",
+      "value": "Dr. med. Katrin Albers",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "body"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D12",
+      "variant": "text_pdf",
+      "id": "I016",
+      "value": "C. Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "footer"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I001",
+      "value": "Klinikum Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I002",
+      "value": "Uferstraße 40, 50999 Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I003",
+      "value": "STIFFEL, Carlo",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I004",
+      "value": "18.10.1959",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I005",
+      "value": "8859641",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I006",
+      "value": "J769144633",
+      "category": "INSURANCE_NO",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "removed"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I007",
+      "value": "Salih-Schmiedecke-Allee 364, 95220 Großenhain",
+      "category": "ADDRESS",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I008",
+      "value": "+49 221 5550006",
+      "category": "PHONE",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I009",
+      "value": "DEMO01-104-0006",
+      "category": "SUBJECT_ID",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I010",
+      "value": "Carlo Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I011",
+      "value": "08.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "lost"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I012",
+      "value": "Zelvoran",
+      "category": "DRUG",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I013",
+      "value": "Parkinson",
+      "category": "EPONYM",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "preserved"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I014",
+      "value": "09.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "lost"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I015",
+      "value": "Dr. med. Katrin Albers",
+      "category": "STAFF_NAME",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D13",
+      "variant": "scan_png_150dpi",
+      "id": "I016",
+      "value": "C. Stiffel",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "scan"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "id": "I001",
+      "value": "STIFFEL, Carlo",
+      "category": "PATIENT_NAME",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "id": "I002",
+      "value": "18.10.1959",
+      "category": "DOB",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "id": "I003",
+      "value": "8859641",
+      "category": "MRN",
+      "requirement": "must_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "residual"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "id": "I004",
+      "value": "Klinikum Rheinbrück",
+      "category": "FACILITY",
+      "requirement": "should_redact",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "not_measurable"
+    },
+    {
+      "doc_id": "D16",
+      "variant": "wrong_extension_png",
+      "id": "I005",
+      "value": "08.01.2026",
+      "category": "CLINICAL_DATE",
+      "requirement": "must_keep",
+      "channel": "page:1",
+      "locations": [
+        "burned_in"
+      ],
+      "status": "preserved"
+    }
+  ],
+  "summary": {
+    "rates": {
+      "all|must_keep": {
+        "preserved": 48,
+        "not_measurable": 1,
+        "lost": 2,
+        "rate": 0.96
+      },
+      "all|must_redact": {
+        "removed": 58,
+        "residual": 30,
+        "not_measurable": 4,
+        "rate": 0.6591
+      },
+      "all|should_redact": {
+        "removed": 31,
+        "residual": 11,
+        "not_measurable": 5,
+        "rate": 0.7381
+      },
+      "category=ADDRESS|must_redact": {
+        "removed": 6,
+        "not_measurable": 3,
+        "rate": 1.0
+      },
+      "category=CASE_REFERENCE|must_redact": {
+        "removed": 2,
+        "residual": 1,
+        "rate": 0.6667
+      },
+      "category=CLINICAL_DATE|must_keep": {
+        "preserved": 20,
+        "lost": 2,
+        "rate": 0.9091
+      },
+      "category=CLINICAL_TERM|must_keep": {
+        "preserved": 4,
+        "rate": 1.0
+      },
+      "category=DOB|must_redact": {
+        "removed": 9,
+        "residual": 7,
+        "rate": 0.5625
+      },
+      "category=DRUG|must_keep": {
+        "preserved": 6,
+        "rate": 1.0
+      },
+      "category=EMAIL|must_redact": {
+        "removed": 2,
+        "rate": 1.0
+      },
+      "category=EPONYM|must_keep": {
+        "preserved": 5,
+        "rate": 1.0
+      },
+      "category=FACILITY|should_redact": {
+        "removed": 20,
+        "residual": 6,
+        "not_measurable": 5,
+        "rate": 0.7692
+      },
+      "category=INSURANCE_NO|must_redact": {
+        "removed": 3,
+        "rate": 1.0
+      },
+      "category=LAB_VALUE|must_keep": {
+        "preserved": 3,
+        "rate": 1.0
+      },
+      "category=MRN|must_redact": {
+        "removed": 10,
+        "residual": 8,
+        "rate": 0.5556
+      },
+      "category=NEXT_OF_KIN|must_redact": {
+        "removed": 2,
+        "rate": 1.0
+      },
+      "category=PATIENT_NAME|must_redact": {
+        "removed": 17,
+        "residual": 11,
+        "not_measurable": 1,
+        "rate": 0.6071
+      },
+      "category=PHONE|must_redact": {
+        "removed": 7,
+        "residual": 3,
+        "rate": 0.7
+      },
+      "category=STAFF_NAME|should_redact": {
+        "removed": 11,
+        "residual": 5,
+        "rate": 0.6875
+      },
+      "category=SUBJECT_ID|must_keep": {
+        "preserved": 10,
+        "not_measurable": 1,
+        "rate": 1.0
+      },
+      "variant=dicom|must_keep": {
+        "preserved": 2,
+        "rate": 1.0
+      },
+      "variant=dicom|must_redact": {
+        "removed": 6,
+        "not_measurable": 1,
+        "residual": 2,
+        "rate": 0.75
+      },
+      "variant=dicom|should_redact": {
+        "removed": 2,
+        "rate": 1.0
+      },
+      "variant=image_pdf_200dpi|must_keep": {
+        "preserved": 2,
+        "rate": 1.0
+      },
+      "variant=image_pdf_200dpi|must_redact": {
+        "residual": 4,
+        "not_measurable": 1,
+        "rate": 0.0
+      },
+      "variant=image_pdf_200dpi|should_redact": {
+        "residual": 2,
+        "not_measurable": 1,
+        "rate": 0.0
+      },
+      "variant=image_pdf_rotated_90|must_keep": {
+        "preserved": 2,
+        "rate": 1.0
+      },
+      "variant=image_pdf_rotated_90|must_redact": {
+        "residual": 3,
+        "rate": 0.0
+      },
+      "variant=image_pdf_rotated_90|should_redact": {
+        "residual": 3,
+        "rate": 0.0
+      },
+      "variant=mixed_pdf_image_header|must_keep": {
+        "preserved": 2,
+        "rate": 1.0
+      },
+      "variant=mixed_pdf_image_header|must_redact": {
+        "residual": 4,
+        "rate": 0.0
+      },
+      "variant=mixed_pdf_image_header|should_redact": {
+        "residual": 1,
+        "removed": 1,
+        "rate": 0.5
+      },
+      "variant=scan_jpg_150dpi_lowq|must_keep": {
+        "preserved": 1,
+        "rate": 1.0
+      },
+      "variant=scan_jpg_150dpi_lowq|must_redact": {
+        "residual": 3,
+        "removed": 2,
+        "rate": 0.4
+      },
+      "variant=scan_jpg_150dpi_lowq|should_redact": {
+        "removed": 1,
+        "not_measurable": 1,
+        "residual": 1,
+        "rate": 0.5
+      },
+      "variant=scan_png_150dpi|must_keep": {
+        "preserved": 3,
+        "lost": 2,
+        "rate": 0.6
+      },
+      "variant=scan_png_150dpi|must_redact": {
+        "residual": 6,
+        "removed": 1,
+        "not_measurable": 1,
+        "rate": 0.1429
+      },
+      "variant=scan_png_150dpi|should_redact": {
+        "not_measurable": 2,
+        "residual": 1,
+        "rate": 0.0
+      },
+      "variant=scan_png_300dpi|must_keep": {
+        "not_measurable": 1,
+        "preserved": 4,
+        "rate": 1.0
+      },
+      "variant=scan_png_300dpi|must_redact": {
+        "residual": 5,
+        "not_measurable": 1,
+        "rate": 0.0
+      },
+      "variant=scan_png_300dpi|should_redact": {
+        "residual": 3,
+        "rate": 0.0
+      },
+      "variant=text_pdf|must_keep": {
+        "preserved": 28,
+        "rate": 1.0
+      },
+      "variant=text_pdf|must_redact": {
+        "removed": 41,
+        "rate": 1.0
+      },
+      "variant=text_pdf|should_redact": {
+        "removed": 26,
+        "rate": 1.0
+      },
+      "variant=wrong_extension_png|must_keep": {
+        "preserved": 1,
+        "rate": 1.0
+      },
+      "variant=wrong_extension_png|must_redact": {
+        "residual": 3,
+        "rate": 0.0
+      },
+      "variant=wrong_extension_png|should_redact": {
+        "not_measurable": 1,
+        "rate": null
+      },
+      "variant=xlsx|must_keep": {
+        "preserved": 3,
+        "rate": 1.0
+      },
+      "variant=xlsx|must_redact": {
+        "removed": 8,
+        "rate": 1.0
+      },
+      "variant=xlsx|should_redact": {
+        "removed": 1,
+        "rate": 1.0
+      }
+    },
+    "gate": {
+      "text_pdf_must_redact_all_removed": true,
+      "no_identifiers_in_metadata": true,
+      "rejected_documents_have_no_output": true,
+      "passed": true
+    }
+  }
+}
