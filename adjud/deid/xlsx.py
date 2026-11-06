@@ -18,7 +18,7 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.packaging.core import DocumentProperties
 
-from adjud.deid.detect import Finding, KnownValues, detect, learn, merge_spans
+from adjud.deid.detect import Finding, KnownValues, detect, finding_id, learn, merge_spans
 from adjud.deid.pagetext import TextUnit
 from adjud.deid.policy import Policy
 from adjud.deid.textmatch import norm
@@ -96,7 +96,24 @@ def learn_xlsx(content: bytes, policy: Policy, known: KnownValues) -> None:
                     learn(TextUnit.from_string(text, f"{ws.title}!{c.coordinate}"), policy, known)
 
 
-def redact_xlsx(content: bytes, policy: Policy, known: KnownValues) -> XlsxOutcome:
+def _site_terms(terms: list[str] | None) -> KnownValues:
+    extra = KnownValues()
+    for term in terms or []:
+        if term.strip():
+            extra.values[term.strip()] = "SITE_TERM"
+    return extra
+
+
+def redact_xlsx(
+    content: bytes,
+    policy: Policy,
+    known: KnownValues,
+    *,
+    extra_terms: list[str] | None = None,
+    keep: list[str] | None = None,
+) -> XlsxOutcome:
+    """`extra_terms`: site-added terms; `keep`: ids of findings the site unticked."""
+    extra, keep_ids = _site_terms(extra_terms), set(keep or [])
     wb = load_workbook(io.BytesIO(content))  # formulas
     cached = load_workbook(io.BytesIO(content), data_only=True)  # last computed values
     forced = _forced_cells(cached, policy)
@@ -112,7 +129,8 @@ def redact_xlsx(content: bytes, policy: Policy, known: KnownValues) -> XlsxOutco
                     c.value = value
                 if c.comment is not None:
                     c.comment = None
-                if (category := forced.get((ws.title, c.coordinate))) is not None:
+                category = forced.get((ws.title, c.coordinate))
+                if category is not None and finding_id(str(value)) not in keep_ids:
                     found = Finding(0, 0, category, "column", str(value), source=where)
                     outcome.findings.append(found)
                     outcome.redacted_cells.append(where)
@@ -122,7 +140,11 @@ def redact_xlsx(content: bytes, policy: Policy, known: KnownValues) -> XlsxOutco
                 if not text:
                     continue
                 unit = TextUnit.from_string(text, where)
-                findings = detect(unit, policy, known)
+                findings = [
+                    f
+                    for f in detect(unit, policy, known) + extra.find(unit)
+                    if f.id not in keep_ids
+                ]
                 if findings:
                     outcome.findings += findings
                     outcome.redacted_cells.append(where)
@@ -181,8 +203,16 @@ class XlsxVerification:
                 "comments": self.comments, "defined_names": self.defined_names}  # fmt: skip
 
 
-def verify_xlsx(output: bytes, policy: Policy, known: KnownValues) -> XlsxVerification:
+def verify_xlsx(
+    output: bytes,
+    policy: Policy,
+    known: KnownValues,
+    *,
+    extra_terms: list[str] | None = None,
+    keep: list[str] | None = None,
+) -> XlsxVerification:
     result = XlsxVerification()
+    extra, keep_ids = _site_terms(extra_terms), set(keep or [])
     for unit in xlsx_texts(output):
         if unit.source.startswith("comment:"):
             result.comments += 1
@@ -190,5 +220,7 @@ def verify_xlsx(output: bytes, policy: Policy, known: KnownValues) -> XlsxVerifi
             result.defined_names += 1
         elif unit.source == "property:creator" and unit.text == "adjud de-identification":
             continue
-        result.residuals += detect(unit, policy, known)
+        result.residuals += [
+            f for f in detect(unit, policy, known) + extra.find(unit) if f.id not in keep_ids
+        ]
     return result

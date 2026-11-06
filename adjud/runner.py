@@ -19,6 +19,7 @@ import yaml
 
 from adjud.documents import DocumentProcessor
 from adjud.events import Clock, utc_now
+from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.paths import DataPaths
 
@@ -54,8 +55,9 @@ class Runner:
         return len(results)
 
     def run_case_steps(self) -> int:
-        """Automatic case steps: de-identify every case waiting in DEIDENTIFYING. A failure
-        in one case is logged and retried next tick; it never stops the others."""
+        """Automatic case steps: de-identify every case waiting in DEIDENTIFYING, and write
+        the Flow 2 handoff for every newly SUBMITTED case. A failure in one case is logged
+        and retried next tick; it never stops the others."""
         from adjud.workflow import State
 
         done = 0
@@ -67,6 +69,19 @@ class Runner:
                 done += 1
             except Exception:
                 log.exception("de-identification failed for %s", cs.case_id)
+        for case_id in pending_handoffs(self.pipeline.store):
+            try:
+                write_handoff(
+                    self.pipeline.store,
+                    case_id,
+                    self.paths.config,
+                    self.documents.outbox,
+                    self.study,
+                )
+                log.info("handoff written for %s", case_id)
+                done += 1
+            except Exception:
+                log.exception("handoff failed for %s", case_id)
         return done
 
     def run_once(self) -> None:

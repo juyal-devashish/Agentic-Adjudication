@@ -14,6 +14,7 @@ nothing that looks like a date is redacted unless it is a known date of birth.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import date
@@ -70,12 +71,25 @@ class Finding:
     score: float = 1.0
     source: str = ""
 
+    @property
+    def id(self) -> str:
+        return finding_id(self.text)
+
     def as_report(self, requirement: str) -> dict[str, Any]:
         d = asdict(self)
         d["requirement"] = requirement
         d["masked"] = mask(self.text)
+        d["id"] = self.id
         del d["text"]  # reports never repeat the identifier itself
         return d
+
+
+def finding_id(text: str) -> str:
+    """Stable id of a finding's text (normalised like the scorer), so a site decision such
+    as "keep this one" can be recorded and re-applied without storing the text."""
+    from adjud.deid.textmatch import norm
+
+    return hashlib.sha256(norm(text, True).encode()).hexdigest()[:12]
 
 
 def mask(text: str) -> str:

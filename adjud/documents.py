@@ -71,10 +71,14 @@ def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
             docs.files.pop(d["name"], None)
             docs.keep.pop(d["name"], None)
         elif t == "redactions.changed":
-            docs.extra_terms += [x for x in d.get("add_terms", []) if x not in docs.extra_terms]
-            for name, texts in (d.get("keep") or {}).items():
+            if d.get("terms"):  # site-added terms live in a quarantined case file
+                text = store.get_file(case_id, d["terms"]["path"]).decode()
+                docs.extra_terms += [
+                    x for x in text.splitlines() if x.strip() and x not in docs.extra_terms
+                ]
+            for name, ids in (d.get("keep") or {}).items():
                 docs.keep.setdefault(name, [])
-                docs.keep[name] += [x for x in texts if x not in docs.keep[name]]
+                docs.keep[name] += [x for x in ids if x not in docs.keep[name]]
         elif t == "deid.started":
             docs.runs = d["run"]
             current_run = {}
@@ -176,10 +180,17 @@ class DocumentProcessor:
         )  # fmt: skip
         statuses = {}
         for r in results:
-            data: dict[str, Any] = {"name": r.name, "kind": r.kind, "status": r.status,
-                                    "reject_code": r.reject_code, "warnings": r.warnings,
-                                    "findings": len(r.findings),
-                                    "residuals": len(r.residuals), "output": None}  # fmt: skip
+            data: dict[str, Any] = {
+                "name": r.name,
+                "kind": r.kind,
+                "status": r.status,
+                "reject_code": r.reject_code,
+                "warnings": r.warnings,
+                "findings": len(r.findings),
+                "residuals": len(r.residuals),
+                "pages": r.pages,
+                "output": None,
+            }
             if r.output is not None and r.output_name:
                 rel = f"documents/redacted/r{run}/{r.output_name}"
                 data["output"] = {"path": rel, "sha256": store.put_file(case_id, rel, r.output)}

@@ -32,7 +32,7 @@ class DocInput:
     name: str
     content: bytes
     extra_terms: list[str] = field(default_factory=list)  # site-added terms (F1-22)
-    keep: list[str] = field(default_factory=list)  # texts the site un-redacted (F1-21)
+    keep: list[str] = field(default_factory=list)  # finding ids the site kept (F1-21)
 
 
 @dataclass
@@ -115,8 +115,8 @@ def deidentify_case(
             res.verification = ver.summary()
             res.status = "verified" if ver.passed else "blocked"
         elif c.kind == "xlsx":
-            out = redact_xlsx(d.content, policy, known)
-            ver = verify_xlsx(out.output, policy, known)
+            out = redact_xlsx(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep)
+            ver = verify_xlsx(out.output, policy, known, extra_terms=d.extra_terms, keep=d.keep)
             res.output, res.output_name = out.output, output_name(d.name, c.kind)
             res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
             res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]

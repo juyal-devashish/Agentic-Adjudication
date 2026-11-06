@@ -25,7 +25,7 @@ import pymupdf
 from PIL import Image, ImageSequence
 
 from adjud.deid import ocr
-from adjud.deid.detect import Finding, KnownValues, detect, learn, merge_spans
+from adjud.deid.detect import Finding, KnownValues, detect, finding_id, learn, merge_spans
 from adjud.deid.pagetext import TextUnit
 from adjud.deid.policy import Policy
 
@@ -141,8 +141,17 @@ class PdfOutcome:
 def _findings(
     unit: TextUnit, policy: Policy, known: KnownValues, extra: KnownValues, keep: set[str]
 ) -> list[Finding]:
-    found = detect(unit, policy, known) + extra.find(unit)
-    return [f for f in found if f.text not in keep]
+    """Findings minus those the site chose to keep (`keep` holds finding ids). Keeping a
+    finding also keeps every other detector's finding inside the same span (e.g. NER's
+    "Amelia Hart" inside the kept "Dr Amelia Hart"). Site-added terms always apply."""
+    found = detect(unit, policy, known)
+    kept = [(f.start, f.end) for f in found if f.id in keep]
+    found = [
+        f
+        for f in found
+        if f.id not in keep and not any(s <= f.start and f.end <= e for s, e in kept)
+    ]
+    return found + extra.find(unit)
 
 
 def _extra(terms: list[str] | None) -> KnownValues:
@@ -173,8 +182,8 @@ def redact_pdf(
     extra_terms: list[str] | None = None,
     keep: list[str] | None = None,
 ) -> PdfOutcome:
-    """Redact every finding. `extra_terms` are site-added terms (F1-22); `keep` holds texts
-    the site unticked with a reason (F1-21)."""
+    """Redact every finding. `extra_terms` are site-added terms (F1-22); `keep` holds the
+    ids of findings the site unticked with a reason (F1-21)."""
     extra, keep_set = _extra(extra_terms), set(keep or [])
     outcome = PdfOutcome(output=b"")
     with pymupdf.open(stream=content, filetype="pdf") as doc:
@@ -305,7 +314,7 @@ def verify_pdf(
             for u in units:
                 result.residuals += _findings(u, policy, known, extra, keep_set)
                 for value in seeded or []:
-                    if value not in keep_set and contains(u.text, value):
+                    if finding_id(value) not in keep_set and contains(u.text, value):
                         result.residuals.append(
                             Finding(0, 0, "SEEDED", "seeded", value, source=unit.source)
                         )
