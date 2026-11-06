@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from adjud.events import Event, canonical_json
+from adjud.events import canonical_json
 
 
 class State(StrEnum):
@@ -59,6 +59,8 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "handoff.flow2_ready": {State.SUBMITTED: SAME},
     "case.withdrawn": dict.fromkeys(OPEN_STATES, State.WITHDRAWN),
     "source.changed": dict.fromkeys(ALL_STATES, SAME),
+    "source.stale_ignored": dict.fromkeys(ALL_STATES, SAME),
+    "case.flagged": dict.fromkeys(ALL_STATES, SAME),
     "notification.queued": dict.fromkeys(ALL_STATES, SAME),
 }
 
@@ -98,28 +100,36 @@ class CaseState(BaseModel):
         return canonical_json(self.model_dump(mode="json")) + "\n"
 
 
-def replay(events: list[Event]) -> CaseState:
-    """Rebuild a case's state from its full event list. Raises on any illegal step."""
+def _add_flag(flags: list[str], flag: str) -> list[str]:
+    return flags if flag in flags else [*flags, flag]
+
+
+def replay(events: list[dict[str, Any]]) -> CaseState:
+    """Rebuild a case's state from its full list of event records.
+    Raises TransitionRefused on any illegal step."""
     if not events:
         raise ValueError("a case has at least one event")
     state: State | None = None
     cs: dict[str, Any] = {}
     for ev in events:
-        new = next_state(state, ev.type)
-        if ev.type == "case.created":
+        new = next_state(state, ev["type"])
+        data = ev.get("data") or {}
+        if ev["type"] == "case.created":
             cs = {
-                "case_id": ev.case,
-                "created_at": ev.at,
-                "study": ev.data.get("study"),
-                "subject": ev.data.get("subject"),
-                "ae_id": ev.data.get("ae_id"),
+                "case_id": ev["case"],
+                "created_at": ev["at"],
+                "study": data.get("study"),
+                "subject": data.get("subject"),
+                "ae_id": data.get("ae_id"),
                 "flags": [],
-                "state_since": ev.at,
+                "state_since": ev["at"],
             }
-        if ev.type == "source.changed" and "source_changed" not in cs["flags"]:
-            cs["flags"] = [*cs["flags"], "source_changed"]
+        elif ev["type"] == "source.changed":
+            cs["flags"] = _add_flag(cs["flags"], "source_changed")
+        elif ev["type"] == "case.flagged" and data.get("flag"):
+            cs["flags"] = _add_flag(cs["flags"], data["flag"])
         if new != state:
-            cs["state_since"] = ev.at
+            cs["state_since"] = ev["at"]
         state = new
     assert state is not None
-    return CaseState(**cs, state=state, seq=events[-1].seq, last_hash=events[-1].hash)
+    return CaseState(**cs, state=state, seq=events[-1]["seq"], last_hash=events[-1]["hash"])

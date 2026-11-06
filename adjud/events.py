@@ -1,7 +1,7 @@
-"""Event records and their hashes (mvp-spec.md §4.3).
+"""Case event records and hashing helpers (mvp-spec.md §4.3).
 
-`hash` is SHA-256 over the canonical JSON of the event without its own `hash` field.
-`prev_hash` of the first event in a log is GENESIS_HASH.
+A case event is a record in a ChainedLog with the fields below. `Event` is a typed,
+read-only view of such a record.
 """
 
 from __future__ import annotations
@@ -36,16 +36,32 @@ def sha256_bytes(content: bytes) -> str:
     return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
+def record_hash(record: dict[str, Any]) -> str:
+    """SHA-256 of the canonical JSON of a record without its own `hash` field."""
+    body = {k: v for k, v in record.items() if k != "hash"}
+    return sha256_bytes(canonical_json(body).encode())
+
+
 class EventDraft(BaseModel):
     """What a caller supplies; the log adds seq, time and the hash chain."""
 
     model_config = ConfigDict(frozen=True)
 
     type: str
-    actor: str  # "user:<id>" or "system:<component>"
+    actor: str  # a user id ("ss.anna") or "system:<component>"
     data: dict[str, Any] = {}
     reason: str | None = None
     signature: dict[str, Any] | None = None
+
+    def fields(self, case_id: str) -> dict[str, Any]:
+        return {
+            "case": case_id,
+            "actor": self.actor,
+            "type": self.type,
+            "data": self.data,
+            "reason": self.reason,
+            "signature": self.signature,
+        }
 
 
 class Event(BaseModel):
@@ -53,7 +69,7 @@ class Event(BaseModel):
 
     seq: int
     at: str
-    case: str | None  # None for entries in the intake log
+    case: str
     actor: str
     type: str
     data: dict[str, Any]
@@ -61,32 +77,6 @@ class Event(BaseModel):
     signature: dict[str, Any] | None
     prev_hash: str
     hash: str
-
-    def body(self) -> dict[str, Any]:
-        return self.model_dump(mode="json", exclude={"hash"})
-
-    def computed_hash(self) -> str:
-        return sha256_bytes(canonical_json(self.body()).encode())
-
-    def to_line(self) -> str:
-        return canonical_json(self.model_dump(mode="json")) + "\n"
-
-    @classmethod
-    def build(
-        cls, draft: EventDraft, *, seq: int, at: str, case: str | None, prev_hash: str
-    ) -> Event:
-        body = {
-            "seq": seq,
-            "at": at,
-            "case": case,
-            "actor": draft.actor,
-            "type": draft.type,
-            "data": draft.data,
-            "reason": draft.reason,
-            "signature": draft.signature,
-            "prev_hash": prev_hash,
-        }
-        return cls(**body, hash=sha256_bytes(canonical_json(body).encode()))
 
 
 def file_refs(data: Any) -> Iterator[dict[str, str]]:

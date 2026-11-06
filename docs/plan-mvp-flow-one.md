@@ -5,7 +5,7 @@
 | **Implements** | [mvp-flow-1.md](mvp-flow-1.md) v0.1 (referred to below as "the spec") |
 | **Checked against** | [flow-1-testcases.md](flow-1-testcases.md) and the test kit in [data/flow1-testkit/](../data/flow1-testkit/README.md) |
 | **Goal** | A really simple, working proof of concept of Flow 1, ready for a stakeholder demo |
-| **Status** | Steps 0–1 done; step 1 being aligned to the kit interface (1b). Tick boxes as steps are completed and committed |
+| **Status** | Steps 0–1b done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -127,13 +127,13 @@ From the spec's open questions (§17), the kit's encoded decisions (kit README) 
 - [x] `tools/rebuild_state.py`, `tools/verify_log.py` (cases and intake log)
 - [x] Tests: chain, tamper, rebuild byte-identical, refusals, orphan file, torn write
 
-### Step 1b — Align storage with the kit interface
+### Step 1b — Align storage with the kit interface ✅
 
-- [ ] `ChainedLog` stores flat records (`{seq, at, …fields, prev_hash, hash}`): case events keep the `Event` shape; intake entries are flat evaluation records
-- [ ] `adjud.store` exposes `read_log(path)` and `verify_log(path) -> (ok, message)` with the failing line number
-- [ ] `FileCaseStore` exposes the kit's view: `root`, `events(id) -> list[dict]`, `list_cases() -> list[str]`, `get_json`, `put_json`, `case_dir`, `evaluations_path`, `load_index`, `rebuild_index`
-- [ ] Workflow table gains `case.flagged` and `source.stale_ignored` (no state change)
-- [ ] Our step 1 tests still pass
+- [x] `ChainedLog` stores flat records (`{seq, at, …fields, prev_hash, hash}`): case events keep the `Event` shape; intake entries are flat evaluation records
+- [x] `adjud.store` exposes `read_log(path)` and `verify_log(path) -> (ok, message)` with the failing line number
+- [x] `FileCaseStore` exposes the kit's view: `root`, `events(id) -> list[dict]`, `list_cases() -> list[str]`, `get_json`, `put_json`, `case_dir`, `evaluations_path`, `load_index`, `rebuild_index`
+- [x] Workflow table gains `case.flagged` and `source.stale_ignored` (no state change)
+- [x] Our step 1 tests still pass
 
 **Done when:** our tests pass and the kit's TC-INT-14 and TC-INT-15 could run against the store (they also need intake, step 3).
 

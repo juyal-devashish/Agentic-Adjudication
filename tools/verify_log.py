@@ -17,7 +17,7 @@ def main() -> int:
     bad = [r for r in reports if not r.ok]
     for r in reports:
         status = "OK " if r.ok else "BAD"
-        print(f"{status} {r.log.relative_to(paths.root)} ({r.events} events)")
+        print(f"{status} {r.log.relative_to(paths.root)} ({r.records} records)")
         for problem in r.problems:
             print(f"    - {problem}")
     print(f"\n{len(reports) - len(bad)}/{len(reports)} logs verified.")

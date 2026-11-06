@@ -6,10 +6,10 @@ import json
 
 import pytest
 
-from adjud.chain import ChainedLog
-from adjud.events import GENESIS_HASH, EventDraft
-from adjud.integrity import rebuild_all, verify_all, verify_chain
-from adjud.store import CaseExists, intake_log
+from adjud.chain import ChainedLog, check_chain
+from adjud.events import GENESIS_HASH, EventDraft, record_hash
+from adjud.integrity import rebuild_all, verify_all
+from adjud.store import CaseExists, intake_log, verify_log
 from adjud.workflow import State, TransitionRefused
 
 CASE = "DEMO01-0001"
@@ -48,11 +48,12 @@ def upload(store, case_id: str = CASE, name: str = "a.pdf", content: bytes = b"%
 def test_events_are_chained_from_genesis(store):
     make_case(store)
     events = store.events(CASE)
-    assert [e.seq for e in events] == [1, 2]
-    assert events[0].prev_hash == GENESIS_HASH
-    assert events[1].prev_hash == events[0].hash
-    assert all(e.computed_hash() == e.hash for e in events)
-    assert events[0].at == "2026-11-05T10:00:00Z"
+    assert [e["seq"] for e in events] == [1, 2]
+    assert events[0]["prev_hash"] == GENESIS_HASH
+    assert events[1]["prev_hash"] == events[0]["hash"]
+    assert all(record_hash(e) == e["hash"] for e in events)
+    assert events[0]["at"] == "2026-11-05T10:00:00Z"
+    assert events[0]["case"] == CASE
 
 
 def test_state_follows_the_workflow(store):
@@ -139,7 +140,7 @@ def test_editing_any_field_of_an_event_is_detected(store, paths, field):
     log.write_text("\n".join(lines) + "\n")
     (report,) = verify_all(paths)
     assert not report.ok
-    assert any("edited" in p for p in report.problems)
+    assert any("line 2: content altered" in p for p in report.problems)
 
 
 def test_deleting_an_event_breaks_the_chain(store, paths):
@@ -168,14 +169,29 @@ def test_deleting_a_referenced_file_is_detected(store, paths):
     assert any("referenced file missing" in p for p in report.problems)
 
 
-def test_intake_log_is_verified_too(paths, clock):
+def test_intake_log_holds_flat_records_and_is_verified(paths, clock):
     log = intake_log(paths, clock)
-    log.append(EventDraft(type="intake.evaluated", actor=SYSTEM, data={"row": 1}))
-    log.append(EventDraft(type="intake.evaluated", actor=SYSTEM, data={"row": 2}))
-    assert verify_chain(log).ok
-    raw = log.path.read_text().replace('"row":2', '"row":3')
+    log.append({"key": "DEMO01|S1|AE-1", "outcome": "created", "rule_set": "DEMO01-ELIG"})
+    log.append({"key": "DEMO01|S1|AE-2", "outcome": "not_eligible", "rule_set": "DEMO01-ELIG"})
+    assert log.records()[1]["outcome"] == "not_eligible"
+    assert verify_log(log.path) == (True, "ok")
+    raw = log.path.read_text().replace('"not_eligible"', '"created"')
     log.path.write_text(raw)
-    assert not verify_chain(log).ok
+    ok, msg = verify_log(log.path)
+    assert not ok and "line 2" in msg
+    assert any(not r.ok for r in verify_all(paths))
+
+
+def test_reserved_fields_cannot_be_set(paths):
+    with pytest.raises(ValueError, match="may not set"):
+        intake_log(paths).append({"hash": "sha256:forged"})
+
+
+def test_new_case_ids_are_sequential_per_study(store):
+    assert store.new_case_id("DEMO01") == "DEMO01-0001"
+    assert store.new_case_id("DEMO01") == "DEMO01-0002"
+    store.create_case("DEMO01-0002", created())
+    assert store.list_cases() == ["DEMO01-0002"]  # folders without a log are not cases
 
 
 # --- rebuild ------------------------------------------------------------------------
@@ -228,9 +244,9 @@ def test_torn_last_write_is_recovered_on_next_append(store, paths):
     upload(store)
 
     events = store.events(CASE)
-    assert [e.seq for e in events] == [1, 2, 3]
-    assert events[2].type == "documents.uploaded"
-    assert verify_chain(ChainedLog(log_path, case=CASE)).ok
+    assert [e["seq"] for e in events] == [1, 2, 3]
+    assert events[2]["type"] == "documents.uploaded"
+    assert check_chain(ChainedLog(log_path), expect={"case": CASE}).ok
 
 
 def test_torn_fragment_is_quarantined_not_lost(store):
