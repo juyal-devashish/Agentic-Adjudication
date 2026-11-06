@@ -4,8 +4,11 @@
     uv run python -m tools.reset_demo --preload    # also put 01_initial.csv in the inbox
 
 Only these runtime folders under the data dir are removed: cases, intake, inbox,
-processed, outbox, metrics, logs, edc_mock. data/config/ and data/flow1-testkit/ are
-never touched.
+processed, outbox, metrics, logs, edc_mock, demo_uploads. data/config/ and
+data/flow1-testkit/ are never touched.
+
+data/demo_uploads/ gets copies of the kit's import files (inbox_files/) and source
+documents (one folder per case key), ready to drag into the UI during the demo.
 """
 
 from __future__ import annotations
@@ -16,7 +19,17 @@ from pathlib import Path
 
 from adjud.paths import DataPaths
 
-RUNTIME = ("cases", "intake", "inbox", "processed", "outbox", "metrics", "logs", "edc_mock")
+RUNTIME = (
+    "cases",
+    "intake",
+    "inbox",
+    "processed",
+    "outbox",
+    "metrics",
+    "logs",
+    "edc_mock",
+    "demo_uploads",
+)
 KIT = Path(__file__).resolve().parents[1] / "data" / "flow1-testkit"
 
 
@@ -30,6 +43,9 @@ def reset(paths: DataPaths, *, preload: bool = False) -> None:
     shutil.copytree(KIT / "edc_mock", paths.edc_mock)
     for name in ("inbox", "processed", "outbox", "cases", "intake"):
         (paths.root / name).mkdir(parents=True, exist_ok=True)
+    staging = paths.root / "demo_uploads"
+    shutil.copytree(KIT / "inbox_scenarios", staging / "inbox_files")
+    shutil.copytree(KIT / "documents", staging / "documents")
     if preload:
         shutil.copy(KIT / "inbox_scenarios" / "01_initial.csv", paths.inbox)
 
