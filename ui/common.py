@@ -17,11 +17,6 @@ from adjud.intake import IntakePipeline
 from adjud.paths import DataPaths
 
 STUDY = "DEMO01"
-ROLE_LABELS = {
-    "site": "Site user",
-    "safety_specialist": "Safety Specialist",
-    "study_admin": "Study admin",
-}
 
 
 def paths() -> DataPaths:
@@ -77,3 +72,33 @@ def processor():
 
 def study_config() -> dict[str, Any]:
     return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
+
+
+def case_header(ctx: Context) -> None:
+    """Case heading, lifecycle rail and the next step for whoever is looking."""
+    import theme
+    from wording import next_step
+
+    from adjud.documents import documents_of
+    from adjud.review import submission_status
+
+    pipe = pipeline()
+    cs = pipe.store.state(ctx.case_id)
+    snap = pipe.latest_snapshot(ctx.case_id)
+    theme.case_heading(
+        ctx.case_id,
+        snap["ae_term"],
+        f"Onset {theme.date_words(snap['onset_date'])}. Subject {snap['subject_id']} at site "
+        f"{snap['site_id']}." + (f" {theme.flag_words(cs.flags)}." if cs.flags else ""),
+    )
+    theme.lifecycle(cs.state)
+    theme.next_step(
+        next_step(
+            ctx.role,
+            cs.state,
+            site=snap["site_id"],
+            requested=study_config().get("requested_documents", []),
+            ready=submission_status(pipe.store, ctx.case_id).ready,
+            has_files=bool(documents_of(pipe.store, ctx.case_id).files),
+        )
+    )

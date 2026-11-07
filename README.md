@@ -36,9 +36,11 @@ More commands are in [AGENTS.md](AGENTS.md).
 
 | Page | Who | What |
 |---|---|---|
-| 1 · EDC input | Study admin, Safety Specialist | Import AE files (CSV/XLSX) and see every record's eligibility with rule-by-rule reasons. Also manual entry and flagged cases (source changed, no longer eligible, possible duplicate). |
-| 2 · Site documents | Site user | Upload files and check their status (verified, blocked or rejected with a reason). Review redacted pages, untick a wrong finding (a reason is required), add a term, delete a file, and **Sign and submit** (password `demo`). |
-| 3 · Results | Everyone | Case list, timeline with "chain verified ✓", source data, notifications, the Flow 2 manifest with downloads, and de-identification metrics compared with the kit's oracle. |
+| AE import | Study admin, Safety Specialist | Import AE files (CSV/XLSX) and see why each record did or did not become a case. Also manual entry, and cases to check (AE changed, no longer meets the rules, possible duplicate). |
+| Documents | Site user | Each case shows its progress and the next step. Upload files and see their status (verified, needs attention, or rejected with a reason). Review redacted pages, keep a wrongly blacked-out term (a reason is required), black out more text, remove a file, and **Sign and submit** (password `demo`). |
+| Case record | Everyone | The package for adjudication with downloads, the audit trail with its integrity check, the EDC source data in plain words, notifications, and how well identifiers are removed on the test kit. |
+
+Direct links preselect the role, user and case, for example `http://localhost:8501/documents?role=site&user=site104.coord&case=DEMO01-0007`.
 
 Roles are simulated in the sidebar. Anyone can switch, which is acceptable only because the data is synthetic.
 
@@ -46,15 +48,15 @@ Roles are simulated in the sidebar. Anyone can switch, which is acceptable only 
 
 Files to drag into the UI are in `data/demo_uploads/` after a reset. The full script is in [the plan](docs/plan-mvp-flow-one.md#7-demo-script-core).
 
-1. **Import** `01_initial.csv` with *Import now*: 22 records give 11 cases and 11 not eligible, each with reasons.
+1. **Import** `01_initial.csv` on *AE import* (or *Import queued files* after a reset with `--preload`): 22 records give 11 cases and 11 not eligible, each with reasons.
 2. **Re-import** `02_reimport_identical.csv`: no new cases.
 3. **Import updates** `03_updates.csv`: a changed case, a downgraded case (flagged, not withdrawn), a stale row and new cases.
 4. **Manual entry** with a reason.
-5. **Site 101, case AE-001:** upload the discharge summary, ECG report and troponin spreadsheet. Press *Process now*, review, then sign and submit.
+5. **Site 101, case AE-001:** upload the discharge summary, ECG report and troponin spreadsheet. Press *Remove identifiers now*, review, then sign and submit.
 6. **Site 102, case AE-005:** a poor fax scan and a letter whose identifiers sit only in an image banner. Both are removed by OCR.
 7. **Site 104, case AE-007:** German documents. The encrypted, corrupt and `.txt` files are rejected with reasons, and a PNG named `.pdf` is handled.
 8. **Untick** a wrongly flagged name with a reason. Only its ID and masked text reach the log.
-9. **Metrics** on page 3: the gate passes, and every scan variant beats the oracle.
+9. **Measurements** on *Case record*: the release check passes, and every scan variant beats the reference.
 10. **Tamper and rebuild:** edit a line of a case's `events.jsonl`, then run `uv run python -m tools.verify_log`. It reports the line. Delete the `case.json` files and run `uv run python -m tools.rebuild_state`.
 
 ## Results (synthetic test kit, OCR on)
@@ -81,7 +83,7 @@ adjud/            our implementation
   handoff.py      Flow 2 manifest
   runner.py       the only background process
 ui/               Streamlit pages
-tools/            reset_demo, verify_log, rebuild_state, run_corpus, deid_check
+tools/            reset_demo, verify_log, rebuild_state, run_corpus, deid_check, screenshots
 data/config/      study configuration (rules, policies, demo users)
 data/flow1-testkit/  synthetic test kit: corpus, ground truth, scoring harness, acceptance tests
 docs/             specs, test cases, build plan

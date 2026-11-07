@@ -88,7 +88,7 @@ def submission_status(store: FileCaseStore, case_id: str) -> SubmissionStatus:
     reasons = []
     state = store.state(case_id).state
     if state != State.AWAITING_SITE_CONFIRMATION:
-        reasons.append(f"case is {state.value}, not AWAITING_SITE_CONFIRMATION")
+        reasons.append("the case is not waiting for site review")
     docs = documents_of(store, case_id)
     if not docs.files:
         reasons.append("no documents uploaded")
@@ -96,11 +96,12 @@ def submission_status(store: FileCaseStore, case_id: str) -> SubmissionStatus:
     for name in sorted(docs.files):
         done = docs.processed.get(name)
         if done is None:
-            reasons.append(f"{name}: not processed yet")
+            reasons.append(f"{name} has not been processed yet")
         elif done["status"] == "rejected":
-            reasons.append(f"{name}: rejected ({done['reject_code']}); delete or replace it")
+            reasons.append(f"{name} was rejected; remove it or upload a replacement")
         elif done["status"] != "verified":
-            reasons.append(f"{name}: verification found {done['residuals']} residual(s)")
+            n = done["residuals"]
+            reasons.append(f"{name} still contains {n} possible identifier{'s' if n != 1 else ''}")
         else:
             out = done["output"]
             records.append({"name": name, "path": out["path"], "sha256": out["sha256"]})

@@ -16,6 +16,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY adjud ./adjud
 COPY ui ./ui
+COPY .streamlit ./.streamlit
 COPY tools ./tools
 RUN uv sync --frozen --no-dev
 

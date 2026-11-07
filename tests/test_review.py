@@ -58,7 +58,7 @@ def test_m2_m3_residual_blocks_submission_until_the_site_adds_the_term(ctx):
     # No label, no pattern, no NER hit: only the seeded-identity check catches it.
     assert processed(store, cid, "note.pdf")["status"] == "blocked"
     status = submission_status(store, cid)
-    assert not status.ready and "residual" in status.reasons[0]
+    assert not status.ready and "still contains" in status.reasons[0]
     with pytest.raises(ReviewRefused):
         submit(store, cid, SITE, "demo", CONFIG)
 

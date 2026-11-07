@@ -1,0 +1,47 @@
+# Visual tokens: docs/ui-design-plan.md
+[server]
+enableStaticServing = true   # serves ui/static/ (self-hosted Public Sans) at app/static/
+
+maxUploadSize = 50           # MB, same limit as study.yaml upload_limits
+
+[client]
+toolbarMode = "viewer"       # no developer menu or Deploy button in the demo
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#4A3AA0"              # stamp violet
+backgroundColor = "#EDF1F3"           # form paper
+secondaryBackgroundColor = "#FAFBFB"  # sheet
+textColor = "#1C2833"                 # ballpoint ink
+linkColor = "#4A3AA0"
+linkUnderline = true
+borderColor = "#C9D3D9"
+dataframeBorderColor = "#D5DDE2"
+dataframeHeaderBackgroundColor = "#E3E9EC"
+dataframeHeaderTextColor = "#1C2833"
+showWidgetBorder = true
+showSidebarBorder = false
+baseRadius = "4px"
+buttonRadius = "4px"
+font = "Public Sans"
+headingFont = "Public Sans"
+baseFontSize = 16
+headingFontSizes = ["36px", "24px", "21px", "16px", "14px", "14px"]
+headingFontWeights = [700, 700, 600, 600, 600, 600]
+greenColor = "#23704F"
+redColor = "#A6342B"
+yellowColor = "#86651A"
+violetColor = "#4A3AA0"
+
+[[theme.fontFaces]]
+family = "Public Sans"
+url = "app/static/fonts/PublicSans-Variable.ttf"
+weight = "100 900"
+style = "normal"
+
+[theme.sidebar]
+backgroundColor = "#DDE5E9"           # case folder
+secondaryBackgroundColor = "#F3F6F7"

@@ -25,6 +25,11 @@ def demo(tmp_path, monkeypatch):
     return paths
 
 
+def html_text(at: AppTest) -> str:
+    """Text of every st.html block (banner, case heading, rail, verdicts)."""
+    return "\n".join(h.proto.body for h in at.get("html"))
+
+
 def run(page: str | None = None, **state) -> AppTest:
     at = AppTest.from_file(APP, default_timeout=30)
     for k, v in state.items():
@@ -46,17 +51,21 @@ def test_app_without_edc_asks_for_a_reset(tmp_path, monkeypatch):
 
 def test_import_now_from_page_1_creates_cases(demo):
     at = run(role="study_admin")
-    assert any("SYNTHETIC DATA ONLY" in e.value for e in at.sidebar.error)
-    import_now = next(b for b in at.button if b.label == "Import now")
+    assert "Synthetic data only." in html_text(at)
+    import_now = next(b for b in at.button if b.label == "Import queued files")
     import_now.click().run()
     assert not at.exception, at.exception
-    assert any("ACCEPTED" in s.value and "11 new cases" in s.value for s in at.success)
+    assert any(
+        "Imported 01_initial.csv: 22 records, 11 new cases, 11 not eligible." in s.value
+        for s in at.success
+    )
     assert len([p for p in demo.cases.iterdir() if p.is_dir()]) == 11
 
 
 def test_site_user_cannot_import(demo):
     at = run(role="site")
-    assert next(b for b in at.button if b.label == "Import now").disabled
+    assert next(b for b in at.button if b.label == "Import queued files").disabled
+    assert next(b for b in at.button if b.label == "Import file").disabled
 
 
 def test_results_and_documents_pages_render_for_a_case(demo):
@@ -64,9 +73,9 @@ def test_results_and_documents_pages_render_for_a_case(demo):
 
     Runner(demo).run_once()
     case_id = sorted(p.name for p in demo.cases.iterdir() if p.is_dir())[0]
-    at = run("pages/results.py", role="safety_specialist", case_id=case_id)
-    assert any("Chain verified" in s.value for s in at.success)
-    run("pages/site_documents.py", role="safety_specialist", case_id=case_id)
+    at = run("views/results.py", role="safety_specialist", case_id=case_id)
+    assert "Intact" in html_text(at) and "Case " + case_id in html_text(at)
+    run("views/site_documents.py", role="safety_specialist", case_id=case_id)
 
 
 def test_site_flow_upload_process_review_and_sign(demo):
@@ -85,22 +94,25 @@ def test_site_flow_upload_process_review_and_sign(demo):
         "site101.coord",
     )
 
-    at = run("pages/site_documents.py", role="site", case_id=cid)
-    next(b for b in at.button if b.label == "Process now").click().run()
+    at = run("views/site_documents.py", role="site", case_id=cid)
+    assert 'aria-current="step">Removing identifiers' in html_text(at)
+    next(b for b in at.button if b.label == "Remove identifiers now").click().run()
     assert not at.exception, at.exception
-    assert "AWAITING_SITE_CONFIRMATION" in [m.value for m in at.metric]
+    assert pipe.store.state(cid).state.value == "AWAITING_SITE_CONFIRMATION"
+    assert 'aria-current="step">Site review' in html_text(at)
+    assert "Check the redacted pages, then sign and submit." in html_text(at)
 
     at.text_input[-1].input("wrong")  # the signing form's password field
     next(b for b in at.button if b.label == "Sign and submit").click().run()
-    assert any("Not submitted" in e.value for e in at.error)
+    assert any("Not signed: the password is wrong" in e.value for e in at.error)
     at.text_input[-1].input("demo")
     next(b for b in at.button if b.label == "Sign and submit").click().run()
     assert not at.exception, at.exception
     assert pipe.store.state(cid).state.value == "SUBMITTED"
 
     runner.run_case_steps()  # writes the handoff
-    at = run("pages/results.py", role="safety_specialist", case_id=cid)
-    assert any("Signed by Site 101 Coordinator" in s.value for s in at.success)
+    at = run("views/results.py", role="safety_specialist", case_id=cid)
+    assert any("Signed by Site 101 Coordinator" in m.value for m in at.markdown)
 
 
 def test_reset_keeps_corpus_metrics_and_stages_demo_files(demo):
