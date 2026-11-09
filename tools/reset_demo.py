@@ -29,7 +29,8 @@ RUNTIME = (
     "logs",
     "edc_mock",
     "demo_uploads",
-)
+    "uploads",
+)  # data/ai/usage.jsonl is kept: AI spend is tracked across demo resets
 KIT = Path(__file__).resolve().parents[1] / "data" / "flow1-testkit"
 
 

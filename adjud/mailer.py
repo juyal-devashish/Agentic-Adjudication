@@ -109,6 +109,11 @@ def compose(note: dict[str, Any], user: dict[str, Any], s: SmtpSettings) -> Emai
         f"Case: {case}",
         f"Task: {note['subject']}",
         f"Open: {link}",
+        *(
+            [f"Or put one ZIP file with all the documents in the upload folder {case}."]
+            if note["template"] in ("documents_requested", "query_opened", "upload_rejected")
+            else []
+        ),
         "",
         "Synthetic demo data. This message carries no clinical content.",
     ]

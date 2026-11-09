@@ -92,6 +92,12 @@ if can_upload:
             st.toast(f"Added {', '.join(names)} to the case")
             st.rerun()
 
+if can_upload:
+    theme.quiet(
+        f"Or put one ZIP file with all the documents in the upload folder {cid} "
+        f"({pipe.paths.uploads / cid}). It is picked up within a minute."
+    )
+
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("The runner picks uploads up within a few seconds. To see the result now:")
     if st.button("Remove identifiers now", type="primary"):

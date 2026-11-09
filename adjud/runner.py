@@ -24,6 +24,7 @@ from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
+from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
 
@@ -44,6 +45,7 @@ class Runner:
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
         self.last_inbox: float | None = None
         self.flow2 = Flow2(self.pipeline.store, self.paths.config, self.study)
+        self.uploads = UploadFolders(self.pipeline.store, self.documents.outbox, self.clock)
         smtp = SmtpSettings.from_env()
         self.mailer = (
             Mailer(self.pipeline.store, self.paths.config, smtp, clock=self.clock) if smtp else None
@@ -69,6 +71,13 @@ class Runner:
                 r.new_cases,
             )
         return len(results)
+
+    def take_uploads(self) -> None:
+        """Per-case upload folders (plan P-31): create them, import complete ZIPs."""
+        try:
+            self.uploads.tick()
+        except Exception:
+            log.exception("upload folders failed")
 
     def run_case_steps(self) -> int:
         """Automatic case steps: de-identify every case waiting in DEIDENTIFYING, and write
@@ -125,6 +134,7 @@ class Runner:
 
     def run_once(self) -> None:
         self.import_inbox()
+        self.take_uploads()
         self.run_case_steps()
         self.send_mail()
 
@@ -134,6 +144,7 @@ class Runner:
         if self.last_inbox is None or now - self.last_inbox >= self.inbox_poll_seconds:
             self.import_inbox()
             self.last_inbox = now
+        self.take_uploads()
         self.run_case_steps()
         self.send_mail()
 

@@ -27,6 +27,12 @@ class DataPaths:
         return self.root / "edc_mock"
 
     @property
+    def uploads(self) -> Path:
+        """One folder per case for the site's ZIP (plan P-31). ADJUD_UPLOAD_DIR can put it
+        elsewhere, e.g. in a OneDrive-synced folder standing in for SharePoint."""
+        return Path(os.environ.get("ADJUD_UPLOAD_DIR") or self.root / "uploads")
+
+    @property
     def inbox(self) -> Path:
         return self.root / "inbox"
 

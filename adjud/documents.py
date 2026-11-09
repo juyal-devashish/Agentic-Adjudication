@@ -100,7 +100,8 @@ def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
 
 
 def upload(store: FileCaseStore, case_id: str, files: list[tuple[str, bytes]], actor: str,
-           labels: dict[str, str] | None = None) -> list[str]:  # fmt: skip
+           labels: dict[str, str] | None = None,
+           via: dict[str, Any] | None = None) -> list[str]:  # fmt: skip
     """Store originals (quarantine, never overwritten) and record the upload. Returns the
     stored names; a name already used in the case gets a numeric suffix."""
     existing = documents_of(store, case_id).files
@@ -120,9 +121,10 @@ def upload(store: FileCaseStore, case_id: str, files: list[tuple[str, bytes]], a
         if labels and raw_name in labels:
             entry["label"] = labels[raw_name]
         entries.append(entry)
-    store.append_event(
-        case_id, EventDraft(type="documents.uploaded", actor=actor, data={"files": entries})
-    )
+    data: dict[str, Any] = {"files": entries}
+    if via:  # how the files arrived, e.g. {"zip": name, "sha256": ...} from an upload folder
+        data["via"] = via
+    store.append_event(case_id, EventDraft(type="documents.uploaded", actor=actor, data=data))
     return [e["name"] for e in entries]
 
 

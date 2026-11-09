@@ -29,6 +29,7 @@ TEMPLATES = {
     "query_opened": "A query about your documents needs an answer",
     "narrative_review_needed": "A narrative needs your review",
     "ready_for_adjudication": "Case ready for adjudication",
+    "upload_rejected": "An uploaded ZIP file could not be used",
 }
 
 
