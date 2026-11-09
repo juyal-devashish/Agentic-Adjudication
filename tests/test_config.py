@@ -6,6 +6,8 @@ from pathlib import Path
 import bcrypt
 import yaml
 
+from adjud.ai.config import AiConfig
+
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "data" / "config"
 KIT_CONFIG = ROOT / "data" / "flow1-testkit" / "config"
@@ -38,7 +40,9 @@ def test_users_are_the_kits_with_a_data_manager_and_bcrypt_hashes():
 def test_study_config_has_ai_off_by_default():
     study = load(CONFIG, "DEMO01/study.yaml")
     assert study["study"] == "DEMO01"
-    assert study["ai"]["phi_detection"] is False
+    ai = AiConfig.model_validate(study["ai"])
+    assert ai.mode == "off" and not any(ai.functions.values())
+    assert ai.model == "claude-haiku-5-5"  # plan P-26
     assert study["sites"] == load(KIT_CONFIG, "DEMO01/study.yaml")["sites"]
 
 

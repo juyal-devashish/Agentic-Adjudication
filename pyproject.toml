@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Clinical event adjudication: Flow 1 (intake) proof of concept. Synthetic data only."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anthropic==1.17.0",
     "bcrypt>=5.0.0",
     "en-core-web-lg",
     "faker>=40.44.0",

@@ -138,3 +138,36 @@ def test_email_link_opens_the_case_as_a_user_of_its_site(demo):
     assert not at.exception, at.exception
     assert at.session_state["user_site"]["id"] == "site102.coord"
     assert at.session_state["case_id"] == "DEMO01-0005"
+
+
+def test_case_record_lists_ai_calls_with_their_source(demo, tmp_path):
+    import json
+
+    from adjud.ai.config import AiConfig
+    from adjud.ai.functions import DOCUMENT_TYPE
+    from adjud.ai.gateway import Gateway, input_hash
+    from adjud.ai.tools import Toolbox
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    cfg = AiConfig(mode="replay", functions={"document_type": True})
+    payload = {"file": "x.pdf"}
+    fixture = (
+        tmp_path
+        / "replays"
+        / "document_type"
+        / f"{input_hash(DOCUMENT_TYPE, cfg.model, payload)}.json"
+    )
+    fixture.parent.mkdir(parents=True)
+    answer = {"document_type": "other", "confidence": 0.5,
+              "evidence": {"file": "x.pdf", "page": 1, "quote": "none"}}  # fmt: skip
+    fixture.write_text(json.dumps({"simulated": True, "output": answer}))
+    Gateway(runner.pipeline.store, cfg, tmp_path / "replays").run(
+        cid, DOCUMENT_TYPE, payload, Toolbox()
+    )
+    at = run("views/results.py", role="safety_specialist", case_id=cid)
+    table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
+    assert table.iloc[0]["Source"] == "Simulated AI" and table.iloc[0]["Task"] == "Document type"
+    assert any("AI is off for this study" in m.value for m in at.markdown)

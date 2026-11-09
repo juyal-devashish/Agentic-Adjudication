@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–11 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–12 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -134,17 +134,19 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** `streamlit-image-coordinates` does not work with Streamlit 1.67, so the preview is a Plotly chart with Streamlit's own box selection (`ui/boxdraw.py`). Checked in a real browser: drag, button, event with page fractions, re-run. Boxes cannot be removed yet; a wrong box needs the file uploaded again.
 
-### Step 12 — AI foundation (P-26 to P-28)
+### Step 12 — AI foundation (P-26 to P-28) ✅
 
-- [ ] `adjud/ai/gateway.py`: the only module that imports the Anthropic SDK; modes `off` / `replay` / `live`; pinned model from `study.yaml`; tool-use loop so agents call local tools
-- [ ] `adjud/ai/tools.py`: the local tools agents may call (read page text, OCR a page, look up EDC fields, list case documents, *propose* a finding or decision). No tool writes a transition
-- [ ] Prompts as versioned files in `adjud/ai/prompts/`; a JSON schema per function; up to 2 retries, then continue without AI and say so
-- [ ] Every call saved to `cases/<id>/ai/` (function, mode, model, prompt version, input hash, output, valid, tokens, cost, latency), failures included; usage ledger `data/ai/usage.jsonl`; budget cap
-- [ ] `adjud/ai/gates.py`: the code gate (schema, citations, confidence, deterministic checks) → transition or exception task
-- [ ] Replay fixtures labelled `simulated` until real outputs are recorded; the UI shows "Simulated AI" or "AI" on every agent result
-- [ ] UI: an "AI activity" panel on the case record (what each agent did, its gate result, its cost); a study-wide usage and cost view
+- [x] `adjud/ai/gateway.py`: the only module that imports the Anthropic SDK; modes `off` / `replay` / `live`; pinned model from `study.yaml`; tool-use loop so agents call local tools
+- [x] `adjud/ai/tools.py`: the local tools agents may call (read page text, OCR a page, look up EDC fields, list case documents, *propose* a finding or decision). No tool writes a transition
+- [x] Prompts as versioned files in `adjud/ai/prompts/`; a JSON schema per function; up to 2 retries, then continue without AI and say so
+- [x] Every call saved to `cases/<id>/ai/` (function, mode, model, prompt version, input hash, output, valid, tokens, cost, latency), failures included; usage ledger `data/ai/usage.jsonl`; budget cap
+- [x] `adjud/ai/gates.py`: the code gate (schema, citations, confidence, deterministic checks) → transition or exception task
+- [x] Replay fixtures labelled `simulated` until real outputs are recorded; the UI shows "Simulated AI" or "AI" on every agent result
+- [x] UI: an "AI activity" panel on the case record (what each agent did, its gate result, its cost); a study-wide usage and cost view
 
 **Done when:** a dummy agent function runs end to end in replay mode through a gate, and with AI off the workflow is unchanged.
+
+**Result:** the first real function, document type (AI-2), runs through the gateway in all three modes, tested with a scripted fake client (tool loop, schema retries, refusal, budget cap, records, chained ledger) and checked against the installed SDK's request types. The gateway uses a manual tool loop rather than the beta tool runner, so replay and off modes and the per-call record share one path. Pinned: `anthropic==1.17.0`. Not yet wired into the workflow; that is step 15. Not run against the live API: no key yet.
 
 ### Step 13 — Flow 2 workflow and fixtures
 

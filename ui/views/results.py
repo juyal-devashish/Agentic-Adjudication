@@ -14,6 +14,7 @@ import streamlit as st
 import theme
 from common import case_header, context, paths, pipeline, users
 
+from adjud.ai.gateway import Gateway
 from adjud.handoff import read_manifest
 from adjud.integrity import verify_case_log
 
@@ -27,6 +28,7 @@ EVENT_WORDS = {
     "notification.queued": "Notification queued",
     "notification.sent": "Notification e-mailed",
     "notification.failed": "Notification e-mail failed",
+    "ai.called": "AI asked",
     "documents.uploaded": "Documents uploaded",
     "deid.started": "Identifier removal started",
     "deid.file_processed": "File processed",
@@ -299,5 +301,36 @@ if mine:
     )
 else:
     st.write("No notifications for this case.")
+
+# --- AI activity (plan step 12) -----------------------------------------------------------------
+st.header("AI activity")
+gw = Gateway.for_study(store, paths().config)
+calls = [e for e in store.events(cid) if e["type"] == "ai.called"]
+mode_words = {"off": "off", "replay": "replaying recorded answers", "live": "live"}
+st.write(
+    f"AI is {mode_words[gw.cfg.mode]} for this study (model {gw.cfg.model}). Agents only "
+    "propose; code checks every proposal before it can move a case."
+)
+if calls:
+    rows = []
+    for e in calls:
+        d = e["data"]
+        rec = store.get_json(cid, d["call"]["path"])
+        rows.append(
+            {
+                "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:16]}",
+                "Task": d["function"].replace("_", " ").capitalize(),
+                "Source": "Simulated AI" if d["simulated"] else "AI",
+                "Answer": "Valid" if d["valid"] else "Not usable",
+                "Tools used": len(rec.get("tool_calls", [])),
+                "Tokens": sum(rec.get("usage", {}).values()),
+                "Cost (USD)": f"{d['cost_usd']:.4f}",
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+else:
+    st.write("No AI calls for this case.")
+spent = gw.spent_usd()
+st.caption(f"All cases: ${spent:.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget.")
 
 measurements()

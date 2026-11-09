@@ -47,6 +47,10 @@ class DataPaths:
         return self.root / "outbox"
 
     @property
+    def ai(self) -> Path:
+        return self.root / "ai"
+
+    @property
     def metrics(self) -> Path:
         return self.root / "metrics"
 

@@ -54,10 +54,10 @@ def case_dirs(paths: DataPaths) -> list[Path]:
 
 def verify_all(paths: DataPaths) -> list[VerifyReport]:
     reports = [verify_case_log(d) for d in case_dirs(paths)]
-    intake = intake_log(paths)
-    if intake.path.exists():
-        check = check_chain(intake)
-        reports.append(VerifyReport(intake.path, check.records, list(check.problems)))
+    for chained in (intake_log(paths), ChainedLog(paths.ai / "usage.jsonl")):
+        if chained.path.exists():
+            check = check_chain(chained)
+            reports.append(VerifyReport(chained.path, check.records, list(check.problems)))
     return reports
 
 
