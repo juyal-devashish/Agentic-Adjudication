@@ -179,6 +179,21 @@ else:
     with st.expander("Package contents (flow2_manifest.json)"):
         st.json(manifest)
 
+flow3 = next((e for e in reversed(store.events(cid)) if e["type"] == "handoff.flow3_ready"), None)
+if flow3:
+    package = store.get_json(cid, flow3["data"]["manifest"]["path"])
+    n = package["narrative"]
+    by = n["approved_by"]
+    if by.startswith("agent:"):
+        by = "code, from a " + ("simulated AI" if n["simulated_ai"] else "AI") + " draft"
+    st.subheader("Ready for adjudication")
+    st.write(
+        f"Dossier version {package['dossier']['version']} and the narrative approved by "
+        f"{by} on {theme.date_words(n['approved_at'])} were handed to adjudication."
+    )
+    with st.expander("Package contents (flow3_manifest.json)"):
+        st.json(package)
+
 # --- audit trail -------------------------------------------------------------------------------
 st.header("Audit trail")
 report = verify_case_log(store.case_dir(cid))

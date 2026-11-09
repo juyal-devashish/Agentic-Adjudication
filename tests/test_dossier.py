@@ -73,3 +73,42 @@ def test_dossier_is_hashed_and_tampering_is_detected(built):
         assert not all(r.ok for r in verify_all(store.paths))
     finally:
         path.write_bytes(original)
+
+
+def test_flow3_handoff_lists_dossier_narrative_and_qc_with_matching_hashes(tmp_path, monkeypatch):
+    import json
+
+    from adjud.events import sha256_bytes
+    from adjud.workflow import State
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True)
+    runner = Runner(paths)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    files = ("discharge_summary.pdf", "ecg_report.pdf", "troponin_results.xlsx")
+    upload(store, cid, [(n, (DOCS / n).read_bytes()) for n in files], "site101.coord")
+    runner.run_case_steps()
+    submit(store, cid, "site101.coord", "demo", paths.config)
+    for _ in range(4):  # handoff + QC start, QC, dossier + narrative, Flow 3 handoff
+        runner.run_case_steps()
+    assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+    event = next(e for e in store.events(cid) if e["type"] == "handoff.flow3_ready")
+    manifest = json.loads((store.case_dir(cid) / event["data"]["manifest"]["path"]).read_text())
+    for key in ("dossier", "narrative", "qc", "flow2_manifest"):
+        ref = manifest[key]
+        assert sha256_bytes((store.case_dir(cid) / ref["path"]).read_bytes()) == ref["sha256"]
+    assert "documents/original" not in json.dumps(manifest)
+    assert manifest["narrative"]["approved_by"] == "agent:narrative"
+    assert manifest["narrative"]["simulated_ai"] is True
+    notes = [json.loads(p.read_text()) for p in paths.outbox.glob("*.json")]
+    assert any(n["template"] == "ready_for_adjudication" and n["case_id"] == cid for n in notes)
+    runner.run_case_steps()  # nothing left to do: written once
+    assert sum(e["type"] == "handoff.flow3_ready" for e in store.events(cid)) == 1
+    assert all(r.ok for r in verify_all(paths))

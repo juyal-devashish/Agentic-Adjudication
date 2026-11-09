@@ -103,7 +103,7 @@ class Runner:
 
     def run_flow2_steps(self) -> int:
         """Flow 2's automatic steps, one per case per tick: start QC from the manifest,
-        run the QC round, draft the narrative."""
+        run the QC round, build the dossier and draft the narrative, hand off to Flow 3."""
         from adjud.workflow import State
 
         store, done = self.pipeline.store, 0
@@ -112,6 +112,8 @@ class Runner:
                   for cs in store.list_case_states(State.QC_CHECKS)]  # fmt: skip
         steps += [(cs.case_id, self.flow2.run_narrative, "narrative")
                   for cs in store.list_case_states(State.NARRATIVE)]  # fmt: skip
+        steps += [(cid, self.flow2.write_flow3_handoff, "Flow 3 handoff")
+                  for cid in self.flow2.pending_flow3_handoffs()]  # fmt: skip
         for case_id, step, name in steps:
             try:
                 step(case_id)

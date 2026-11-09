@@ -26,7 +26,7 @@ from adjud.ai.gates import GateResult, gate
 from adjud.ai.gateway import AiResult, Gateway
 from adjud.ai.tools import case_toolbox, dossier_page_text, output_pages, page_text
 from adjud.dossier import build_and_record, latest_dossier
-from adjud.events import EventDraft
+from adjud.events import EventDraft, sha256_bytes
 from adjud.handoff import latest_manifest_ref
 from adjud.notify import Outbox
 from adjud.qc import Checklist, run_checks
@@ -362,6 +362,54 @@ class Flow2:
         }
         template = (self.config_dir / self.study / "narrative_template.md").read_text()
         return template.format_map(values)
+
+    def pending_flow3_handoffs(self) -> list[str]:
+        return [cs.case_id for cs in self.store.list_case_states(State.READY_FOR_ADJUDICATION)
+                if _latest(self.store, cs.case_id, "handoff.flow3_ready") is None]  # fmt: skip
+
+    def write_flow3_handoff(self, case_id: str) -> dict[str, Any]:
+        """The package for Flow 3 (step 18): the dossier, the approved narrative and the QC
+        results, each by path and SHA-256. Like the Flow 2 manifest, it never names
+        anything from documents/original/. Written once; a re-run after a crash reuses an
+        identical file."""
+        approval = next(e for e in reversed(self.store.events(case_id))
+                        if e["type"] in ("narrative.approved", "narrative.signed"))  # fmt: skip
+        dossier = latest_dossier(self.store, case_id)
+        qc_pass = next(e for e in reversed(self.store.events(case_id))
+                       if e["type"] in ("qc.passed", "qc.signed_pass"))  # fmt: skip
+        cs = self.store.state(case_id)
+        manifest = {
+            "case_id": case_id,
+            "study": cs.study,
+            "subject": cs.subject,
+            "ae_id": cs.ae_id,
+            "flow2_manifest": dossier["manifest"],
+            "dossier": {**dossier["dossier"], "version": dossier["version"],
+                        "page_map": dossier["page_map"]},
+            "qc": {**qc_pass["data"]["results"], "passed_by": qc_pass["actor"],
+                   "passed_at": qc_pass["at"]},
+            "narrative": {
+                **approval["data"]["narrative"],
+                "source": approval["data"].get("source"),
+                "approved_by": (approval["signature"]["signer"] if approval.get("signature")
+                                else approval["actor"]),
+                "approved_at": approval["at"],
+                "simulated_ai": bool(approval["data"].get("simulated")),
+            },
+        }  # fmt: skip
+        content = json_bytes(manifest)
+        rel = "handoff/flow3_manifest.json"
+        path = self.store.case_dir(case_id) / rel
+        if path.exists():
+            if path.read_bytes() != content:
+                raise Flow2Refused(f"an existing {rel} differs; not overwriting")
+            sha = sha256_bytes(content)
+        else:
+            sha = self.store.put_file(case_id, rel, content)
+        self._event(case_id, "handoff.flow3_ready", SYSTEM_QC,
+                    {"manifest": {"path": rel, "sha256": sha}})  # fmt: skip
+        self._notify(case_id, "role:safety_specialist", "ready_for_adjudication", SYSTEM_QC)
+        return manifest
 
     # -- Safety Specialist actions -----------------------------------------------------------
 

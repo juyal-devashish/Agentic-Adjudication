@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–17 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–18 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -203,12 +203,14 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** the agent reads the dossier through a `read_dossier_page` tool and returns statements, each with a dossier page and a quote. The gate checks every quote on its page, a minimum number of statements, and the study's forbidden-wording list in `study.yaml` (cause, relatedness, adjudication, allocation). In replay mode five of the six kit cases and the complete fixture reach `READY_FOR_ADJUDICATION` with only the site's people in the audit trail; AE-006 waits on its query. The simulated narratives are mechanical (EDC facts plus one statement per document, from each case's own dossier) and labelled "Simulated AI"; real ones come with the key (step 22).
 
-### Step 18 — Handoff to Flow 3
+### Step 18 — Handoff to Flow 3 ✅
 
-- [ ] `READY_FOR_ADJUDICATION` writes `handoff/flow3_manifest.json`: dossier, narrative, QC results, with hashes
-- [ ] E-mail to the Safety Specialist: "Case ready for adjudication" (and the existing "Documents received")
+- [x] `READY_FOR_ADJUDICATION` writes `handoff/flow3_manifest.json`: dossier, narrative, QC results, with hashes
+- [x] E-mail to the Safety Specialist: "Case ready for adjudication" (and the existing "Documents received")
 
 **Done when:** the Flow 3 manifest verifies and contains nothing from `documents/original/`.
+
+**Result:** the runner writes `handoff/flow3_manifest.json` once per case (dossier with its page map, narrative with who approved it and whether the AI was simulated, QC results, the Flow 2 manifest, each with its hash) and notifies the Safety Specialist. Shown on the case record.
 
 ### Step 19 — Per-case folder and ZIP upload (P-31)
 
