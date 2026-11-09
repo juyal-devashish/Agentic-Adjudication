@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–15 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–16 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -184,12 +184,14 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** in replay mode the agent types kit AE-005's GP summary letter (the case then passes with nobody involved) and AE-006's clinic letter (the case gets a query for the missing discharge summary and ECG), and spots that the "different event" fixture is a hip fracture (query `wrong_event`). A doctored answer whose quote is not on the page is refused by the gate and goes to the Safety Specialist. The complete fixture needs no agent at all.
 
-### Step 16 — Dossier (QC-04, QC-08)
+### Step 16 — Dossier (QC-04, QC-08) ✅
 
-- [ ] Dossier PDF: cover, EDC summary, prior similar events, redacted documents in checklist order, bookmarks, subject ID on every page; hashed and versioned
-- [ ] Locked once QC passes; later changes only through a new version
+- [x] Dossier PDF: cover, EDC summary, prior similar events, redacted documents in checklist order, bookmarks, subject ID on every page; hashed and versioned
+- [x] Locked once QC passes; later changes only through a new version
 
 **Done when:** every passed case has a hashed dossier and changing a file afterwards is refused.
+
+**Result:** `adjud/dossier.py` builds `dossier/dossier_v<n>.pdf` at the start of the narrative step, once per passed QC round, from the manifest only, with a page map (which document starts where) for the narrative agent to cite. Documents are already locked by the workflow after signing; the dossier file is never overwritten, and editing it is caught by `verify_log` (tested). Download on the Quality check page.
 
 ### Step 17 — Narrative agent (AI-4, NAR-01 to NAR-06)
 

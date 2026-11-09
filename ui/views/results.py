@@ -36,6 +36,7 @@ EVENT_WORDS = {
     "qc.review_needed": "Quality check needs a person",
     "qc.signed_pass": "Quality check passed and signed",
     "query.opened": "Query sent to the site",
+    "dossier.built": "Dossier built",
     "narrative.drafted": "Narrative drafted",
     "narrative.approved": "Narrative approved automatically",
     "narrative.review_needed": "Narrative needs a person",

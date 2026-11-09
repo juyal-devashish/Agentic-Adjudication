@@ -14,6 +14,7 @@ import streamlit as st
 import theme
 from common import case_header, context, paths, pipeline
 
+from adjud.dossier import latest_dossier
 from adjud.flow2 import QUERY_CODES, Flow2, Flow2Refused
 from adjud.signatures import SignatureRefused
 from adjud.workflow import State
@@ -130,6 +131,23 @@ if state == State.QC_REVIEW:
                     st.error(f"Not signed: {msg}. Try again.")
                 except Flow2Refused as exc:
                     st.error(f"Not signed: {exc}.")
+
+# --- dossier ---------------------------------------------------------------------------------
+dossier = latest_dossier(store, cid)
+if dossier:
+    st.header("Dossier")
+    pages = "; ".join(f"{d['name']} from page {d['first_page']}" for d in dossier["page_map"])
+    st.write(
+        f"Version {dossier['version']}, built when the quality check passed: cover, EDC "
+        f"summary, then {pages}. Every page carries the subject ID and case number."
+    )
+    st.download_button(
+        "Download the dossier (PDF)",
+        store.get_file(cid, dossier["dossier"]["path"]),
+        file_name=f"{cid}_dossier_v{dossier['version']}.pdf",
+        mime="application/pdf",
+    )
+    theme.quiet(f"SHA-256 {dossier['dossier']['sha256'][:16]}…")
 
 # --- narrative --------------------------------------------------------------------------------
 st.header("Narrative")

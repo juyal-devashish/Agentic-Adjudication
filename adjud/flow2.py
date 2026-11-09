@@ -23,6 +23,7 @@ from adjud.ai.functions import DOCUMENT_TYPE, EVENT_MATCH, EVENT_VERDICTS
 from adjud.ai.gates import GateResult, gate
 from adjud.ai.gateway import AiResult, Gateway
 from adjud.ai.tools import case_toolbox, output_pages, page_text
+from adjud.dossier import build_and_record, latest_dossier
 from adjud.events import EventDraft
 from adjud.handoff import latest_manifest_ref
 from adjud.notify import Outbox
@@ -245,9 +246,22 @@ class Flow2:
                         {"function": r.function, "about": about, "call": r.call,
                          **g.as_dict()})  # fmt: skip
 
+    def ensure_dossier(self, case_id: str) -> dict[str, Any]:
+        """Build the dossier for the latest passed QC round, once (step 16)."""
+        types_ = [e["type"] for e in self.store.events(case_id)]
+        passed = max(i for i, t in enumerate(types_) if t in ("qc.passed", "qc.signed_pass"))
+        if "dossier.built" in types_[passed:]:
+            return latest_dossier(self.store, case_id)
+        checks = self.store.get_json(case_id, self._checks_ref(case_id)["path"])
+        manifest = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
+        return build_and_record(self.store, case_id, manifest, checks.get("types", {}),
+                                self.config_dir, self.study)  # fmt: skip
+
     def run_narrative(self, case_id: str) -> str:
-        """Draft the narrative. With AI off (or its draft failing the gate) the study
-        template is filled from the EDC record and the Safety Specialist reviews it."""
+        """Build the dossier, then draft the narrative. With AI off (or its draft failing
+        the gate) the study template is filled from the EDC record and the Safety
+        Specialist reviews it."""
+        self.ensure_dossier(case_id)
         n = _rounds(self.store, case_id, "narrative.drafted") + 1
         text = self.template_draft(case_id)
         rel = f"narrative/draft_v{n}.md"

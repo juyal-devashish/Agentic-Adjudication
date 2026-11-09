@@ -83,6 +83,7 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "qc.review_needed": {State.QC_CHECKS: State.QC_REVIEW},
     "qc.signed_pass": {State.QC_REVIEW: State.NARRATIVE},  # Safety Specialist
     "query.opened": {State.QC_CHECKS: State.QUERY_OPEN, State.QC_REVIEW: State.QUERY_OPEN},
+    "dossier.built": {State.NARRATIVE: SAME},  # once per passed QC round
     "narrative.drafted": {State.NARRATIVE: SAME},
     "narrative.approved": {State.NARRATIVE: State.READY_FOR_ADJUDICATION},  # agent gate
     "narrative.review_needed": {State.NARRATIVE: State.NARRATIVE_REVIEW},
