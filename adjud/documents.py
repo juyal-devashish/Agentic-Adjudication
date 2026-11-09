@@ -38,6 +38,33 @@ def safe_filename(name: str) -> str:
     return SAFE_NAME.sub("_", base)[:120]
 
 
+def phi_detector(gw: Any, case_id: str, policy: Policy) -> Any:
+    """AI-1 as a callback `detect(file, page, image) -> [(text, category)]`: each OCR'd
+    page image goes to the agent through `gw` (a Gateway), and every call is recorded on
+    `case_id`. Synthetic data only: the images are unredacted."""
+    from adjud.ai.functions import PHI_DETECTION
+    from adjud.ai.tools import Toolbox
+    from adjud.events import sha256_bytes
+
+    categories = {*policy.must_redact, *policy.should_redact, "PERSON"}
+
+    def detect(name: str, page: int, image: Any) -> list[tuple[str, str]]:
+        img = image.copy()
+        img.thumbnail((2000, 2000))  # enough to read; keeps the request small
+        png = png_bytes(img)
+        payload = {"file": name, "page": page, "image_sha256": sha256_bytes(png)}
+        r = gw.run(case_id, PHI_DETECTION, payload, Toolbox(), images=[png])
+        if not r.ok or not r.output:
+            return []
+        return [
+            (i["text"], i["category"] if i["category"] in categories else "PERSON")
+            for i in r.output["identifiers"]
+            if len(i["text"].strip()) >= 3
+        ]
+
+    return detect
+
+
 @dataclass
 class CaseDocument:
     name: str
@@ -171,29 +198,11 @@ class DocumentProcessor:
         the study has it off. It sees unredacted page images: synthetic data only."""
         from adjud.ai.functions import PHI_DETECTION
         from adjud.ai.gateway import Gateway
-        from adjud.ai.tools import Toolbox
-        from adjud.events import sha256_bytes
 
         gw = Gateway.for_study(self.store, self.config_dir, self.study)
         if not gw.cfg.enabled(PHI_DETECTION.name):
             return None
-        categories = {*self.policy.must_redact, *self.policy.should_redact, "PERSON"}
-
-        def detect(name: str, page: int, image: Any) -> list[tuple[str, str]]:
-            img = image.copy()
-            img.thumbnail((2000, 2000))  # enough to read; keeps the request small
-            png = png_bytes(img)
-            payload = {"file": name, "page": page, "image_sha256": sha256_bytes(png)}
-            r = gw.run(case_id, PHI_DETECTION, payload, Toolbox(), images=[png])
-            if not r.ok or not r.output:
-                return []
-            return [
-                (i["text"], i["category"] if i["category"] in categories else "PERSON")
-                for i in r.output["identifiers"]
-                if len(i["text"].strip()) >= 3
-            ]
-
-        return detect
+        return phi_detector(gw, case_id, self.policy)
 
     def process_case(self, case_id: str) -> dict[str, Any]:
         """One de-identification run over all current documents of a DEIDENTIFYING case."""
