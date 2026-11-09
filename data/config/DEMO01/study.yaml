@@ -24,7 +24,7 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
   max_tool_turns: 8
   max_retries: 2             # schema-invalid answers re-asked, then continue without AI
   min_confidence: 0.8        # gates send anything below this to a person
-  budget_usd: 5.0            # live calls stop when the usage ledger reaches this
+  budget_usd: 1.0            # live calls stop when the usage ledger reaches this
   price_per_mtok:            # Claude Haiku 5.5, prompts up to 100K tokens; check the
     input: 0.10              # pricing page at go-live (P-28)
     output: 0.50
