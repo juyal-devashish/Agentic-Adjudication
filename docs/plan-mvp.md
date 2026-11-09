@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–21 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–21 and 23 done; step 22 waits for the API key; live rehearsal outstanding. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -238,7 +238,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - [x] A button on the import page that exports the mock EDC's AE table (without its `H-` history records, set in `study.yaml`) into the queue and imports it, labelled as a demo stand-in; pulling again only adds or updates
 
-### Step 22 — Go live with the API key
+### Step 22 — Go live with the API key (blocked: waiting for the key)
 
 - [ ] Key in the environment only; `ai.mode: live`; prices entered; budget cap set
 - [ ] Record real outputs for every fixture and replace the simulated replays; measure cost per case and repeatability (5 runs per function)
@@ -247,10 +247,13 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Done when:** the full Flows 1+2 demo runs live with measured cost per case.
 
-### Step 23 — Process document and demo
+### Step 23 — Process document and demo ✅ (live rehearsal outstanding)
 
-- [ ] `docs/process.md`: each step with trigger, component, who or what does it, and where AI and the API are used
-- [ ] Demo script for Flows 1+2; automated rehearsal test; live rehearsal
+- [x] `docs/process.md`: each step with trigger, component, who or what does it, and where AI and the API are used
+- [x] Demo script for Flows 1+2 (README) and an automated rehearsal in replay mode (`tests/test_demo_script.py`)
+- [ ] Live rehearsal by the presenter
+
+**Result:** screenshots of every page, including the Quality check page and the eight-step rail, at desktop and phone width (`tools/screenshots.py`, now in replay mode). They showed one misleading message, "AI is off" in replay mode when no answer was recorded; fallbacks now give the gateway's own reason.
 
 ---
 

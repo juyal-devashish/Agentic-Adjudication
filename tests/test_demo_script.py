@@ -188,3 +188,51 @@ def test_11_tamper_detected_and_state_rebuilt(demo):
     rebuild_all(demo.paths)
     assert all(r.ok for r in verify_all(demo.paths))
     assert not any(r.changed for r in rebuild_all(demo.paths, write=False))
+
+
+def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
+    """The Flows 1+2 demo (README): a site drops one ZIP and, with the recorded agent
+    answers, the case reaches adjudication with only the site's people in its audit
+    trail; a case whose letter has no title is typed by the agent and passes too."""
+    import io
+    import zipfile
+
+    from adjud.paths import DataPaths
+    from adjud.review import submit
+    from adjud.runner import Runner
+    from adjud.workflow import State
+    from tools.reset_demo import reset
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True)
+    runner = Runner(paths)
+    runner.run_once()
+    store = runner.pipeline.store
+    runner.take_uploads()  # folders for every case waiting for documents
+    cases = {}
+    for folder, site in (("DEMO01-101-0001_AE-001", "101"), ("DEMO01-102-0004_AE-005", "102")):
+        subject, ae = folder.split("_")
+        cid = runner.pipeline.case_for(f"DEMO01|{subject}|{ae}")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for f in sorted((KIT / "documents" / folder).iterdir()):
+                zf.writestr(f.name, f.read_bytes())
+        (paths.uploads / cid / "documents.zip").write_bytes(buf.getvalue())
+        cases[cid] = f"site{site}.coord"
+    runner.take_uploads()
+    runner.take_uploads()  # unchanged since the last tick: imported
+    runner.run_case_steps()  # identifiers removed
+    for cid, site in cases.items():
+        assert store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+        submit(store, cid, site, "demo", paths.config)  # the one human signature
+    for _ in range(4):  # handoff, QC (+ agents), dossier + narrative, Flow 3 handoff
+        runner.run_case_steps()
+    for cid, site in cases.items():
+        assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+        people = {e["actor"] for e in store.events(cid)} - {"system:upload-folder"}
+        assert {a for a in people if not a.startswith(("system:", "agent:"))} == {site}

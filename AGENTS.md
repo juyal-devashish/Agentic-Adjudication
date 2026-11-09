@@ -104,6 +104,9 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Measure de-identification on the kit corpus with the kit's harness and gate (~30 s; real API calls if AI-1 is on: ask first) | `uv run python -m tools.deid_check` |
 | Run only our pipeline over the kit corpus (outputs + per-file reports) | `uv run python -m tools.run_corpus` |
 | Reset the demo (wipes runtime data, loads kit EDC; `--preload` puts `01_initial.csv` in the inbox) | `uv run python -m tools.reset_demo` |
+| Flow 2 QC scenarios (also staged by reset) | `uv run python -m tools.make_flow2_fixtures --out <dir>` |
+| Rewrite the simulated replay answers for the demo cases (no API calls) | `uv run python -m tools.simulate_ai` |
+| Run the UI or runner with recorded agent answers | `ADJUD_AI_MODE=replay uv run python -m adjud.runner` |
 
 Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit.
 

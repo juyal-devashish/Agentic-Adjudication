@@ -147,7 +147,8 @@ class Flow2:
             decision = "review"
             reasons = [c.detail or c.label for c in outcome.unknown]
             if not any(a["status"] != "unavailable" for a in ai):
-                reasons.append("AI is off: the Safety Specialist decides what code could not")
+                why = next((a["note"] for a in ai), "") or "AI is off"
+                reasons.append(f"No AI answer ({why}): the Safety Specialist decides")
             reasons += [f"{a['task']} for {a['about']}: {r}" for a in ai
                         for r in (a["gate"] or {}).get("reasons", [])]  # fmt: skip
         result = {
@@ -296,7 +297,8 @@ class Flow2:
                          "simulated": r.simulated, "call": r.call})  # fmt: skip
             return text
         if r.status == "unavailable":
-            reasons = ["AI is off: the Safety Specialist completes the narrative"]
+            reasons = [f"No AI draft ({r.note or 'AI is off'}): the Safety Specialist completes "
+                       "the narrative"]  # fmt: skip
         else:
             reasons = [f"AI draft not accepted: {x}" for x in (g.reasons if g else [r.note])]
         self._event(case_id, "narrative.review_needed", SYSTEM_NARRATIVE, {"reasons": reasons})

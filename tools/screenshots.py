@@ -59,12 +59,16 @@ def prepare(data: Path) -> dict[str, str]:
     upload(
         pipe.store,
         done,
-        [(n, (folder / n).read_bytes()) for n in ("discharge_summary.pdf", "ecg_report.pdf")],
+        [
+            (n, (folder / n).read_bytes())
+            for n in ("discharge_summary.pdf", "ecg_report.pdf", "troponin_results.xlsx")
+        ],  # fmt: skip
         "site101.coord",
     )
     runner.run_case_steps()
     submit(pipe.store, done, "site101.coord", "demo", paths.config)
-    runner.run_case_steps()
+    for _ in range(4):  # Flow 2: QC, dossier and narrative, handoff to Flow 3
+        runner.run_case_steps()
     return {"review": review, "done": done}
 
 
@@ -74,6 +78,7 @@ def main() -> None:
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     data = Path(tempfile.mkdtemp()) / "data"
+    os.environ["ADJUD_AI_MODE"] = "replay"  # Flow 2 agents answer from the recorded replays
     cases = prepare(data)
     env = {**os.environ, "ADJUD_DATA_DIR": str(data)}
     server = subprocess.Popen(  # noqa: S603
@@ -101,13 +106,14 @@ def main() -> None:
         from playwright.sync_api import sync_playwright
 
         shots = [
-            ("1_import", "?role=data_manager"),
+            ("1_import", "import?role=data_manager"),
             (
                 "2_documents_review",
                 f"documents?role=site&user=site104.coord&case={cases['review']}",
             ),
             ("3_documents_submitted", f"documents?role=site&case={cases['done']}"),
             ("4_record", f"record?role=safety_specialist&case={cases['done']}"),
+            ("6_quality_check", f"qc?role=safety_specialist&case={cases['done']}"),
             ("5_record_list", "record?role=safety_specialist"),
         ]
         with sync_playwright() as pw:
