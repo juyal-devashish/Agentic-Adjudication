@@ -210,3 +210,57 @@ def test_study_config_builds_a_gateway_with_ai_off(case):
     store, _ = case
     gw = Gateway.for_study(store, CONFIG)
     assert gw.cfg.mode == "off" and gw.replay_dir == CONFIG / "DEMO01" / "ai_replays"
+
+
+# --- AI-1: the agent adds identifiers on scanned pages (plan step 20) ----------------------
+
+
+def test_ai1_adds_an_identifier_the_rules_missed_on_a_scan(tmp_path, clock, monkeypatch):
+    from adjud.documents import documents_of
+
+    data = tmp_path / "data"
+    pipe = IntakePipeline(data, CONFIG, KIT / "edc_mock", clock=clock)
+    (data / "flow1-testkit").symlink_to(KIT)
+    pipe.import_file(KIT / "inbox_scenarios" / "01_initial.csv")
+    cid = pipe.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    with pymupdf.open() as doc:
+        doc.new_page().insert_text(
+            (72, 120), "Clinic note. Tray zebra quokka is full.", fontsize=14
+        )
+        png = doc[0].get_pixmap(dpi=200).tobytes("png")  # a scan: pixels only
+    upload(pipe.store, cid, [("scan.png", png)], "site101.coord")
+    answer = {"identifiers": [{"text": "zebra quokka", "category": "PATIENT_NAME"}]}
+    client = FakeClient(reply(text(json.dumps(answer))))
+    gw = Gateway(pipe.store, cfg(functions={"phi_detection": True}), tmp_path / "r",
+                 client=client)  # fmt: skip
+    monkeypatch.setattr("adjud.ai.gateway.Gateway.for_study", classmethod(lambda *a, **k: gw))
+    DocumentProcessor(pipe.store, CONFIG).process_case(cid)
+
+    done = documents_of(pipe.store, cid).processed["scan.png"]
+    assert done["status"] == "verified"
+    report = pipe.store.get_json(cid, done["report"]["path"])
+    assert any(
+        f["detector"] == "ai" and f["category"] == "PATIENT_NAME" for f in report["findings"]
+    )
+    out = pipe.store.get_file(cid, done["output"]["path"])
+    assert "zebra" not in page_text_of(out).lower() and "clinic note" in page_text_of(out).lower()
+    sent = client.requests[0]["messages"][0]["content"]
+    assert sent[0]["type"] == "image" and json.loads(sent[1]["text"])["file"] == "scan.png"
+    assert "tools" not in client.requests[0]  # AI-1 gets no tools
+
+
+def test_ai1_stays_off_unless_switched_on(case, tmp_path):
+    from adjud.documents import DocumentProcessor as DP
+
+    store, _ = case
+    assert DP(store, CONFIG)._ai_phi("DEMO01-0001") is None  # study.yaml: phi_detection false
+
+
+def page_text_of(pdf_bytes: bytes) -> str:
+    from PIL import Image
+
+    from adjud.deid import ocr
+
+    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+        pix = doc[0].get_pixmap(dpi=200, colorspace=pymupdf.csGRAY)
+    return ocr.ocr_unit(Image.frombytes("L", (pix.width, pix.height), pix.samples), 200).text

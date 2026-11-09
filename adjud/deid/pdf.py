@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import io
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -136,6 +137,7 @@ class PdfOutcome:
     unverifiable_pages: list[int] = field(default_factory=list)  # images, but no OCR
     notes: list[str] = field(default_factory=list)
     pages: int = 0
+    ai_terms: list[str] = field(default_factory=list)  # AI-1 identifiers located and redacted
 
 
 def _findings(
@@ -152,6 +154,40 @@ def _findings(
         if f.id not in keep and not any(s <= f.start and f.end <= e for s, e in kept)
     ]
     return found + extra.find(unit)
+
+
+AiDetect = Callable[[int, Image.Image], list[tuple[str, str]]]  # (page, image) -> (text, cat)
+
+
+def _ai_findings(
+    ai_detect: AiDetect | None, page_no: int, op: ocr.OcrPage, outcome: PdfOutcome
+) -> list[tuple[TextUnit, list[Finding]]]:
+    """AI-1 (plan step 20): identifiers the agent saw on the unredacted page image, located
+    in the page's OCR text. They only ever add redaction; one that cannot be found in the
+    OCR text cannot be boxed and is reported as a warning for the site."""
+    if ai_detect is None:
+        return []
+    items = ai_detect(page_no, op.image)
+    if not items:
+        return []
+    known = KnownValues()
+    for text, category in items:
+        known.values.setdefault(text.strip(), category)
+    located: list[tuple[TextUnit, list[Finding]]] = []
+    hit: set[str] = set()
+    for u in op.units:
+        found = known.find(u)
+        for f in found:
+            f.detector = "ai"
+            hit.add(next((v for v in known.values if f.text.lower() in v.lower()
+                           or v.lower() in f.text.lower()), f.text))  # fmt: skip
+        located.append((u, found))
+    missed = [v for v in known.values if v not in hit]
+    outcome.ai_terms += [v for v in known.values if v in hit]
+    if missed:
+        outcome.notes.append(f"page {page_no}: AI saw {len(missed)} identifier(s) OCR could "
+                             "not place; check this page")  # fmt: skip
+    return located
 
 
 def _extra(terms: list[str] | None) -> KnownValues:
@@ -190,6 +226,7 @@ def redact_pdf(
     extra_terms: list[str] | None = None,
     keep: list[str] | None = None,
     boxes: dict[int, list[Box]] | None = None,
+    ai_detect: AiDetect | None = None,
 ) -> PdfOutcome:
     """Redact every finding. `extra_terms` are site-added terms (F1-22); `keep` holds the
     ids of findings the site unticked with a reason (F1-21); `boxes` are areas the site drew
@@ -219,6 +256,9 @@ def redact_pdf(
                     for x0, y0, x1, y1 in unit.rects_for(s, e)
                 ]
                 rects += _box_px(boxes.get(page.number + 1, []), *op.image.size)
+                for u, found in _ai_findings(ai_detect, page.number + 1, op, outcome):
+                    outcome.findings += found
+                    rects += [r for s, e in merge_spans(found) for r in u.rects_for(s, e)]
                 rebuilt[page.number] = (ocr.black_out(op.image, rects), op.dpi)
                 outcome.ocr_pages.append(page.number + 1)
                 outcome.notes += [f"page {page.number + 1}: {n}" for n in op.notes]
@@ -249,6 +289,7 @@ def redact_image(
     extra_terms: list[str] | None = None,
     keep: list[str] | None = None,
     boxes: dict[int, list[Box]] | None = None,
+    ai_detect: AiDetect | None = None,
 ) -> PdfOutcome:
     """PNG/JPG/TIFF -> upright, straightened, redacted image-only PDF (one page per frame).
     `boxes`: site-drawn areas by 1-based page, as in `redact_pdf`."""
@@ -272,6 +313,11 @@ def redact_image(
                 outcome.findings += findings
                 rects += [r for s, e in merge_spans(findings) for r in u.rects_for(s, e)]
             rects += _box_px(boxes.get(n + 1, []), *op.image.size)
+            for u, found in _ai_findings(ai_detect, n + 1, op, outcome):
+                for f in found:
+                    f.source = f"page:{n + 1}"
+                outcome.findings += found
+                rects += [r for s, e in merge_spans(found) for r in u.rects_for(s, e)]
             _image_page(out, ocr.black_out(op.image, rects), op.dpi)
             outcome.ocr_pages.append(n + 1)
             outcome.notes += [f"page {n + 1}: {note}" for note in op.notes]

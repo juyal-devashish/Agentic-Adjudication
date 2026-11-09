@@ -62,6 +62,19 @@ class NarrativeOutput(BaseModel):
     statements: list[Statement]
 
 
+class PhiItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str
+    category: str
+
+
+class PhiOutput(BaseModel):
+    """AI-1: identifiers seen on an unredacted page image (synthetic data only)."""
+
+    model_config = ConfigDict(extra="forbid")
+    identifiers: list[PhiItem]
+
+
 @dataclass(frozen=True)
 class AgentFunction:
     name: str
@@ -98,5 +111,6 @@ def inline_schema(schema: dict[str, Any]) -> dict[str, Any]:
 DOCUMENT_TYPE = AgentFunction("document_type", 1, DocumentTypeOutput)
 EVENT_MATCH = AgentFunction("event_match", 1, EventMatchOutput)
 NARRATIVE = AgentFunction("narrative", 1, NarrativeOutput)
-FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE)}
+PHI_DETECTION = AgentFunction("phi_detection", 1, PhiOutput)
+FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE, PHI_DETECTION)}
 EVENT_VERDICTS = ("matches", "different_event", "unclear")

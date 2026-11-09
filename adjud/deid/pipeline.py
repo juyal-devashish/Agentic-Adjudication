@@ -16,6 +16,7 @@ Each file ends as one of:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import PurePath
 from typing import Any
@@ -88,7 +89,10 @@ def output_name(name: str, kind: str) -> str:
 def deidentify_case(
     docs: list[DocInput], policy: Policy, *, known: KnownValues | None = None,
     seeded: list[str] | None = None, max_file_mb: int = 50, max_pdf_pages: int = 200,
+    ai_detect: Callable[[str, int, Any], list[tuple[str, str]]] | None = None,
 ) -> list[DocResult]:  # fmt: skip
+    """`ai_detect(file, page, image)`: AI-1, only when the study switches it on (synthetic
+    data only); it can add findings on OCR'd pages, never remove any."""
     known = known or KnownValues()
     checks = {d.name: check_upload(d.name, d.content, max_file_mb=max_file_mb,
                                    max_pdf_pages=max_pdf_pages) for d in docs}  # fmt: skip
@@ -119,12 +123,13 @@ def deidentify_case(
             res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
         elif c.kind in ("pdf", "image"):
             redact = redact_pdf if c.kind == "pdf" else redact_image
-            out = redact(
-                d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep, boxes=d.boxes
+            detect = (
+                (lambda page, img, name=d.name: ai_detect(name, page, img)) if ai_detect else None
             )
-            ver = verify_pdf(
-                out.output, policy, known, keep=d.keep, seeded=seeded, extra_terms=d.extra_terms
-            )
+            out = redact(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep,
+                         boxes=d.boxes, ai_detect=detect)  # fmt: skip
+            ver = verify_pdf(out.output, policy, known, keep=d.keep, seeded=seeded,
+                             extra_terms=d.extra_terms + out.ai_terms)  # fmt: skip
             res.output, res.output_name = out.output, output_name(d.name, c.kind)
             res.pages = out.pages
             res.warnings += out.notes

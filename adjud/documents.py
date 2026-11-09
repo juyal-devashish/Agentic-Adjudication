@@ -21,6 +21,7 @@ from typing import Any
 
 import yaml
 
+from adjud.deid.ocr import png_bytes
 from adjud.deid.pipeline import DocInput, deidentify_case
 from adjud.deid.policy import Policy
 from adjud.events import EventDraft
@@ -165,6 +166,35 @@ class DocumentProcessor:
         self._event(case_id, "notification.queued",
                     {"to": to, "template": template, "id": note["id"]})  # fmt: skip
 
+    def _ai_phi(self, case_id: str) -> Any:
+        """AI-1 (plan step 20) as a callback for the redaction of OCR'd pages, or None when
+        the study has it off. It sees unredacted page images: synthetic data only."""
+        from adjud.ai.functions import PHI_DETECTION
+        from adjud.ai.gateway import Gateway
+        from adjud.ai.tools import Toolbox
+        from adjud.events import sha256_bytes
+
+        gw = Gateway.for_study(self.store, self.config_dir, self.study)
+        if not gw.cfg.enabled(PHI_DETECTION.name):
+            return None
+        categories = {*self.policy.must_redact, *self.policy.should_redact, "PERSON"}
+
+        def detect(name: str, page: int, image: Any) -> list[tuple[str, str]]:
+            img = image.copy()
+            img.thumbnail((2000, 2000))  # enough to read; keeps the request small
+            png = png_bytes(img)
+            payload = {"file": name, "page": page, "image_sha256": sha256_bytes(png)}
+            r = gw.run(case_id, PHI_DETECTION, payload, Toolbox(), images=[png])
+            if not r.ok or not r.output:
+                return []
+            return [
+                (i["text"], i["category"] if i["category"] in categories else "PERSON")
+                for i in r.output["identifiers"]
+                if len(i["text"].strip()) >= 3
+            ]
+
+        return detect
+
     def process_case(self, case_id: str) -> dict[str, Any]:
         """One de-identification run over all current documents of a DEIDENTIFYING case."""
         store = self.store
@@ -189,6 +219,7 @@ class DocumentProcessor:
             inputs, self.policy, seeded=seeded_values(self.identities, cs.subject or ""),
             max_file_mb=int(limits.get("max_file_mb", 50)),
             max_pdf_pages=int(limits.get("max_pdf_pages", 200)),
+            ai_detect=self._ai_phi(case_id),
         )  # fmt: skip
         statuses = {}
         for r in results:

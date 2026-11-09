@@ -19,6 +19,7 @@ without AI. Nothing here moves a case: the gates and the runner do.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
@@ -114,8 +115,15 @@ class Gateway:
     # -- entry point -------------------------------------------------------------------------
 
     def run(
-        self, case_id: str, function: AgentFunction, payload: dict[str, Any], toolbox: Toolbox
+        self,
+        case_id: str,
+        function: AgentFunction,
+        payload: dict[str, Any],
+        toolbox: Toolbox,
+        images: list[bytes] | None = None,
     ) -> AiResult:
+        """`images`: PNG pages sent with the request (AI-1). Their SHA-256 must be in
+        `payload` so that the input hash, and therefore replay, covers them."""
         if not self.cfg.enabled(function.name):
             return AiResult(function.name, "off", "unavailable", note="AI is off")
         h = input_hash(function, self.cfg.model, payload)
@@ -131,7 +139,7 @@ class Gateway:
                 function.name, "off", "unavailable",
                 note=f"AI budget of ${self.cfg.budget_usd:.2f} reached; continuing without AI",
             )  # fmt: skip
-        return self._live(case_id, function, payload, h, toolbox)
+        return self._live(case_id, function, payload, h, toolbox, images or [])
 
     # -- replay ------------------------------------------------------------------------------
 
@@ -191,13 +199,18 @@ class Gateway:
         payload: dict[str, Any],
         h: str,
         toolbox: Toolbox,
+        images: list[bytes],
     ) -> AiResult:
         import anthropic
 
         client = self._client()
-        messages: list[dict[str, Any]] = [
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
-        ]
+        content: list[dict[str, Any]] = [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                         "data": base64.standard_b64encode(img).decode()}}
+            for img in images
+        ]  # fmt: skip
+        content.append({"type": "text", "text": json.dumps(payload, ensure_ascii=False)})
+        messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
         usage = dict.fromkeys(
             ("input_tokens", "output_tokens", "cache_creation_input_tokens",
              "cache_read_input_tokens"), 0,
@@ -212,12 +225,13 @@ class Gateway:
                     note = "too many turns without an answer"
                     break
                 requests += 1
+                tools = toolbox.definitions()
                 response = client.messages.create(
                     model=self.cfg.model,
                     max_tokens=self.cfg.max_tokens,
                     system=function.system_prompt(),
-                    tools=toolbox.definitions(),
                     messages=messages,
+                    **({"tools": tools} if tools else {}),
                     output_config={
                         "effort": self.cfg.effort,
                         "format": {"type": "json_schema", "schema": function.output_schema()},

@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–19 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–20 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -224,12 +224,15 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** done and tested, except the real OneDrive run. A ZIP is taken once its size and time stamp have not changed for one runner tick (about 10 s). Folders exist for cases waiting for documents or answering a query; the e-mails for those tasks name the folder. `runner --once` makes one pass, so it never takes a ZIP it has just seen.
 
-### Step 20 — AI-1: AI finds PHI on scans and images
+### Step 20 — AI-1: AI finds PHI on scans and images ✅
 
-- [ ] Agent looks at page images and *adds* findings (never removes); its findings go through the same redaction and verification
-- [ ] Synthetic data only; `tools.deid_check` reports recall with AI off vs on (ask before a live run: more than ~10 calls)
+- [x] Agent looks at page images and *adds* findings (never removes); its findings go through the same redaction and verification
+- [x] Synthetic data only; off unless `functions.phi_detection` is switched on
+- [ ] `tools.deid_check` with AI off vs on: moved to step 22, because it needs live calls (ask first: more than ~10). Simulated AI-1 answers on the scored corpus would make the recall figures meaningless, so none are written
 
 **Done when:** replay shows AI-1 findings redacted and verified; the live comparison waits for the key.
+
+**Result:** on every OCR'd page the agent gets the unredacted page image (downscaled, its hash in the input) and returns strings with categories; each is located in the page's OCR text, blacked out with detector `ai`, and passed to verification as a term that must be gone. An identifier OCR cannot place becomes a warning for the site. Tested with a scripted client: a made-up name no rule catches is removed from a scan.
 
 ### Step 21 — "Pull data from EDC" tab (P-34, optional)
 
@@ -239,6 +242,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - [ ] Key in the environment only; `ai.mode: live`; prices entered; budget cap set
 - [ ] Record real outputs for every fixture and replace the simulated replays; measure cost per case and repeatability (5 runs per function)
+- [ ] `tools.deid_check` with AI-1 off vs on, live (ask before running)
 - [ ] Re-run the full demo live; report cost
 
 **Done when:** the full Flows 1+2 demo runs live with measured cost per case.
