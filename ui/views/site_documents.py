@@ -10,6 +10,7 @@ import pandas as pd
 import pymupdf
 import streamlit as st
 import theme
+from boxdraw import page_box
 from common import case_header, context, pipeline, processor, study_config
 from openpyxl import load_workbook
 
@@ -155,7 +156,23 @@ if reviewable:
             with pymupdf.open(stream=output, filetype="pdf") as doc:
                 n = st.number_input("Page", 1, doc.page_count, 1) if doc.page_count > 1 else 1
                 png = doc[n - 1].get_pixmap(dpi=90).tobytes("png")
-            st.image(png, caption=f"{name}, page {n}, as it will be sent", width="stretch")
+            if not can_change:
+                st.image(png, caption=f"{name}, page {n}, as it will be sent", width="stretch")
+            else:
+                st.caption(
+                    f"{name}, page {n}, as it will be sent. To black out something we "
+                    "missed, such as a handwritten name or a stamp, drag a box over it."
+                )
+                box = page_box(png, key=f"box_{done['output']['path']}_{n}")
+                if box and st.button(f"Black out the selected area on page {n}", type="primary"):
+                    try:
+                        change_redactions(
+                            store, cid, ctx.actor, boxes=[{"file": name, "page": n, "rect": box}]
+                        )
+                        st.toast("Area added. Identifiers are being removed again.")
+                        st.rerun()
+                    except ReviewRefused as exc:
+                        st.error(f"Nothing changed: {exc}.")
     with right:
         if report["residuals"]:
             items = "".join(

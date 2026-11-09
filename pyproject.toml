@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.4.6",
     "openpyxl>=3.1.5",
     "pillow>=13.0.0",
+    "plotly==6.3.0",
     "presidio-analyzer>=2.2.366",
     "pydantic>=2.14.3",
     "pydicom>=3.0.2",

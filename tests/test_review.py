@@ -154,3 +154,73 @@ def test_rejected_file_must_be_deleted_before_submission(ctx):
     assert not status.ready and any("rejected" in r for r in status.reasons)
     delete_document(store, cid, "notes.txt", SITE, reason="wrong file")
     assert submission_status(store, cid).ready
+
+
+# --- boxes drawn by the site (plan step 11, P-30) -------------------------------------------
+
+
+def _fractions(page: pymupdf.Page, rect: pymupdf.Rect) -> list[float]:
+    w, h = page.rect.width, page.rect.height
+    return [rect.x0 / w, rect.y0 / h, rect.x1 / w, rect.y1 / h]
+
+
+def test_box_removes_text_no_detector_finds_and_survives_later_runs(ctx):
+    store, proc, cid = ctx
+    upload(store, cid, [("note.pdf", pdf("Seen today. Tray zebra quokka is full, ward 7."))], SITE)
+    proc.process_case(cid)
+    out = store.get_file(cid, processed(store, cid, "note.pdf")["output"]["path"])
+    with pymupdf.open(stream=out, filetype="pdf") as doc:
+        assert "zebra quokka" in doc[0].get_text()  # nothing detects these made-up words
+        box = _fractions(doc[0], doc[0].search_for("zebra quokka")[0])
+    change_redactions(store, cid, SITE, boxes=[{"file": "note.pdf", "page": 1, "rect": box}])
+    proc.process_case(cid)
+    change_redactions(store, cid, SITE, add_terms=["ward 7"])  # a later, unrelated change
+    proc.process_case(cid)
+    done = processed(store, cid, "note.pdf")
+    assert done["status"] == "verified"
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        text = doc[0].get_text()
+    assert "zebra" not in text and "quokka" not in text and "Seen today" in text
+    assert all(r.ok for r in verify_all(store.paths))
+
+
+def test_box_on_a_scan_blacks_out_the_pixels(ctx):
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    store, proc, cid = ctx
+    img = Image.new("L", (1240, 1754), 255)  # A4 at 150 dpi
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((300, 400, 700, 460), fill=90)  # a grey "handwritten" scribble
+    buf = BytesIO()
+    img.save(buf, format="PNG", dpi=(150, 150))
+    upload(store, cid, [("scan.png", buf.getvalue())], SITE)
+    proc.process_case(cid)
+    box = [280 / 1240, 390 / 1754, 720 / 1240, 470 / 1754]
+    change_redactions(store, cid, SITE, boxes=[{"file": "scan.png", "page": 1, "rect": box}])
+    proc.process_case(cid)
+    done = processed(store, cid, "scan.png")
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        pix = doc[0].get_pixmap(dpi=150, colorspace=pymupdf.csGRAY)
+    out = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+    sx, sy = out.width / 1240, out.height / 1754
+    area = out.crop((int(310 * sx), int(410 * sy), int(690 * sx), int(450 * sy)))
+    assert area.getextrema()[1] < 10  # the grey scribble is now black, not grey
+
+
+@pytest.mark.parametrize(
+    ("box", "match"),
+    [
+        ({"file": "note.pdf", "page": 1, "rect": [0.1, 0.1, 0.1001, 0.2]}, "too small"),
+        ({"file": "other.pdf", "page": 1, "rect": [0.1, 0.1, 0.3, 0.2]}, "no document"),
+        ({"file": "note.pdf", "page": 0, "rect": [0.1, 0.1, 0.3, 0.2]}, "too small"),
+        ({"file": "note.pdf", "rect": [0.1, 0.1, 0.3, 0.2]}, "not valid"),
+    ],
+)
+def test_invalid_boxes_are_refused(ctx, box, match):
+    store, proc, cid = ctx
+    upload(store, cid, [("note.pdf", pdf("Seen today."))], SITE)
+    proc.process_case(cid)
+    with pytest.raises(ReviewRefused, match=match):
+        change_redactions(store, cid, SITE, boxes=[box])

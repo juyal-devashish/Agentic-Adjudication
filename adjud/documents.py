@@ -52,6 +52,10 @@ class CaseDocuments:
     files: dict[str, CaseDocument] = field(default_factory=dict)
     extra_terms: list[str] = field(default_factory=list)
     keep: dict[str, list[str]] = field(default_factory=dict)  # file name -> texts kept
+    # file name -> 1-based page -> boxes drawn by the site, as fractions of the page
+    boxes: dict[str, dict[int, list[tuple[float, float, float, float]]]] = field(
+        default_factory=dict
+    )
     runs: int = 0
     last_run: dict[str, Any] | None = None  # data of the last deid.completed / failed
     processed: dict[str, dict[str, Any]] = field(default_factory=dict)  # last run's files
@@ -70,6 +74,7 @@ def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
         elif t == "document.deleted":
             docs.files.pop(d["name"], None)
             docs.keep.pop(d["name"], None)
+            docs.boxes.pop(d["name"], None)
         elif t == "redactions.changed":
             if d.get("terms"):  # site-added terms live in a quarantined case file
                 text = store.get_file(case_id, d["terms"]["path"]).decode()
@@ -79,6 +84,10 @@ def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
             for name, ids in (d.get("keep") or {}).items():
                 docs.keep.setdefault(name, [])
                 docs.keep[name] += [x for x in ids if x not in docs.keep[name]]
+            for b in d.get("boxes") or []:
+                docs.boxes.setdefault(b["file"], {}).setdefault(b["page"], []).append(
+                    tuple(b["rect"])
+                )
         elif t == "deid.started":
             docs.runs = d["run"]
             current_run = {}
@@ -170,6 +179,7 @@ class DocumentProcessor:
                 content=store.get_file(case_id, f.path),
                 extra_terms=docs.extra_terms,
                 keep=docs.keep.get(f.name, []),
+                boxes=docs.boxes.get(f.name, {}),
             )
             for f in docs.files.values()
         ]

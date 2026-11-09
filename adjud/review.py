@@ -30,6 +30,19 @@ class ReviewRefused(Exception):
     pass
 
 
+def _checked_box(b: dict[str, Any]) -> dict[str, Any]:
+    """A box must name a file and a page and lie inside the page with a visible size."""
+    try:
+        x0, y0, x1, y1 = (min(max(float(v), 0.0), 1.0) for v in b["rect"])
+        page, name = int(b["page"]), str(b["file"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ReviewRefused("the box is not valid") from exc
+    x0, x1, y0, y1 = min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1)
+    if page < 1 or x1 - x0 < 0.005 or y1 - y0 < 0.002:
+        raise ReviewRefused("the box is too small; drag across the text to cover")
+    return {"file": name, "page": page, "rect": [round(v, 5) for v in (x0, y0, x1, y1)]}
+
+
 def change_redactions(
     store: FileCaseStore,
     case_id: str,
@@ -38,13 +51,21 @@ def change_redactions(
     reason: str | None = None,
     keep: list[dict[str, str]] | None = None,
     add_terms: list[str] | None = None,
+    boxes: list[dict[str, Any]] | None = None,
 ) -> None:
     """`keep`: [{"file", "id", "masked", "category"}] findings to un-redact (F1-21).
-    `add_terms`: extra terms to redact on all pages of all files (F1-22)."""
+    `add_terms`: extra terms to redact on all pages of all files (F1-22).
+    `boxes`: [{"file", "page", "rect": [x0, y0, x1, y1]}] areas to black out, drawn on the
+    redacted preview; rect as fractions of the page (plan P-30). Adding redaction needs no
+    reason; only un-redacting does."""
     keep = keep or []
     terms = [t.strip() for t in add_terms or [] if t and t.strip()]
-    if not keep and not terms:
+    boxes = [_checked_box(b) for b in boxes or []]
+    if not keep and not terms and not boxes:
         raise ReviewRefused("nothing to change")
+    unknown = {b["file"] for b in boxes} - set(documents_of(store, case_id).files)
+    if unknown:
+        raise ReviewRefused(f"no document named {', '.join(sorted(unknown))} in this case")
     if keep and not (reason or "").strip():
         raise ReviewRefused("a reason is required to un-redact a finding")
     data: dict[str, Any] = {"keep": {}, "kept": []}
@@ -56,6 +77,8 @@ def change_redactions(
         rel = f"documents/site_terms/terms_v{n}.txt"
         sha = store.put_file(case_id, rel, ("\n".join(terms) + "\n").encode())
         data["terms"] = {"path": rel, "sha256": sha, "count": len(terms)}
+    if boxes:
+        data["boxes"] = boxes
     store.append_event(
         case_id,
         EventDraft(

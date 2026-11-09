@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–10 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–11 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -78,7 +78,7 @@ Change any of these by editing this table first.
 | P-27 | AI provider modes | `off` / `replay` / `live` in `study.yaml`. `live` also needs `ANTHROPIC_API_KEY`; without it the gateway falls back to `off` and says so | Plan |
 | P-28 | Cost control | Every call logs input and output tokens; prices per million tokens are entered in `study.yaml` from the pricing page at go-live; a budget cap (`ai.budget_usd`) stops live calls when reached | Checklist |
 | P-29 | E-mail | Bare minimum: SMTP via environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`); Outlook through `smtp.office365.com:587` if the presenter's tenant allows SMTP AUTH, otherwise Mailpit. Not configured → outbox only, as today. Body: case ID, task, link; never clinical content | User |
-| P-30 | Manual redaction | The site draws a box on the page preview (two clicks: corners), using `streamlit-image-coordinates`. The box applies to that page of that file; text and pixels under it are removed and verification re-runs. Spreadsheets keep "black out this text" | User |
+| P-30 | Manual redaction | The site drags a box on the page preview (Streamlit's box selection on a Plotly chart). The box applies to that page of that file; text and pixels under it are removed and verification re-runs. Spreadsheets keep "black out this text" | User |
 | P-31 | Upload flow | On case creation the runner makes `uploads/<case-id>/`. The site drops **one ZIP**; a complete ZIP is the "upload finished" signal (code, not AI). The folder can sit in a OneDrive-synced directory (`ADJUD_UPLOAD_DIR`) to stand in for SharePoint. The UI upload stays as a second route | Meeting |
 | P-32 | Same-patient check | Deterministic first: identifiers learned from each document of a case (name, DOB, MRN) must agree across documents; event term and dates must appear near the EDC onset. The AI agent adds a judgement with citations for unclear cases. A mismatch is a QC finding, not a block on upload | Demo discussion |
 | P-33 | Flow 2 sign-offs | QC pass and narrative approval are **automated decisions** when every gate passes. The Safety Specialist signs only on exceptions or overrides. *Confirm with the team; spec.md QC-06 and NAR-04 had the SS sign every case* | P-24 |
@@ -123,14 +123,16 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** 11 e-mails delivered to Mailpit from one runner pass. E-mail links name the case, not the person, so a `role=site&case=…` link now opens the case as a user of the case's own site.
 
-### Step 11 — Draw a box (P-30)
+### Step 11 — Draw a box (P-30) ✅
 
-- [ ] Click two corners on the page preview; the box is shown before it is applied
-- [ ] `redactions.changed` carries `boxes: [{file, page, rect}]` in PDF coordinates; the re-run applies them (text pages: redaction annotation; image pages: black out pixels) and verification re-runs
-- [ ] Boxes from earlier runs are kept on later runs, like added terms
-- [ ] Tests: a box over text removes it from the text layer; a box on a scan removes the pixels
+- [x] Drag a box on the page preview; it is shown before it is applied
+- [x] `redactions.changed` carries `boxes: [{file, page, rect}]` in PDF coordinates; the re-run applies them (text pages: redaction annotation; image pages: black out pixels) and verification re-runs
+- [x] Boxes from earlier runs are kept on later runs, like added terms
+- [x] Tests: a box over text removes it from the text layer; a box on a scan removes the pixels
 
 **Done when:** the site can cover a handwritten name on a scan and still sign.
+
+**Result:** `streamlit-image-coordinates` does not work with Streamlit 1.67, so the preview is a Plotly chart with Streamlit's own box selection (`ui/boxdraw.py`). Checked in a real browser: drag, button, event with page fractions, re-run. Boxes cannot be removed yet; a wrong box needs the file uploaded again.
 
 ### Step 12 — AI foundation (P-26 to P-28)
 
@@ -238,4 +240,4 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 | Automated approvals read as e-signatures | Regulatory misunderstanding | Events and UI say "automated decision"; no compliance claim |
 | AI-1 sends unredacted images | Real PHI could leave if real data is used | Synthetic only; AI-1 off by default; IT input before any real data |
 | Costs grow during testing | Budget surprise | Usage ledger, budget cap, cost per case on the AI activity view |
-| Streamlit box drawing via a third-party component | Component breaks on upgrade | Pin the version; fallback: enter the box as numbers |
+| Box drawing relies on Plotly box selection in Streamlit | Behaviour changes on upgrade | Browser check in the step; pinned versions |

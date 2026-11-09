@@ -21,7 +21,14 @@ from pathlib import PurePath
 from typing import Any
 
 from adjud.deid.detect import KnownValues
-from adjud.deid.pdf import learn_image, learn_pdf, redact_image, redact_pdf, verify_pdf
+from adjud.deid.pdf import (
+    Box,
+    learn_image,
+    learn_pdf,
+    redact_image,
+    redact_pdf,
+    verify_pdf,
+)
 from adjud.deid.policy import Policy
 from adjud.deid.sniff import check_upload
 from adjud.deid.xlsx import learn_xlsx, redact_xlsx, verify_xlsx
@@ -33,6 +40,7 @@ class DocInput:
     content: bytes
     extra_terms: list[str] = field(default_factory=list)  # site-added terms (F1-22)
     keep: list[str] = field(default_factory=list)  # finding ids the site kept (F1-21)
+    boxes: dict[int, list[Box]] = field(default_factory=dict)  # site-drawn areas by page
 
 
 @dataclass
@@ -101,7 +109,9 @@ def deidentify_case(
             res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
         elif c.kind in ("pdf", "image"):
             redact = redact_pdf if c.kind == "pdf" else redact_image
-            out = redact(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep)
+            out = redact(
+                d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep, boxes=d.boxes
+            )
             ver = verify_pdf(
                 out.output, policy, known, keep=d.keep, seeded=seeded, extra_terms=d.extra_terms
             )

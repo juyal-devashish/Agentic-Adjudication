@@ -162,6 +162,14 @@ def _extra(terms: list[str] | None) -> KnownValues:
     return extra
 
 
+Box = tuple[float, float, float, float]  # x0, y0, x1, y1 as fractions of the output page
+
+
+def _box_px(boxes: list[Box], width: float, height: float) -> list[Box]:
+    """Site-drawn boxes (fractions of the page) in pixels or points of a page this size."""
+    return [(x0 * width, y0 * height, x1 * width, y1 * height) for x0, y0, x1, y1 in boxes]
+
+
 def _image_page(out: pymupdf.Document, img: Image.Image, dpi: float) -> None:
     page = out.new_page(width=img.width * 72 / dpi, height=img.height * 72 / dpi)
     page.insert_image(page.rect, stream=ocr.png_bytes(img))
@@ -181,10 +189,13 @@ def redact_pdf(
     *,
     extra_terms: list[str] | None = None,
     keep: list[str] | None = None,
+    boxes: dict[int, list[Box]] | None = None,
 ) -> PdfOutcome:
     """Redact every finding. `extra_terms` are site-added terms (F1-22); `keep` holds the
-    ids of findings the site unticked with a reason (F1-21)."""
-    extra, keep_set = _extra(extra_terms), set(keep or [])
+    ids of findings the site unticked with a reason (F1-21); `boxes` are areas the site drew
+    on the output preview, by 1-based page (plan P-30). Processing the same original always
+    gives the same page geometry, so a box drawn on one run's output fits the next run."""
+    extra, keep_set, boxes = _extra(extra_terms), set(keep or []), boxes or {}
     outcome = PdfOutcome(output=b"")
     with pymupdf.open(stream=content, filetype="pdf") as doc:
         outcome.pages = doc.page_count
@@ -207,6 +218,7 @@ def redact_pdf(
                     for s, e in merge_spans(text_findings)
                     for x0, y0, x1, y1 in unit.rects_for(s, e)
                 ]
+                rects += _box_px(boxes.get(page.number + 1, []), *op.image.size)
                 rebuilt[page.number] = (ocr.black_out(op.image, rects), op.dpi)
                 outcome.ocr_pages.append(page.number + 1)
                 outcome.notes += [f"page {page.number + 1}: {n}" for n in op.notes]
@@ -216,6 +228,8 @@ def redact_pdf(
             for s, e in merge_spans(text_findings):
                 for rect in unit.rects_for(s, e):
                     page.add_redact_annot(pymupdf.Rect(rect), fill=(0, 0, 0))
+            for rect in _box_px(boxes.get(page.number + 1, []), page.rect.width, page.rect.height):
+                page.add_redact_annot(pymupdf.Rect(rect) * page.derotation_matrix, fill=(0, 0, 0))
             page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_PIXELS)
         with pymupdf.open() as out:
             for page in doc:
@@ -234,9 +248,11 @@ def redact_image(
     *,
     extra_terms: list[str] | None = None,
     keep: list[str] | None = None,
+    boxes: dict[int, list[Box]] | None = None,
 ) -> PdfOutcome:
-    """PNG/JPG/TIFF -> upright, straightened, redacted image-only PDF (one page per frame)."""
-    extra, keep_set = _extra(extra_terms), set(keep or [])
+    """PNG/JPG/TIFF -> upright, straightened, redacted image-only PDF (one page per frame).
+    `boxes`: site-drawn areas by 1-based page, as in `redact_pdf`."""
+    extra, keep_set, boxes = _extra(extra_terms), set(keep or []), boxes or {}
     outcome = PdfOutcome(output=b"")
     frames = image_frames(content)
     outcome.pages = len(frames)
@@ -244,7 +260,8 @@ def redact_image(
         for n, (frame, dpi) in enumerate(frames):
             if not ocr.available():
                 outcome.unverifiable_pages.append(n + 1)
-                _image_page(out, frame, float(dpi or RENDER_DPI))
+                drawn = ocr.black_out(frame, _box_px(boxes.get(n + 1, []), *frame.size))
+                _image_page(out, drawn, float(dpi or RENDER_DPI))
                 continue
             op = ocr_image_frame(content, n, frame, dpi)
             rects = []
@@ -254,6 +271,7 @@ def redact_image(
                     f.source = f"page:{n + 1}"
                 outcome.findings += findings
                 rects += [r for s, e in merge_spans(findings) for r in u.rects_for(s, e)]
+            rects += _box_px(boxes.get(n + 1, []), *op.image.size)
             _image_page(out, ocr.black_out(op.image, rects), op.dpi)
             outcome.ocr_pages.append(n + 1)
             outcome.notes += [f"page {n + 1}: {note}" for note in op.notes]
