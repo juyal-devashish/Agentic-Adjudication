@@ -1,4 +1,4 @@
-"""OCR for scanned and image pages (mvp-flow-1.md §7.1–7.3, §7.5).
+"""OCR for scanned and image pages.
 
 The image we OCR is the image we output: it is first made upright (Tesseract OSD, 90°
 steps), straightened (small skew, by projection profile) and brought to about 300 dpi.

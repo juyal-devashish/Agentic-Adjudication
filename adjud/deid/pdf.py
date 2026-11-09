@@ -1,4 +1,4 @@
-"""PDF and image redaction, metadata scrub and verification (mvp-flow-1.md §7.3–7.5, §7.8).
+"""PDF and image redaction, metadata scrub and verification.
 
 Text-only pages: PyMuPDF redaction annotations over every finding's words, then
 `apply_redactions`, which deletes the underlying characters (they are not just covered).

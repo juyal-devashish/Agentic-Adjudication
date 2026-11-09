@@ -1,4 +1,4 @@
-"""Notifications written to outbox/ (mvp-flow-1.md §10).
+"""Notifications written to outbox/.
 
 A notification never carries clinical content: only study, case id, recipient,
 template name and a link. The recipient is a site (`site:<id>`) or a role

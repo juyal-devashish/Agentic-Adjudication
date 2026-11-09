@@ -1,4 +1,4 @@
-"""Flow 1 case states, the transition table and replay (mvp-flow-1.md §4).
+"""Flow 1 case states, the transition table and replay.
 
 The current state of a case is never stored as truth: it is computed by replaying the
 case's events through this table. case.json is only a cache of that result.

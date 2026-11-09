@@ -1,4 +1,4 @@
-"""Handoff to Flow 2 (mvp-flow-1.md §11).
+"""Handoff to Flow 2.
 
 After submission the runner writes handoff/flow2_manifest.json and appends
 handoff.flow2_ready. The manifest is the contract with Flow 2: everything Flow 2 needs,

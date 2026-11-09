@@ -1,4 +1,4 @@
-"""Locations of the data folder and its fixed subfolders (mvp-flow-1.md §5)."""
+"""Locations of the data folder and its fixed subfolders."""
 
 from __future__ import annotations
 

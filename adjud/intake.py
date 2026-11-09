@@ -1,4 +1,4 @@
-"""Flow 1 intake (mvp-flow-1.md §6): import AE files, validate, evaluate eligibility,
+"""Flow 1 intake: import AE files, validate, evaluate eligibility,
 create cases idempotently, detect source changes, pull related data and prior events,
 flag possible duplicates and notify the site.
 

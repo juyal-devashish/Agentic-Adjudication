@@ -1,4 +1,4 @@
-"""Documents (mvp-flow-1.md §9.2, §7.10): upload, removal of identifiers, review of the
+"""Documents: upload, removal of identifiers, review of the
 redacted pages, corrections with reasons, and Sign and submit."""
 
 from __future__ import annotations

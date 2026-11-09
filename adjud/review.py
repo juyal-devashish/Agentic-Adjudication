@@ -1,4 +1,4 @@
-"""Site review and submission (mvp-flow-1.md §7.10, F1-20 to F1-26).
+"""Site review and submission.
 
     change_redactions()  untick findings (reason required) and/or add terms
                          -> redactions.changed (AWAITING_SITE_CONFIRMATION -> DEIDENTIFYING)

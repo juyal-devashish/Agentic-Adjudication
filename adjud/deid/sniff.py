@@ -1,4 +1,4 @@
-"""File type from content, not extension, and the upload checks (mvp-flow-1.md §7.1, §7.2).
+"""File type from content, not extension, and the upload checks.
 
 Rejections tell the site exactly what to send instead; nothing is produced for them.
 """

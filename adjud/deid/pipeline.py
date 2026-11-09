@@ -1,4 +1,4 @@
-"""De-identify all documents of one case (mvp-flow-1.md §7.2).
+"""De-identify all documents of one case.
 
 Two passes over the case's files:
   1. learn: every labelled or pattern-matched identifier in any file is remembered

@@ -1,4 +1,4 @@
-"""The mock EDC: CSV files that stand in for the study database (mvp-flow-1.md §5)."""
+"""The mock EDC: CSV files that stand in for the study database."""
 
 from __future__ import annotations
 

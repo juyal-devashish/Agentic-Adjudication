@@ -2,7 +2,7 @@
 
 > **SYNTHETIC DATA ONLY.** Every patient, identifier, hospital and drug in this repository is invented. This is a proof of concept. It is not validated, not 21 CFR Part 11 / Annex 11 compliant, and has no real authentication. Never use it with real patient data.
 
-This POC covers Flow 1 of the adjudication workflow ([spec](docs/mvp-flow-1.md)). Adverse-event (AE) records from a mock EDC become adjudication cases when they meet the study's rules, and every record gets a rule-by-rule explanation. Sites upload source documents. The system removes PHI destructively and checks the output again from scratch. The site reviews, corrects and signs. The result is a hashed handoff package for Flow 2.
+This POC covers Flow 1 of the adjudication workflow, which is built. Flow 2 (QC, dossier and narrative, run by AI agents) is next; see [the plan](docs/plan-mvp.md). Adverse-event (AE) records from a mock EDC become adjudication cases when they meet the study's rules, and every record gets a rule-by-rule explanation. Sites upload source documents. The system removes PHI destructively and checks the output again from scratch. The site reviews, corrects and signs. The result is a hashed handoff package for Flow 2.
 
 There is no database. Each case is a folder whose single source of truth is a hash-chained, append-only event log.
 
@@ -46,7 +46,7 @@ Roles are simulated in the sidebar. Anyone can switch, which is acceptable only 
 
 ## Demo script
 
-Files to drag into the UI are in `data/demo_uploads/` after a reset. The full script is in [the plan](docs/plan-mvp-flow-one.md#7-demo-script-core).
+Files to drag into the UI are in `data/demo_uploads/` after a reset.
 
 1. **Import** `01_initial.csv` on *AE import* (or *Import queued files* after a reset with `--preload`): 22 records give 11 cases and 11 not eligible, each with reasons.
 2. **Re-import** `02_reimport_identical.csv`: no new cases.

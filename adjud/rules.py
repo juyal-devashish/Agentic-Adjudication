@@ -1,4 +1,4 @@
-"""Declarative eligibility rules (mvp-flow-1.md §6.1). Never uses eval().
+"""Declarative eligibility rules. Never uses eval().
 
 A rule set has a top-level `all` or `any` list. Each node is either a group (`all` /
 `any` with children, optionally with `id` and `description`) or a leaf with `field` and

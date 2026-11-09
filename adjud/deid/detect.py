@@ -1,4 +1,4 @@
-"""PHI detectors (mvp-flow-1.md §7.4).
+"""PHI detectors.
 
     labels     a value right after a label ("DOB: 24/07/1955", "Pat.-Nr. 8859641")
     patterns   custom regexes from deid_policy.yaml (e-mail, phones, ID formats, Dr names,

@@ -1,4 +1,4 @@
-"""Case record (mvp-flow-1.md §9.3): all cases, and for one case its audit trail with the
+"""Case record: all cases, and for one case its audit trail with the
 chain check, source data, notifications and the package for adjudication. Also the
 de-identification measurements on the synthetic test corpus."""
 

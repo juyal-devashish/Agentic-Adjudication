@@ -1,4 +1,4 @@
-"""Rehearsal of the core demo script (docs/plan-mvp-flow-one.md §7), end to end through
+"""Rehearsal of the core demo script (the Flow 1 demo), end to end through
 the same functions the UI calls. If this passes, every scenario in the script works on a
 freshly reset demo."""
 

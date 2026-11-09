@@ -1,7 +1,7 @@
 """Shared UI helpers: data paths, the intake pipeline, demo users and the sidebar context.
 
 Roles are SIMULATED: anyone can switch. That is acceptable only because the data is
-synthetic (mvp-flow-1.md §2). Every write still goes through the CaseStore rules.
+synthetic. Every write still goes through the CaseStore rules.
 """
 
 from __future__ import annotations

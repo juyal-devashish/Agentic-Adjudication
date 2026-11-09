@@ -1,4 +1,4 @@
-"""Spreadsheet de-identification (mvp-flow-1.md §7.6).
+"""Spreadsheet de-identification.
 
 - Every cell on every sheet, including hidden sheets, rows and columns, is scanned.
 - Columns whose header is an identifier label (Patient Name, Hospital no, DOB, ...) are

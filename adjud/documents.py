@@ -1,4 +1,4 @@
-"""Case documents through the workflow (mvp-flow-1.md §4, §7, §7.10).
+"""Case documents through the workflow.
 
     upload()        site uploads files            -> documents.uploaded  (-> DEIDENTIFYING)
     process_case()  runner de-identifies them all -> deid.started, deid.file_processed per

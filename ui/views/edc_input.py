@@ -1,4 +1,4 @@
-"""AE import (mvp-flow-1.md §9.1): import AE files, see every record's eligibility with
+"""AE import: import AE files, see every record's eligibility with
 rule-by-rule reasons, enter an AE by hand, and see flagged cases."""
 
 from __future__ import annotations

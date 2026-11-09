@@ -1,4 +1,4 @@
-"""Demo electronic signatures (mvp-flow-1.md F1-26; spec.md SIG-02, SIG-03).
+"""Demo electronic signatures (spec.md SIG-02, SIG-03).
 
 NOT Part 11 compliant: there is no real authentication. A signature re-checks the demo
 user's password and records signer, meaning, time (the event's `at`) and the hashes of

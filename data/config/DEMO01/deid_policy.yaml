@@ -1,4 +1,4 @@
-# De-identification policy (from the Flow 1 test kit; mvp-flow-1.md §7.4, §7.9).
+# De-identification policy (from the Flow 1 test kit).
 # Detector settings are added in step 4.
 version: 1
 date_policy: dob_only        # P-01: clinical dates are kept, dates of birth redacted

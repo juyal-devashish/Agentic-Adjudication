@@ -4,14 +4,14 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this
 
 ## Project
 
-**Clinical Event Adjudication — Flow 1 (Intake) proof of concept:** a file-based workflow that takes a synthetic AE file, creates cases from configured eligibility rules (explaining every "no"), collects site documents, removes PHI destructively and verifies it by code, lets the site review and sign, and writes a hashed handoff manifest for Flow 2. Hash-chained audit trail throughout. AI is optional and off by default.
+**Clinical Event Adjudication — Flow 1 (Intake) + Flow 2 (QC and narrative) proof of concept, built around AI:** a file-based workflow that takes a synthetic AE file, creates cases from configured eligibility rules (explaining every "no"), collects site documents, removes PHI destructively and verifies it by code, lets the site review and sign, then has AI agents run QC, build the dossier and draft the narrative, and hands a hashed package to Flow 3. Hash-chained audit trail throughout. **The goal is to minimise the people needed:** agents do the work, code gates decide whether their results may move a case, and people handle signatures and exceptions.
 
-- **We are building Flow 1 only.** [docs/mvp-flow-1.md](docs/mvp-flow-1.md) is the source of truth for behavior. [docs/plan-mvp-flow-one.md](docs/plan-mvp-flow-one.md) is the step-by-step build plan: follow its step order, scope (core before stretch) and decisions table, and tick its boxes as steps complete.
-- [docs/mvp-spec.md](docs/mvp-spec.md) (whole MVP) supplies the shared storage design (§4) that Flow 1 reuses; [docs/spec.md](docs/spec.md) is the full-product spec and the source of requirement IDs. Where they differ from mvp-flow-1.md, mvp-flow-1.md wins. Nothing from Flow 2 onwards is built.
+- **We are building Flows 1 and 2.** [docs/plan-mvp.md](docs/plan-mvp.md) is the step-by-step build plan and holds the autonomy model (§2) and the decisions table: follow its step order and tick its boxes as steps complete. Flow 1 is built; its behavior is defined by the code, its tests and the test kit.
+- For Flow 2, [docs/mvp-spec.md](docs/mvp-spec.md) (§4 storage, §5.2 states, §8 MVP-11 to MVP-15, §9 AI) and [docs/spec.md](docs/spec.md) (§6.3–6.4, requirement IDs) describe the behavior. Where they differ from the plan's autonomy model or decisions, the plan wins. Nothing from Flow 3 onwards is built.
 - Read the relevant spec section before changing behavior. If code and spec disagree, flag it; don't silently pick one.
 - Don't start UI polish before the store, workflow and their tests pass. Don't pull in the production stack from spec.md §8.3.
 
-Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, optional Mailpit, optional Anthropic Python SDK (version pinned). **No database server, no queue broker, no cloud service.**
+Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, SMTP via `smtplib` (Mailpit or Outlook for the demo), Anthropic Python SDK (version pinned, used only through the gateway). **No database server, no queue broker, no cloud service.**
 
 ## Working style
 
@@ -43,34 +43,38 @@ Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyM
 - All storage goes through the `CaseStore` interface (§4.5). Workflow code never touches the filesystem directly, so a database can replace `FileCaseStore` later.
 - Writing rules (§4.4): lock per case around every append; validate the transition against the workflow table before appending; write files first (temp file + atomic rename), then the event that references them by path and SHA-256; **never overwrite**: new versions get new names (e.g. a re-redacted file gets a new versioned name, and its report likewise).
 - Every event carries `prev_hash` and `hash` (§4.3). `tools/verify_log.py` must detect any edited event or modified referenced file.
-- **No AI in any handover.** State transitions come only from runner steps (deterministic code) or signed human actions. AI never appends a workflow transition, decides which findings are redacted, or signs.
-- The full workflow must run with every AI switch off; AI-1 only adds findings, it never changes the workflow path.
+- **Agents act, code gates decide, people handle exceptions** (plan §2). An agent's result moves a case only when a deterministic gate passes it (schema valid, every citation verified, confidence at or above the configured threshold, every deterministic check passed); the runner then appends the transition with actor `agent:<function>` and the AI call ID. Otherwise a person gets an exception task. Agents act through local tools and never write files or events directly.
+- An automated decision is an event, **never an electronic signature**. The site's submission stays a human signature.
+- AI can add PHI findings, never remove them. Post-redaction verification is deterministic and blocking.
+- The full workflow must still complete with AI off: steps that need judgement become human tasks.
 - Eligibility rules are evaluated declaratively from YAML. **No `eval()`** or equivalent.
 - Redaction is destructive: underlying text and pixels removed, metadata stripped, then text re-extracted and detection re-run. Any residual finding blocks submission.
 - Every AE record evaluated, eligible or not, goes to the hash-chained intake log `data/intake/evaluations.jsonl` with each rule's result.
 - Intake is idempotent on (study, subject, AE ID). A newer `last_modified` stores a new snapshot and raises `source.changed`; nothing is withdrawn automatically.
 - **Sign and submit** is possible only when every file has passed verification. Signed submissions are immutable.
-- The Flow 2 handoff manifest lists only redacted files and source snapshots with hashes, never anything from `documents/original/`.
+- The Flow 2 handoff manifest lists only redacted files and source snapshots with hashes, never anything from `documents/original/`. Flow 2 reads only that manifest. The Flow 3 manifest likewise lists only the dossier, narrative and QC results with hashes.
 - Notifications contain no clinical content: case ID, task and link only.
 - Study behavior changes by editing config in `data/config/`, not code.
 
 **Data and privacy**
 - **Synthetic data only.** Never add, request or process real patient data. The UI keeps its permanent "Synthetic data only" banner.
-- AI-1 (PHI detection by AI, mvp-flow-1.md §8) is the last stretch step of the plan. It sends **unredacted** page images to the provider, so it runs only on synthetic data, only with an approved key, and never as a replacement for the rule-based detectors.
+- AI-1 (AI finds PHI on scans and images) sends **unredacted** page images to the provider, so it runs only on synthetic data and never as a replacement for the rule-based detectors. Real data would need IT input and a restricted production setup.
 - Don't claim the MVP is validated or Part 11 / Annex 11 compliant. It demonstrates the mechanics only. Blinding and roles are shown, not enforced; say so where it matters.
 
 **Tests**
 - Tests must be deterministic: seeded Faker/RNG, fixed or injected clock, stored AI outputs. **Tests never call the Claude API.**
 - Never loosen a test, tolerance or threshold just to make it pass. If a test looks wrong, explain why and ask.
-- Each demo scenario S1–S12 (mvp-flow-1.md §14) that is in scope should become an automated test where possible, and the set must stay green.
+- Each demo scenario should become an automated test where possible, and the set must stay green. Agent behavior is tested in replay mode (stored outputs keyed by input hash).
 - `deid_check.py` measures removal of the generator's seeded identifiers. Text-layer PDFs must reach 100% with zero metadata residuals; scan, spreadsheet and DICOM rates are measured and reported, not tuned to look good.
 
-**AI calls (optional, only once API access is approved)**
+**AI calls**
 - All calls go through `adjud/ai/gateway.py`. No other module imports the Anthropic SDK.
-- Switches live in `study.yaml` and are all off by default. The model ID is pinned there and prompts are versioned files in `adjud/ai/prompts/`. Don't hard-code either elsewhere.
+- The mode (`off` / `replay` / `live`), the per-function switches, the pinned model (a small model by default) and the gate thresholds live in `study.yaml`; prompts are versioned files in `adjud/ai/prompts/`. Don't hard-code any of them elsewhere. `live` without a key falls back to `off` and says so.
+- Replay outputs written by hand are labelled *simulated* in events and in the UI until real outputs are recorded.
+- Log tokens and cost for every call in `data/ai/usage.jsonl`; respect the budget cap in `study.yaml`.
 - The API key comes only from an environment variable. Never write it to `data/`, logs or the repository.
 - Validate every output against its JSON schema, up to 2 retries, then continue without AI and tell the user. Verify citations in code; mark unverifiable findings "unverified".
-- Save every call to `cases/<id>/ai/` (function, model, prompt version, input hash, output, valid, latency), including failures, refusals and timeouts. Never drop them. The human's accept/edit/reject decision is an event.
+- Save every call to `cases/<id>/ai/` (function, mode, model, prompt version, input hash, output, valid, tokens, cost, latency), including failures, refusals and timeouts. Never drop them. The gate result is an event, and so is any human override.
 - Ask before running anything that makes more than ~10 real API calls (e.g. `tools/deid_check.py` with AI-1 on).
 
 **Code hygiene**
