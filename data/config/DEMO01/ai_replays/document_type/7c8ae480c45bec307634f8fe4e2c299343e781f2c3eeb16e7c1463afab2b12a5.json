@@ -1,9 +1,9 @@
 {
-  "simulated": true,
+  "simulated": false,
   "function": "document_type",
+  "model": "claude-haiku-5-5",
+  "prompt": "document_type_v1",
   "input": {
-    "file": "summary_letter_lowquality.jpg",
-    "pages": 1,
     "allowed_types": [
       "discharge_summary",
       "ecg_report",
@@ -13,15 +13,35 @@
       "referral_letter",
       "clinic_letter",
       "other"
-    ]
+    ],
+    "file": "summary_letter_lowquality.jpg",
+    "pages": 1
   },
   "output": {
+    "confidence": 0.6,
     "document_type": "discharge_summary",
-    "confidence": 0.86,
     "evidence": {
       "file": "summary_letter_lowquality.jpg",
       "page": 1,
       "quote": "SUMMARY LETTER TO GENERAL PRACTITIONER"
     }
-  }
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "summary_letter_lowquality.jpg",
+        "page": 1
+      },
+      "result_sha256": "2ebacb97cd4016ee4250b4f30d7e16247171df4c68e9487fe25397ebf198a0b1",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 3388,
+    "output_tokens": 450
+  },
+  "cost_usd": 0.000564
 }

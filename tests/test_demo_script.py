@@ -193,7 +193,8 @@ def test_11_tamper_detected_and_state_rebuilt(demo):
 def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
     """The Flows 1+2 demo (README): a site drops one ZIP and, with the recorded agent
     answers, the case reaches adjudication with only the site's people in its audit
-    trail; a case whose letter has no title is typed by the agent and passes too."""
+    trail. A case whose letter has no title is typed by the agent, but the recorded live
+    answer is unsure (confidence 0.6), so the gate hands it to the Safety Specialist."""
     import io
     import zipfile
 
@@ -232,7 +233,8 @@ def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
         submit(store, cid, site, "demo", paths.config)  # the one human signature
     for _ in range(4):  # handoff, QC (+ agents), dossier + narrative, Flow 3 handoff
         runner.run_case_steps()
-    for cid, site in cases.items():
-        assert store.state(cid).state == State.READY_FOR_ADJUDICATION
-        people = {e["actor"] for e in store.events(cid)} - {"system:upload-folder"}
-        assert {a for a in people if not a.startswith(("system:", "agent:"))} == {site}
+    (ae001, site), (ae005, _) = cases.items()
+    assert store.state(ae001).state == State.READY_FOR_ADJUDICATION
+    people = {e["actor"] for e in store.events(ae001)} - {"system:upload-folder"}
+    assert {a for a in people if not a.startswith(("system:", "agent:"))} == {site}
+    assert store.state(ae005).state == State.QC_REVIEW  # an exception for a person

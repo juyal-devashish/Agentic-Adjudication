@@ -125,9 +125,9 @@ def test_agent_spots_a_different_event_and_queries_the_site(tmp_path, fixtures, 
     assert result["decision"] == "query"
     query = next(e for e in store.events(cid) if e["type"] == "query.opened")
     assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["wrong_event"]
-    assert "hip fracture" in query["data"]["text"]
+    assert "fracture" in query["data"]["text"]  # the recorded live answer's own words
     (entry,) = result["ai"]
-    assert entry["label"] == "Simulated AI" and entry["gate"]["passed"]
+    assert entry["label"] == "AI" and entry["gate"]["passed"]
     assert any(e["type"] == "ai.gate" and e["data"]["passed"] for e in store.events(cid))
 
 
@@ -164,8 +164,10 @@ def _gateway(cls, store, replays):
 
 
 def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
-    """Kit AE-005 (fatal, a GP summary letter) passes; AE-006 (a clinic letter and an
-    angiography report, no discharge summary or ECG) gets a query for both."""
+    """Kit AE-005 (fatal, a poor-quality GP summary letter): the recorded live agent types
+    it as a discharge summary but is unsure (0.6), so the gate sends it to the Safety
+    Specialist. AE-006 (a clinic letter and an angiography report, no discharge summary or
+    ECG) gets a query for both."""
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")
     data = tmp_path / "data"
     data.mkdir()
@@ -189,8 +191,11 @@ def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
                "demo", paths.config)  # fmt: skip
     for _ in range(2):
         runner.run_case_steps()
-    passed = next(e for e in store.events(cases["AE-005"]) if e["type"] == "qc.passed")
-    assert passed["actor"] == "agent:qc" and passed["data"]["by"] == "checks and AI"
+    assert store.state(cases["AE-005"]).state == State.QC_REVIEW
+    result = store.get_json(cases["AE-005"], "qc/checks_v1.json")
+    (entry,) = result["ai"]
+    assert entry["label"] == "AI" and not entry["gate"]["passed"]
+    assert any("below 0.80" in r for r in entry["gate"]["reasons"])
     query = next(e for e in store.events(cases["AE-006"]) if e["type"] == "query.opened")
     assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["missing_document"]
     assert "Discharge or death summary, ECG report" in query["data"]["text"]
@@ -217,9 +222,9 @@ def test_narrative_agent_writes_a_cited_narrative_nobody_has_to_sign(
     Runner(store.paths).run_case_steps()  # dossier + narrative
     assert store.state(cid).state == State.READY_FOR_ADJUDICATION
     approved = next(e for e in store.events(cid) if e["type"] == "narrative.approved")
-    assert approved["actor"] == "agent:narrative" and approved["data"]["simulated"]
+    assert approved["actor"] == "agent:narrative" and approved["data"]["simulated"] is False
     text = store.get_file(cid, approved["data"]["narrative"]["path"]).decode()
-    assert "Myocardial infarction" in text and "[dossier p. 2]" in text
+    assert "myocardial infarction" in text.lower() and "[dossier p. 2]" in text
     people = {e["actor"] for e in store.events(cid)} - {"site101.coord"}
     assert all(a.startswith(("system:", "agent:")) for a in people)
 

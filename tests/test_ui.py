@@ -214,7 +214,7 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     assert 'aria-current="step">Ready for adjudication' in html_text(at)
 
 
-def test_quality_check_page_shows_simulated_ai_proposals(demo, monkeypatch, tmp_path):
+def test_quality_check_page_shows_ai_proposals(demo, monkeypatch, tmp_path):
     import json
 
     from adjud.documents import upload
@@ -237,5 +237,5 @@ def test_quality_check_page_shows_simulated_ai_proposals(demo, monkeypatch, tmp_
         runner.run_case_steps()
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
     table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
-    assert table.iloc[0]["Source"] == "Simulated AI" and table.iloc[0]["Accepted"] == "Yes"
-    assert any("hip fracture" in i.value for i in at.info)  # the query the agent sent
+    assert table.iloc[0]["Source"] == "AI" and table.iloc[0]["Accepted"] == "Yes"
+    assert any("fracture" in i.value for i in at.info)  # the query the agent sent

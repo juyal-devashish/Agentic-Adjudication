@@ -1,11 +1,13 @@
 {
-  "simulated": true,
+  "simulated": false,
   "function": "event_match",
+  "model": "claude-haiku-5-5",
+  "prompt": "event_match_v1",
   "input": {
     "ae": {
       "ae_term": "Myocardial infarction",
-      "onset_date": "2026-03-14",
       "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
       "outcome": "RECOVERED"
     },
     "documents": [
@@ -20,20 +22,58 @@
     ]
   },
   "output": {
-    "verdict": "different_event",
-    "confidence": 0.93,
+    "confidence": 0.85,
     "evidence": [
       {
         "file": "discharge_summary.pdf",
         "page": 1,
-        "quote": "Fractured neck of femur"
+        "quote": "Diagnosis: Fractured neck of femur"
       },
       {
         "file": "discharge_summary.pdf",
         "page": 1,
-        "quote": "Admitted on 02/11/2025"
+        "quote": "Admitted on 02/11/2025. Fell at home; hemiarthroplasty"
+      },
+      {
+        "file": "ecg_report.pdf",
+        "page": 1,
+        "quote": "ST elevation in V1-V4, consistent with an acute anterior"
       }
     ],
-    "reason": "The documents describe a hip fracture admitted on 2 November 2025, not a myocardial infarction with onset on 14 March 2026."
-  }
+    "reason": "The discharge summary records a femoral neck fracture admitted 02/11/2025, and the ECG recorded 02/11/2025 reports ST elevation consistent with an acute anterior infarct, but both are about a year before the recorded myocardial infarction onset of 2026-03-14 and the summary does not mention an infarction.",
+    "verdict": "different_event"
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {},
+      "result_sha256": "3b9a83e05f10896bc8b242420cfbe94eda8cb69436e652a2a2a55bb697d6d7a7",
+      "tool": "get_ae_record"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary.pdf",
+        "page": 1
+      },
+      "result_sha256": "5221d46ef67140f2327d4cdcd614d05d1e13faa593476dd611321f3623dae9b4",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "ecg_report.pdf",
+        "page": 1
+      },
+      "result_sha256": "27fa6a519e53f94f382c1b38aba4488fc7f2dd266f8b3117e246cf81ffc31a76",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 4331,
+    "output_tokens": 859
+  },
+  "cost_usd": 0.000863
 }

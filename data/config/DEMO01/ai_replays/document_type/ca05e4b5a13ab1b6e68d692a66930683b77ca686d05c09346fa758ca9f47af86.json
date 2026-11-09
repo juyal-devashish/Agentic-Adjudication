@@ -1,9 +1,9 @@
 {
-  "simulated": true,
+  "simulated": false,
   "function": "document_type",
+  "model": "claude-haiku-5-5",
+  "prompt": "document_type_v1",
   "input": {
-    "file": "clinic_letter.pdf",
-    "pages": 1,
     "allowed_types": [
       "discharge_summary",
       "ecg_report",
@@ -13,15 +13,44 @@
       "referral_letter",
       "clinic_letter",
       "other"
-    ]
+    ],
+    "file": "clinic_letter.pdf",
+    "pages": 1
   },
   "output": {
+    "confidence": 0.95,
     "document_type": "clinic_letter",
-    "confidence": 0.9,
     "evidence": {
       "file": "clinic_letter.pdf",
       "page": 1,
-      "quote": "Cardiology Outpatients"
+      "quote": "I reviewed your patient in clinic on 02/06/2025 after her admission with unstable"
     }
-  }
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "clinic_letter.pdf",
+        "page": 1
+      },
+      "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "clinic_letter.pdf",
+        "page": 1
+      },
+      "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5926,
+    "output_tokens": 417
+  },
+  "cost_usd": 0.000801
 }

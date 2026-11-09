@@ -1,56 +1,135 @@
 {
-  "simulated": true,
+  "simulated": false,
   "function": "narrative",
+  "model": "claude-haiku-5-5",
+  "prompt": "narrative_v1",
   "input": {
     "ae": {
       "ae_term": "Sudden cardiac death",
-      "onset_date": "2026-05-19",
       "end_date": "2026-05-19",
+      "onset_date": "2026-05-19",
+      "outcome": "FATAL",
       "serious": "Y",
       "seriousness_criteria": "DEATH",
-      "outcome": "FATAL",
       "severity": "SEVERE"
     },
     "dossier": {
-      "version": 1,
       "page_map": [
         {
-          "name": "death_summary.pdf",
-          "type": "discharge_summary",
           "first_page": 3,
-          "pages": 3
+          "name": "death_summary.pdf",
+          "pages": 3,
+          "type": "discharge_summary"
         },
         {
-          "name": "autopsy_request_scan.pdf",
-          "type": "autopsy_report",
           "first_page": 6,
-          "pages": 1
+          "name": "autopsy_request_scan.pdf",
+          "pages": 1,
+          "type": "autopsy_report"
         }
-      ]
+      ],
+      "version": 1
     }
   },
   "output": {
     "statements": [
       {
-        "text": "The EDC records Sudden cardiac death with onset on 2026-05-19.",
         "page": 2,
-        "quote": "Event term: Sudden cardiac death"
+        "quote": "Event term: Sudden cardiac death Onset: 2026-05-19",
+        "text": "The EDC records a serious adverse event of sudden cardiac death with onset and end date 2026-05-19, seriousness criterion death, outcome fatal and severity severe."
       },
       {
-        "text": "The event was reported as serious (death), with the outcome fatal.",
         "page": 2,
-        "quote": "Outcome: FATAL"
+        "quote": "ae id: AE-004, ae term: Myocardial infarction",
+        "text": "The EDC lists an earlier event, AE-004 myocardial infarction, with onset date 2026-05-17."
       },
       {
-        "text": "The dossier contains the discharge or death summary (death_summary.pdf) from page 3.",
+        "page": 2,
+        "quote": "drug: Amlodipine, start date: 2024-11-01",
+        "text": "The subject was a 77-year-old man with ongoing hypertension since 2018, and amlodipine was recorded as a concomitant medication from 2024-11-01."
+      },
+      {
         "page": 3,
-        "quote": "DEMO01-102-0003"
+        "quote": "admitted on 17/05/2026 with an acute anterior",
+        "text": "The subject was admitted to the Coronary Care Unit on 17/05/2026 with an acute anterior myocardial infarction."
       },
       {
-        "text": "The dossier contains the post-mortem request or report (autopsy_request_scan.pdf) from page 6.",
-        "page": 6,
-        "quote": "Subject DEMO01-102-0003 Case DEMO01-0003 Dossier v1 Page 6 of 6"
+        "page": 3,
+        "quote": "troponin T 2950 ng/L",
+        "text": "The admission troponin T was recorded as 2950 ng/L."
+      },
+      {
+        "page": 4,
+        "quote": "developed cardiogenic shock requiring inotropic support",
+        "text": "On 18/05/2026 the subject developed cardiogenic shock requiring inotropic support, and TIMI flow grade 0 was seen in the left anterior descending artery."
+      },
+      {
+        "page": 4,
+        "quote": "ventricular fibrillation arrest. Resuscitation was unsuccessful",
+        "text": "On 19/05/2026 at 03:40 the subject had a ventricular fibrillation arrest, resuscitation was unsuccessful, and death was confirmed at 04:15."
+      },
+      {
+        "page": 5,
+        "quote": "Cause of death: 1a cardiogenic shock, 1b acute anterior myocardial infarction.",
+        "text": "The death summary conclusion gives the cause of death as cardiogenic shock (1a) and acute anterior myocardial infarction (1b), and the death was reported to the coroner."
       }
     ]
-  }
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "f83b91c442c71577ab53564b7b48e64edb8ec8d5e5ae413e7e477689139f028a",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "a1d378c037f31032cf969ac914aa0e6b7ef686442fff5851243c0a03316f6b66",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "47eeb1f17b4183d88564262fa7b81a2c7f360b9d67531a72684454d5674d07ec",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 5
+      },
+      "result_sha256": "2fe95c52812e01ebacabf51a130e2b9f3a1a0d445be7d62c5e9449ee40cfadf2",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 6
+      },
+      "result_sha256": "c1d8e5cbb2f018e2aa83e12c9d411a6f4e6e6eab700fe450c4a4ad779f68f280",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": true,
+      "input": {
+        "page": 7
+      },
+      "result_sha256": "d25fd3011eb9e904827a6cf379c80e64f84528b48652d01ebff5db22988ae65f",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5369,
+    "output_tokens": 2442
+  },
+  "cost_usd": 0.001758
 }

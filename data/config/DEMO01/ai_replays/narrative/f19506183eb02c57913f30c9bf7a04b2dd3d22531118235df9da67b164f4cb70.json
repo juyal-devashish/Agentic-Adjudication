@@ -1,56 +1,114 @@
 {
-  "simulated": true,
+  "simulated": false,
   "function": "narrative",
+  "model": "claude-haiku-5-5",
+  "prompt": "narrative_v1",
   "input": {
     "ae": {
       "ae_term": "Myocardial infarction",
-      "onset_date": "2026-03-14",
       "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
       "serious": "Y",
       "seriousness_criteria": "HOSPITALISATION",
-      "outcome": "RECOVERED",
       "severity": "SEVERE"
     },
     "dossier": {
-      "version": 1,
       "page_map": [
         {
-          "name": "discharge_summary.pdf",
-          "type": "discharge_summary",
           "first_page": 3,
-          "pages": 1
+          "name": "discharge_summary.pdf",
+          "pages": 1,
+          "type": "discharge_summary"
         },
         {
-          "name": "ecg_report.pdf",
-          "type": "ecg_report",
           "first_page": 4,
-          "pages": 1
+          "name": "ecg_report.pdf",
+          "pages": 1,
+          "type": "ecg_report"
         }
-      ]
+      ],
+      "version": 1
     }
   },
   "output": {
     "statements": [
       {
-        "text": "The EDC records Myocardial infarction with onset on 2026-03-14.",
         "page": 2,
-        "quote": "Event term: Myocardial infarction"
+        "quote": "Event term: Myocardial infarction Onset: 2026-03-14 End: 2026-03-21",
+        "text": "The EDC records a myocardial infarction event with onset on 2026-03-14 and end date 2026-03-21."
       },
       {
-        "text": "The event was reported as serious (hospitalisation), with the outcome recovered.",
         "page": 2,
-        "quote": "Outcome: RECOVERED"
+        "quote": "Seriousness: HOSPITALISATION Outcome: RECOVERED Severity: SEVERE",
+        "text": "The EDC records the event as serious, with seriousness criterion hospitalisation, outcome recovered and severity severe."
       },
       {
-        "text": "The dossier contains the discharge or death summary (discharge_summary.pdf) from page 3.",
+        "page": 2,
+        "quote": "condition: Hypertension, ongoing: Y, start year: 2012",
+        "text": "The subject is a 70-year-old male with a history of hypertension since 2012 and type 2 diabetes mellitus since 2018, both recorded as ongoing."
+      },
+      {
+        "page": 2,
+        "quote": "dose: 75 mg OD, drug: Clopidogrel, end date: 2026-03-14, start date: 2025-06-01",
+        "text": "Concomitant medication recorded includes aspirin 75 mg once daily from 2025-03-10 and clopidogrel 75 mg once daily from 2025-06-01, with the clopidogrel end date recorded as 2026-03-14."
+      },
+      {
+        "page": 2,
+        "quote": "ae id: H-001, ae term: Myocardial infarction, days before: 194",
+        "text": "The EDC lists two earlier events: a myocardial infarction with onset 2025-09-01 (AE H-001) and atrial fibrillation with onset 2025-12-01 (AE H-002)."
+      },
+      {
         "page": 3,
-        "quote": "DISCHARGE SUMMARY"
+        "quote": "Presented with central chest pain; troponin T rose to 3860 ng/L.",
+        "text": "The discharge summary records admission on 14/03/2026 with central chest pain and a troponin T rise to 3860 ng/L, with a discharge diagnosis of acute anterior myocardial infarction."
       },
       {
-        "text": "The dossier contains the ecg report (ecg_report.pdf) from page 4.",
         "page": 4,
-        "quote": "12-LEAD ECG REPORT"
+        "quote": "ST elevation in V1-V4, consistent with an acute anterior",
+        "text": "The 12-lead ECG recorded on 14/03/2026 at 08:52 showed sinus rhythm at 88/min with ST elevation in V1-V4 and a QTc of 452 ms, and the subject was discharged home in a stable condition."
       }
     ]
-  }
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 1
+      },
+      "result_sha256": "38862f98f5621c17f12c017abe9a17f604f9036dcda904531d0edc700337edff",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "8b568a327a41065e535277f71dd35d162b47ae9ceba1bf13a4a466da27870249",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "861be291b5db80595d4d7094100d0fb983b22de4eafc1b8639bf1a9b1aa3f65a",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "406ebd2c7d2995c365f1e5cfdbaf15b58a18493bc35705273b0a0d934e770141",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5202,
+    "output_tokens": 1745
+  },
+  "cost_usd": 0.001393
 }
