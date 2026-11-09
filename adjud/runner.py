@@ -19,6 +19,7 @@ import yaml
 
 from adjud.documents import DocumentProcessor
 from adjud.events import Clock, utc_now
+from adjud.flow2 import Flow2
 from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
@@ -42,6 +43,7 @@ class Runner:
         )
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
         self.last_inbox: float | None = None
+        self.flow2 = Flow2(self.pipeline.store, self.paths.config, self.study)
         smtp = SmtpSettings.from_env()
         self.mailer = (
             Mailer(self.pipeline.store, self.paths.config, smtp, clock=self.clock) if smtp else None
@@ -96,6 +98,27 @@ class Runner:
                 done += 1
             except Exception:
                 log.exception("handoff failed for %s", case_id)
+        done += self.run_flow2_steps()
+        return done
+
+    def run_flow2_steps(self) -> int:
+        """Flow 2's automatic steps, one per case per tick: start QC from the manifest,
+        run the QC round, draft the narrative."""
+        from adjud.workflow import State
+
+        store, done = self.pipeline.store, 0
+        steps = [(cid, self.flow2.start_qc, "QC start") for cid in self.flow2.pending_qc_starts()]
+        steps += [(cs.case_id, self.flow2.run_qc, "QC")
+                  for cs in store.list_case_states(State.QC_CHECKS)]  # fmt: skip
+        steps += [(cs.case_id, self.flow2.run_narrative, "narrative")
+                  for cs in store.list_case_states(State.NARRATIVE)]  # fmt: skip
+        for case_id, step, name in steps:
+            try:
+                step(case_id)
+                log.info("%s done for %s", name, case_id)
+                done += 1
+            except Exception:
+                log.exception("%s failed for %s", name, case_id)
         return done
 
     def run_once(self) -> None:

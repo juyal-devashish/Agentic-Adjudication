@@ -66,13 +66,28 @@ LIFECYCLE = [
     (State.DEIDENTIFYING, "Removing identifiers"),
     (State.AWAITING_SITE_CONFIRMATION, "Site review"),
     (State.SUBMITTED, "Submitted"),
+    (State.QC_CHECKS, "Quality check"),
+    (State.NARRATIVE, "Narrative"),
+    (State.READY_FOR_ADJUDICATION, "Ready for adjudication"),
 ]
+# States that sit on another state's step of the rail.
+RAIL_STEP = {
+    State.QC_REVIEW: State.QC_CHECKS,
+    State.QUERY_OPEN: State.QC_CHECKS,
+    State.NARRATIVE_REVIEW: State.NARRATIVE,
+}
 STATE_WORDS = {
     State.EVENT_CREATED: "Case created",
     State.AWAITING_DOCUMENTS: "Waiting for documents",
     State.DEIDENTIFYING: "Removing identifiers",
     State.AWAITING_SITE_CONFIRMATION: "Waiting for site review",
     State.SUBMITTED: "Submitted",
+    State.QC_CHECKS: "Quality check running",
+    State.QC_REVIEW: "Waiting for QC review",
+    State.QUERY_OPEN: "Query open with the site",
+    State.NARRATIVE: "Narrative being drafted",
+    State.NARRATIVE_REVIEW: "Waiting for narrative review",
+    State.READY_FOR_ADJUDICATION: "Ready for adjudication",
     State.WITHDRAWN: "Withdrawn",
 }
 FLAG_WORDS = {
@@ -173,7 +188,12 @@ def synthetic_band() -> None:
     )
 
 
-SHORT_STATE = {s: label.lower() for s, label in LIFECYCLE} | {State.WITHDRAWN: "withdrawn"}
+SHORT_STATE = {s: label.lower() for s, label in LIFECYCLE} | {
+    State.QC_REVIEW: "QC review",
+    State.QUERY_OPEN: "query open",
+    State.NARRATIVE_REVIEW: "narrative review",
+    State.WITHDRAWN: "withdrawn",
+}
 
 
 def short_state(state: State) -> str:
@@ -200,7 +220,8 @@ def case_heading(case_id: str, title: str, meta: str) -> None:
 def lifecycle(state: State) -> None:
     """The rail: where the case has been, and (in black) where it is now."""
     order = [s for s, _ in LIFECYCLE]
-    now = order.index(state) if state in order else -1
+    step = RAIL_STEP.get(state, state)
+    now = order.index(step) if step in order else -1
     items = []
     for i, (_, label) in enumerate(LIFECYCLE):
         cls = "now" if i == now else "done" if i < now else ""

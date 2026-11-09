@@ -15,6 +15,7 @@ from common import case_header, context, pipeline, processor, study_config
 from openpyxl import load_workbook
 
 from adjud.documents import documents_of, upload
+from adjud.flow2 import QUERY_CODES, query_of
 from adjud.review import (
     SUBMIT_MEANING,
     ReviewRefused,
@@ -46,11 +47,26 @@ if not is_site:
         "by the site user."
     )
 
+# Once signed, files are fixed until a QC query reopens the case.
+SIGNED_STATES = {
+    State.SUBMITTED,
+    State.QC_CHECKS,
+    State.QC_REVIEW,
+    State.NARRATIVE,
+    State.NARRATIVE_REVIEW,
+    State.READY_FOR_ADJUDICATION,
+}
+query = query_of(store, cid)
+if query:
+    reasons = ", ".join(QUERY_CODES[c].lower() for c in query["codes"])
+    st.warning(f"Query from the quality check: {reasons}. {query['text']}")
+
 # --- upload ---------------------------------------------------------------------------------
 can_upload = is_site and cs.state in (
     State.AWAITING_DOCUMENTS,
     State.AWAITING_SITE_CONFIRMATION,
     State.DEIDENTIFYING,
+    State.QUERY_OPEN,
 )
 if can_upload:
     with st.form("upload", clear_on_submit=True, border=False):
@@ -123,7 +139,7 @@ for name in sorted(docs.files):
         st.error(f"{name} was rejected. {message}")
         if (
             is_site
-            and cs.state != State.SUBMITTED
+            and cs.state not in SIGNED_STATES
             and st.button(f"Remove {name}", key=f"rm_{name}")
         ):
             delete_document(store, cid, name, ctx.actor, reason="rejected file removed")
@@ -244,7 +260,7 @@ if reviewable:
             st.rerun()
         if (
             is_site
-            and cs.state != State.SUBMITTED
+            and cs.state not in SIGNED_STATES
             and st.button(f"Remove {name}", key=f"rm_r_{name}")
         ):
             delete_document(store, cid, name, ctx.actor, reason="removed by site")
@@ -253,8 +269,11 @@ if reviewable:
 # --- sign and submit --------------------------------------------------------------------------
 st.header("Sign and submit")
 status = submission_status(store, cid)
-if store.state(cid).state == State.SUBMITTED:
+now = store.state(cid).state
+if now in SIGNED_STATES:
     st.write("Signed and submitted. The package for adjudication is on the case record.")
+elif now != State.AWAITING_SITE_CONFIRMATION:
+    st.write("You can sign once the documents have been processed and reviewed.")
 elif not status.ready:
     st.button("Sign and submit", disabled=True)
     st.write("You can sign once every file is verified:")

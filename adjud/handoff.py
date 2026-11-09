@@ -7,7 +7,6 @@ with hashes, and nothing from documents/original/.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -84,27 +83,42 @@ def build_manifest(
     }
 
 
+def manifest_path(n: int) -> str:
+    return MANIFEST if n == 1 else MANIFEST.replace(".json", f"_v{n}.json")
+
+
+def latest_manifest_ref(store: FileCaseStore, case_id: str) -> dict[str, str] | None:
+    """{"path", "sha256"} of the last Flow 2 manifest handed off, or None."""
+    refs = [e["data"]["manifest"] for e in store.events(case_id)
+            if e["type"] == "handoff.flow2_ready"]  # fmt: skip
+    return refs[-1] if refs else None
+
+
 def write_handoff(
     store: FileCaseStore, case_id: str, config_dir: Path, outbox: Outbox, study: str = "DEMO01"
 ) -> dict[str, Any]:
-    """Write the manifest (once; a re-run after a crash reuses an identical file) and
-    record handoff.flow2_ready."""
+    """Write the manifest for the latest submission (once; a re-run after a crash reuses an
+    identical file) and record handoff.flow2_ready. The first submission's manifest is
+    `handoff/flow2_manifest.json`; a resubmission after a QC query gets `_v2`, `_v3` …,
+    so a handed-off manifest is never overwritten."""
     manifest = build_manifest(store, case_id, config_dir, study)
     content = json_bytes(manifest)
-    path = store.case_dir(case_id) / MANIFEST
+    n = sum(e["type"] == "handoff.flow2_ready" for e in store.events(case_id)) + 1
+    rel = manifest_path(n)
+    path = store.case_dir(case_id) / rel
     if path.exists():
         if path.read_bytes() != content:
-            raise RuntimeError(f"{case_id}: an existing {MANIFEST} differs; not overwriting")
-        sha = _ref(store, case_id, MANIFEST)["sha256"]
+            raise RuntimeError(f"{case_id}: an existing {rel} differs; not overwriting")
+        sha = _ref(store, case_id, rel)["sha256"]
     else:
-        sha = store.put_file(case_id, MANIFEST, content)
+        sha = store.put_file(case_id, rel, content)
     store.append_event(
         case_id,
         EventDraft(
             type="handoff.flow2_ready",
             actor=SYSTEM,
             data={
-                "manifest": {"path": MANIFEST, "sha256": sha},
+                "manifest": {"path": rel, "sha256": sha},
                 "documents": len(manifest["documents"]),
             },
         ),
@@ -129,13 +143,15 @@ def write_handoff(
 def pending_handoffs(store: FileCaseStore) -> list[str]:
     from adjud.workflow import State
 
-    return [
-        cs.case_id
-        for cs in store.list_case_states(State.SUBMITTED)
-        if not any(e["type"] == "handoff.flow2_ready" for e in store.events(cs.case_id))
-    ]
+    def handed_off(case_id: str) -> bool:  # the latest submission already has its manifest
+        types = [e["type"] for e in store.events(case_id)]
+        signed = max(i for i, t in enumerate(types) if t == "submission.signed")
+        return "handoff.flow2_ready" in types[signed:]
+
+    return [cs.case_id for cs in store.list_case_states(State.SUBMITTED)
+            if not handed_off(cs.case_id)]  # fmt: skip
 
 
 def read_manifest(store: FileCaseStore, case_id: str) -> dict[str, Any] | None:
-    path = store.case_dir(case_id) / MANIFEST
-    return json.loads(path.read_text()) if path.exists() else None
+    ref = latest_manifest_ref(store, case_id)
+    return store.get_json(case_id, ref["path"]) if ref else None

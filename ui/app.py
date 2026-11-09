@@ -97,6 +97,9 @@ st.navigation(
             url_path="documents",
         ),
         st.Page(
+            "views/quality_check.py", title="Quality check", icon=":material/rule:", url_path="qc"
+        ),
+        st.Page(
             "views/results.py", title="Case record", icon=":material/fact_check:", url_path="record"
         ),
     ]

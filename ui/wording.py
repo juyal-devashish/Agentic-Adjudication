@@ -49,13 +49,36 @@ def next_step(
                 else "Some files need attention before you can submit. See below."
             ),
             State.SUBMITTED: "Signed and submitted. Nothing more is needed from you.",
+            State.QC_CHECKS: "Signed and submitted. Your documents are being checked.",
+            State.QC_REVIEW: "Signed and submitted. Your documents are being checked.",
+            State.QUERY_OPEN: "The quality check found a problem. Read the query below, then "
+            "upload the missing or corrected documents.",
+            State.NARRATIVE: "Your documents passed the quality check. Nothing more is needed.",
+            State.NARRATIVE_REVIEW: "Your documents passed the quality check. Nothing more is "
+            "needed.",
+            State.READY_FOR_ADJUDICATION: "The case is ready for adjudication. Nothing more is "
+            "needed from you.",
         }[state]
     return {
         State.EVENT_CREATED: "Related data is being pulled from the EDC.",
         State.AWAITING_DOCUMENTS: f"Waiting for site {site} to upload documents.",
         State.DEIDENTIFYING: f"Identifiers are being removed from site {site}'s uploads.",
         State.AWAITING_SITE_CONFIRMATION: f"Waiting for site {site} to review and sign.",
-        State.SUBMITTED: "Signed by the site. The package for adjudication is on the case record.",
+        State.SUBMITTED: "Signed by the site. The quality check starts automatically.",
+        State.QC_CHECKS: "The quality check is running.",
+        State.QC_REVIEW: (
+            "The automatic quality check could not decide. Review it on the Quality check page."
+            if role == "safety_specialist"
+            else "Waiting for the Safety Specialist to review the quality check."
+        ),
+        State.QUERY_OPEN: f"Waiting for site {site} to answer the query.",
+        State.NARRATIVE: "The narrative is being drafted.",
+        State.NARRATIVE_REVIEW: (
+            "Complete and sign the narrative on the Quality check page."
+            if role == "safety_specialist"
+            else "Waiting for the Safety Specialist to sign the narrative."
+        ),
+        State.READY_FOR_ADJUDICATION: "Ready for adjudication. No action is needed.",
     }[state]
 
 

@@ -171,3 +171,38 @@ def test_case_record_lists_ai_calls_with_their_source(demo, tmp_path):
     table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
     assert table.iloc[0]["Source"] == "Simulated AI" and table.iloc[0]["Task"] == "Document type"
     assert any("AI is off for this study" in m.value for m in at.markdown)
+
+
+def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrative(demo):
+    import pymupdf
+
+    from adjud.documents import upload
+    from adjud.review import submit
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    with pymupdf.open() as doc:
+        doc.new_page().insert_text((72, 72), "DISCHARGE SUMMARY. Chest pain.")
+        upload(store, cid, [("summary.pdf", doc.tobytes())], "site101.coord")
+    runner.run_case_steps()
+    submit(store, cid, "site101.coord", "demo", demo.config)
+    for _ in range(3):  # handoff, QC start, QC round
+        runner.run_case_steps()
+
+    at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
+    assert 'aria-current="step">Quality check' in html_text(at)
+    at.text_input[-1].input("demo")
+    next(b for b in at.button if b.label == "Sign decision").click().run()
+    assert not at.exception, at.exception
+    assert store.state(cid).state.value == "NARRATIVE"
+
+    runner.run_case_steps()  # template draft
+    at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
+    at.text_input[-1].input("demo")
+    next(b for b in at.button if b.label == "Sign narrative").click().run()
+    assert not at.exception, at.exception
+    assert store.state(cid).state.value == "READY_FOR_ADJUDICATION"
+    assert 'aria-current="step">Ready for adjudication' in html_text(at)

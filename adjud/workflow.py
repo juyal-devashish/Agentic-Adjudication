@@ -1,4 +1,4 @@
-"""Flow 1 case states, the transition table and replay.
+"""Case states for Flows 1 and 2, the transition table and replay.
 
 The current state of a case is never stored as truth: it is computed by replaying the
 case's events through this table. case.json is only a cache of that result.
@@ -20,6 +20,13 @@ class State(StrEnum):
     DEIDENTIFYING = "DEIDENTIFYING"
     AWAITING_SITE_CONFIRMATION = "AWAITING_SITE_CONFIRMATION"
     SUBMITTED = "SUBMITTED"
+    # Flow 2 (plan step 13): agents act, gates decide, people handle the *_REVIEW states.
+    QC_CHECKS = "QC_CHECKS"
+    QC_REVIEW = "QC_REVIEW"
+    QUERY_OPEN = "QUERY_OPEN"
+    NARRATIVE = "NARRATIVE"
+    NARRATIVE_REVIEW = "NARRATIVE_REVIEW"
+    READY_FOR_ADJUDICATION = "READY_FOR_ADJUDICATION"
     WITHDRAWN = "WITHDRAWN"
 
 
@@ -34,7 +41,16 @@ OPEN_STATES = frozenset(
 ALL_STATES = frozenset(State)
 
 # States in which the runner (not a person) has the next action.
-AUTOMATIC_STATES = frozenset({State.EVENT_CREATED, State.DEIDENTIFYING})
+AUTOMATIC_STATES = frozenset(
+    {
+        State.EVENT_CREATED,
+        State.DEIDENTIFYING,
+        State.SUBMITTED,
+        State.QC_CHECKS,
+        State.NARRATIVE,
+        State.READY_FOR_ADJUDICATION,
+    }
+)
 
 SAME = "SAME"  # event is recorded but does not change state
 
@@ -46,6 +62,7 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
         State.AWAITING_DOCUMENTS: State.DEIDENTIFYING,
         State.AWAITING_SITE_CONFIRMATION: State.DEIDENTIFYING,
         State.DEIDENTIFYING: SAME,
+        State.QUERY_OPEN: State.DEIDENTIFYING,  # the site answers a QC query
     },
     "deid.started": {State.DEIDENTIFYING: SAME},
     "deid.file_processed": {State.DEIDENTIFYING: SAME},
@@ -55,9 +72,22 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "document.deleted": {
         State.AWAITING_DOCUMENTS: SAME,
         State.AWAITING_SITE_CONFIRMATION: SAME,
+        State.QUERY_OPEN: SAME,
     },
     "submission.signed": {State.AWAITING_SITE_CONFIRMATION: State.SUBMITTED},
     "handoff.flow2_ready": {State.SUBMITTED: SAME},
+    # --- Flow 2 ---
+    "qc.started": {State.SUBMITTED: State.QC_CHECKS},  # reads the Flow 2 manifest only
+    "qc.checks_completed": {State.QC_CHECKS: SAME},
+    "qc.passed": {State.QC_CHECKS: State.NARRATIVE},  # by agent:qc when its gate passes
+    "qc.review_needed": {State.QC_CHECKS: State.QC_REVIEW},
+    "qc.signed_pass": {State.QC_REVIEW: State.NARRATIVE},  # Safety Specialist
+    "query.opened": {State.QC_CHECKS: State.QUERY_OPEN, State.QC_REVIEW: State.QUERY_OPEN},
+    "narrative.drafted": {State.NARRATIVE: SAME},
+    "narrative.approved": {State.NARRATIVE: State.READY_FOR_ADJUDICATION},  # agent gate
+    "narrative.review_needed": {State.NARRATIVE: State.NARRATIVE_REVIEW},
+    "narrative.signed": {State.NARRATIVE_REVIEW: State.READY_FOR_ADJUDICATION},
+    "handoff.flow3_ready": {State.READY_FOR_ADJUDICATION: SAME},
     "case.withdrawn": dict.fromkeys(OPEN_STATES, State.WITHDRAWN),
     "source.changed": dict.fromkeys(ALL_STATES, SAME),
     "source.stale_ignored": dict.fromkeys(ALL_STATES, SAME),

@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–12 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–13 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -148,18 +148,22 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** the first real function, document type (AI-2), runs through the gateway in all three modes, tested with a scripted fake client (tool loop, schema retries, refusal, budget cap, records, chained ledger) and checked against the installed SDK's request types. The gateway uses a manual tool loop rather than the beta tool runner, so replay and off modes and the per-call record share one path. Pinned: `anthropic==1.17.0`. Not yet wired into the workflow; that is step 15. Not run against the live API: no key yet.
 
-### Step 13 — Flow 2 workflow and fixtures
+### Step 13 — Flow 2 workflow ✅
 
-- [ ] States after `SUBMITTED`: `QC_CHECKS` (auto) → `QC_REVIEW` (exception only) / `QUERY_OPEN` (back to the site) → `NARRATIVE` (auto) → `NARRATIVE_REVIEW` (exception only) → `READY_FOR_ADJUDICATION`. Withdrawal stays out of scope
-- [ ] Flow 2 reads only `handoff/flow2_manifest.json` (the Flow 1 contract does not change)
-- [ ] `QUERY_OPEN` → new upload → `DEIDENTIFYING`: more documents go through Flow 1 again
-- [ ] `tools/make_flow2_fixtures.py`: seeded synthetic cases for QC (complete, missing document, wrong patient, different event, unreadable page), built from the kit's documents and Faker; never edits the kit
-- [ ] Rebuild and verify tools cover the new states
+- [x] States after `SUBMITTED`: `QC_CHECKS` (auto) → `QC_REVIEW` (exception only) / `QUERY_OPEN` (back to the site) → `NARRATIVE` (auto) → `NARRATIVE_REVIEW` (exception only) → `READY_FOR_ADJUDICATION`. Withdrawal stays out of scope
+- [x] Flow 2 reads only `handoff/flow2_manifest.json` (the Flow 1 contract does not change)
+- [x] `QUERY_OPEN` → new upload → `DEIDENTIFYING`: more documents go through Flow 1 again
+- [x] Rebuild and verify tools cover the new states
+
+- [x] Safety Specialist actions, signed: pass the QC, send a query (reason codes + message), complete and sign the narrative (template draft from the EDC record); a "Quality check" page for them; the site sees the query and can upload again
 
 **Done when:** a submitted case moves through every Flow 2 state with AI off, people handling every judgement step.
 
+**Result:** `tests/test_flow2.py` runs the whole path, including a query that sends the case back through Flow 1 (upload, de-identification, signature, `flow2_manifest_v2.json`) before QC passes and the narrative is signed. Each resubmission gets a new manifest version, so a handed-off manifest is never overwritten. The QC round has no checks yet (step 14), so it always asks the Safety Specialist.
+
 ### Step 14 — QC checks: deterministic layer (QC-01, QC-02, P-32)
 
+- [ ] `tools/make_flow2_fixtures.py`: seeded synthetic cases for QC (complete, missing document, wrong patient, different event, unreadable page), built from the kit's documents and Faker; never edits the kit
 - [ ] `data/config/DEMO01/document_checklist.yaml`: required documents per event type
 - [ ] Checks: required documents present, every file readable with page counts, no residual PHI, subject ID and onset date found, **same patient across documents**, event term and dates match the EDC
 - [ ] Results written as `qc/checks_v<n>.json` with an event; a failed required check opens a query to the site automatically, with reason codes

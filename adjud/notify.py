@@ -25,6 +25,10 @@ TEMPLATES = {
     "source_changed": "The source AE changed after case creation",
     "possible_duplicate": "A new case may duplicate an existing one",
     "case_withdrawn": "Case withdrawn",
+    "qc_review_needed": "A quality check needs your review",
+    "query_opened": "A query about your documents needs an answer",
+    "narrative_review_needed": "A narrative needs your review",
+    "ready_for_adjudication": "Case ready for adjudication",
 }
 
 
