@@ -1,0 +1,67 @@
+{
+  "simulated": true,
+  "function": "narrative",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "onset_date": "2026-03-14",
+      "end_date": "2026-03-21",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "outcome": "RECOVERED",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "version": 1,
+      "page_map": [
+        {
+          "name": "discharge_summary.pdf",
+          "type": "discharge_summary",
+          "first_page": 3,
+          "pages": 2
+        },
+        {
+          "name": "ecg_report.pdf",
+          "type": "ecg_report",
+          "first_page": 5,
+          "pages": 1
+        },
+        {
+          "name": "troponin_results.xlsx",
+          "type": "lab_results",
+          "first_page": 6,
+          "pages": 1
+        }
+      ]
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "text": "The EDC records Myocardial infarction with onset on 2026-03-14.",
+        "page": 2,
+        "quote": "Event term: Myocardial infarction"
+      },
+      {
+        "text": "The event was reported as serious (hospitalisation), with the outcome recovered.",
+        "page": 2,
+        "quote": "Outcome: RECOVERED"
+      },
+      {
+        "text": "The dossier contains the discharge or death summary (discharge_summary.pdf) from page 3.",
+        "page": 3,
+        "quote": "DEMO01-101-0001"
+      },
+      {
+        "text": "The dossier contains the ecg report (ecg_report.pdf) from page 5.",
+        "page": 5,
+        "quote": "12-LEAD ECG REPORT"
+      },
+      {
+        "text": "The dossier contains the laboratory results (troponin_results.xlsx) from page 6.",
+        "page": 6,
+        "quote": "S26-4412 | [REDACTED] | [REDACTED] | 2026-03-14 07:55:00 | TROPONIN_T | 1240"
+      }
+    ]
+  }
+}

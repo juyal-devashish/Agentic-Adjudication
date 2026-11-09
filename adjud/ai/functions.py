@@ -46,6 +46,22 @@ class EventMatchOutput(BaseModel):
     reason: str
 
 
+class Statement(BaseModel):
+    """One sentence of the narrative and the dossier page it comes from."""
+
+    model_config = ConfigDict(extra="forbid")
+    text: str
+    page: int
+    quote: str
+
+
+class NarrativeOutput(BaseModel):
+    """AI-4: a facts-only narrative, every statement cited (plan step 17)."""
+
+    model_config = ConfigDict(extra="forbid")
+    statements: list[Statement]
+
+
 @dataclass(frozen=True)
 class AgentFunction:
     name: str
@@ -81,5 +97,6 @@ def inline_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 DOCUMENT_TYPE = AgentFunction("document_type", 1, DocumentTypeOutput)
 EVENT_MATCH = AgentFunction("event_match", 1, EventMatchOutput)
-FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH)}
+NARRATIVE = AgentFunction("narrative", 1, NarrativeOutput)
+FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE)}
 EVENT_VERDICTS = ("matches", "different_event", "unclear")

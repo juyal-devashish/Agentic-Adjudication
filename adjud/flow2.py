@@ -19,10 +19,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from adjud.ai.functions import DOCUMENT_TYPE, EVENT_MATCH, EVENT_VERDICTS
+import yaml
+
+from adjud.ai.functions import DOCUMENT_TYPE, EVENT_MATCH, EVENT_VERDICTS, NARRATIVE
 from adjud.ai.gates import GateResult, gate
 from adjud.ai.gateway import AiResult, Gateway
-from adjud.ai.tools import case_toolbox, output_pages, page_text
+from adjud.ai.tools import case_toolbox, dossier_page_text, output_pages, page_text
 from adjud.dossier import build_and_record, latest_dossier
 from adjud.events import EventDraft
 from adjud.handoff import latest_manifest_ref
@@ -34,6 +36,7 @@ from adjud.workflow import State
 
 SYSTEM_QC = "system:qc"
 AGENT_QC = "agent:qc"  # a QC decision that used an agent answer which passed its gate
+AGENT_NARRATIVE = "agent:narrative"  # a narrative approved because its gate passed
 SYSTEM_NARRATIVE = "system:narrative"
 QC_PASS_MEANING = "Quality check passed — the documents are complete and fit for adjudication"  # noqa: S105
 QUERY_MEANING = "Quality check failed — a query is sent to the site"
@@ -80,10 +83,14 @@ class Flow2:
     gateway: Gateway | None = None  # from study.yaml when not given
     outbox: Outbox = field(init=False)
     checklist: Checklist = field(init=False)
+    narrative_cfg: dict[str, Any] = field(init=False)
 
     def __post_init__(self) -> None:
         self.outbox = Outbox(self.store.paths, self.study, clock=self.store.clock)
         self.checklist = Checklist.for_study(self.config_dir, self.study)
+        study_cfg = yaml.safe_load((self.config_dir / self.study / "study.yaml").read_text())
+        self.narrative_cfg = {"min_statements": 3, "forbidden": [],
+                              **(study_cfg.get("narrative") or {})}  # fmt: skip
         if self.gateway is None:
             self.gateway = Gateway.for_study(self.store, self.config_dir, self.study)
 
@@ -258,21 +265,79 @@ class Flow2:
                                 self.config_dir, self.study)  # fmt: skip
 
     def run_narrative(self, case_id: str) -> str:
-        """Build the dossier, then draft the narrative. With AI off (or its draft failing
-        the gate) the study template is filled from the EDC record and the Safety
-        Specialist reviews it."""
-        self.ensure_dossier(case_id)
+        """Build the dossier, then draft the narrative (step 17). The narrative agent writes
+        facts-only statements, each quoting a dossier page; if its gate passes the
+        narrative is approved and frozen with no person involved. Otherwise, or with AI
+        off, the draft (the agent's, labelled, or the study template) goes to the Safety
+        Specialist."""
+        dossier = self.ensure_dossier(case_id)
         n = _rounds(self.store, case_id, "narrative.drafted") + 1
-        text = self.template_draft(case_id)
+        r, g, statements = self._narrative_agent(case_id, dossier)
+        if statements:
+            text = "\n".join(f"{s['text']} [dossier p. {s['page']}]" for s in statements)
+            source = "ai"
+        else:
+            text, source = self.template_draft(case_id), "template"
         rel = f"narrative/draft_v{n}.md"
         sha = self.store.put_file(case_id, rel, text.encode())
         self._event(case_id, "narrative.drafted", SYSTEM_NARRATIVE,
-                    {"draft": {"path": rel, "sha256": sha}, "source": "template"})  # fmt: skip
-        reasons = ["AI is off: the Safety Specialist completes the narrative"]
+                    {"draft": {"path": rel, "sha256": sha}, "source": source,
+                     "simulated": r.simulated, "call": r.call})  # fmt: skip
+        if g is not None and g.passed:
+            k = (
+                _rounds(self.store, case_id, "narrative.signed")
+                + _rounds(self.store, case_id, "narrative.approved")
+                + 1
+            )
+            final = f"narrative/narrative_v{k}.md"
+            fsha = self.store.put_file(case_id, final, text.encode() + b"\n")
+            self._event(case_id, "narrative.approved", AGENT_NARRATIVE,
+                        {"narrative": {"path": final, "sha256": fsha}, "source": "ai",
+                         "simulated": r.simulated, "call": r.call})  # fmt: skip
+            return text
+        if r.status == "unavailable":
+            reasons = ["AI is off: the Safety Specialist completes the narrative"]
+        else:
+            reasons = [f"AI draft not accepted: {x}" for x in (g.reasons if g else [r.note])]
         self._event(case_id, "narrative.review_needed", SYSTEM_NARRATIVE, {"reasons": reasons})
         self._notify(case_id, "role:safety_specialist", "narrative_review_needed",
                      SYSTEM_NARRATIVE)  # fmt: skip
         return text
+
+    def _narrative_agent(
+        self, case_id: str, dossier: dict[str, Any]
+    ) -> tuple[AiResult, GateResult | None, list[dict[str, Any]]]:
+        """Ask the narrative agent; returns its result, the gate, and its statements (empty
+        when it gave none)."""
+        assert self.gateway is not None
+        manifest = self.store.get_json(case_id, dossier["manifest"]["path"])
+        ae = self.store.get_json(case_id, manifest["ae_snapshot"]["path"])
+        payload = {
+            "ae": {k: ae.get(k) for k in ("ae_term", "onset_date", "end_date", "serious",
+                                          "seriousness_criteria", "outcome", "severity")},
+            "dossier": {"version": dossier["version"], "page_map": dossier["page_map"]},
+        }  # fmt: skip
+        r = self.gateway.run(case_id, NARRATIVE, payload, case_toolbox(self.store, case_id))
+        if r.status == "unavailable":
+            return r, None, []
+        statements = (r.output or {}).get("statements") or []
+        cfg = self.narrative_cfg
+
+        def dossier_text(_file: str, page: int) -> str | None:
+            return dossier_page_text(self.store, case_id, page)
+
+        found = sorted({w for s in statements for w in cfg["forbidden"]
+                        if w.lower() in s["text"].lower()})  # fmt: skip
+        g = gate(r, min_confidence=self.gateway.cfg.min_confidence, page_text=dossier_text,
+                 citations=[{"file": "dossier", "page": s["page"], "quote": s["quote"]}
+                            for s in statements],
+                 checks=[(f"fewer than {cfg['min_statements']} statements",
+                          len(statements) >= cfg["min_statements"]),
+                         (f"forbidden wording: {', '.join(found)}", not found)])  # fmt: skip
+        self._event(case_id, "ai.gate", SYSTEM_NARRATIVE,
+                    {"function": r.function, "about": "narrative", "call": r.call,
+                     **g.as_dict()})  # fmt: skip
+        return r, g, statements
 
     def template_draft(self, case_id: str) -> str:
         manifest_ref = _latest(self.store, case_id, "qc.started")["data"]["manifest"]

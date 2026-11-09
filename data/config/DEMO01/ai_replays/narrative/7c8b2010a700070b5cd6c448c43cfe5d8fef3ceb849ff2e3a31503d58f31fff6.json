@@ -1,0 +1,56 @@
+{
+  "simulated": true,
+  "function": "narrative",
+  "input": {
+    "ae": {
+      "ae_term": "Sudden cardiac death",
+      "onset_date": "2026-05-19",
+      "end_date": "2026-05-19",
+      "serious": "Y",
+      "seriousness_criteria": "DEATH",
+      "outcome": "FATAL",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "version": 1,
+      "page_map": [
+        {
+          "name": "death_summary.pdf",
+          "type": "discharge_summary",
+          "first_page": 3,
+          "pages": 3
+        },
+        {
+          "name": "autopsy_request_scan.pdf",
+          "type": "autopsy_report",
+          "first_page": 6,
+          "pages": 1
+        }
+      ]
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "text": "The EDC records Sudden cardiac death with onset on 2026-05-19.",
+        "page": 2,
+        "quote": "Event term: Sudden cardiac death"
+      },
+      {
+        "text": "The event was reported as serious (death), with the outcome fatal.",
+        "page": 2,
+        "quote": "Outcome: FATAL"
+      },
+      {
+        "text": "The dossier contains the discharge or death summary (death_summary.pdf) from page 3.",
+        "page": 3,
+        "quote": "DEMO01-102-0003"
+      },
+      {
+        "text": "The dossier contains the post-mortem request or report (autopsy_request_scan.pdf) from page 6.",
+        "page": 6,
+        "quote": "Subject DEMO01-102-0003 Case DEMO01-0003 Dossier v1 Page 6 of 6"
+      }
+    ]
+  }
+}

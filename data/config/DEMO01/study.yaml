@@ -31,7 +31,15 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
   functions:                 # each agent function on or off; `mode` is the master switch
     document_type: true      # AI-2: QC step, documents without a recognisable title
     event_match: true        # QC step: do the documents describe this AE?
+    narrative: true          # AI-4: facts-only narrative, every statement cited
     phi_detection: false     # AI-1: unredacted page images, synthetic data only
 # Synthetic data only: verification also searches each output
 # for the generator's seeded identifiers of the case's subject. Relative to the data dir.
 seeded_identities: flow1-testkit/identities/identities_SYNTHETIC.json
+narrative:                   # plan step 17; checked by code in the narrative gate
+  min_statements: 3
+  # Wording a narrative must not contain (case-insensitive): opinion on cause or
+  # relatedness, adjudication language, and anything that could reveal allocation.
+  forbidden: [caused by, due to the study, related to the study, relatedness,
+    attributable, causal, adjudicat, we conclude, in my opinion, probably, likely,
+    placebo, active arm, treatment arm, allocation, randomised to, randomized to, unblind]

@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–16 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–17 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -193,13 +193,15 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** `adjud/dossier.py` builds `dossier/dossier_v<n>.pdf` at the start of the narrative step, once per passed QC round, from the manifest only, with a page map (which document starts where) for the narrative agent to cite. Documents are already locked by the workflow after signing; the dossier file is never overwritten, and editing it is caught by `verify_log` (tested). Download on the Quality check page.
 
-### Step 17 — Narrative agent (AI-4, NAR-01 to NAR-06)
+### Step 17 — Narrative agent (AI-4, NAR-01 to NAR-06) ✅
 
-- [ ] Agent drafts a facts-only narrative; every sentence cites a dossier page or EDC field; code checks every citation
-- [ ] Gate: all citations verified, no forbidden wording (diagnosis, causality, adjudication, blinded fields) → `narrative.approved` by `agent:narrative`; otherwise `NARRATIVE_REVIEW` for the Safety Specialist (editor, AI text labelled, edits tracked, sign)
-- [ ] AI off: the template is filled from EDC fields and goes to `NARRATIVE_REVIEW`
+- [x] Agent drafts a facts-only narrative; every sentence cites a dossier page or EDC field; code checks every citation
+- [x] Gate: all citations verified, no forbidden wording (diagnosis, causality, adjudication, blinded fields) → `narrative.approved` by `agent:narrative`; otherwise `NARRATIVE_REVIEW` for the Safety Specialist (editor, AI text labelled, edits tracked, sign)
+- [x] AI off: the template is filled from EDC fields and goes to `NARRATIVE_REVIEW`
 
 **Done when:** in replay mode a complete case reaches a frozen, cited narrative with no person involved.
+
+**Result:** the agent reads the dossier through a `read_dossier_page` tool and returns statements, each with a dossier page and a quote. The gate checks every quote on its page, a minimum number of statements, and the study's forbidden-wording list in `study.yaml` (cause, relatedness, adjudication, allocation). In replay mode five of the six kit cases and the complete fixture reach `READY_FOR_ADJUDICATION` with only the site's people in the audit trail; AE-006 waits on its query. The simulated narratives are mechanical (EDC facts plus one statement per document, from each case's own dossier) and labelled "Simulated AI"; real ones come with the key (step 22).
 
 ### Step 18 — Handoff to Flow 3
 

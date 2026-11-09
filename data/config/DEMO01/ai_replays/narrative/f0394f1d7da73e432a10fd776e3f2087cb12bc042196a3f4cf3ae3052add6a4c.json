@@ -1,0 +1,45 @@
+{
+  "simulated": true,
+  "function": "narrative",
+  "input": {
+    "ae": {
+      "ae_term": "Ischaemic stroke",
+      "onset_date": "2026-04-02",
+      "end_date": "",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "outcome": "RECOVERING",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "version": 1,
+      "page_map": [
+        {
+          "name": "discharge_summary_scan.png",
+          "type": "discharge_summary",
+          "first_page": 3,
+          "pages": 1
+        }
+      ]
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "text": "The EDC records Ischaemic stroke with onset on 2026-04-02.",
+        "page": 2,
+        "quote": "Event term: Ischaemic stroke"
+      },
+      {
+        "text": "The event was reported as serious (hospitalisation), with the outcome recovering.",
+        "page": 2,
+        "quote": "Outcome: RECOVERING"
+      },
+      {
+        "text": "The dossier contains the discharge or death summary (discharge_summary_scan.png) from page 3.",
+        "page": 3,
+        "quote": "Subject DEMO01-101-0002 Case DEMO01-0002 Dossier v1 Page 3 of 3"
+      }
+    ]
+  }
+}

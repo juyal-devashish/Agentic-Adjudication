@@ -157,7 +157,9 @@ def test_a_quote_the_page_does_not_contain_sends_the_case_to_a_person(
 def _gateway(cls, store, replays):
     from adjud.ai.config import AiConfig
 
-    cfg = AiConfig(mode="replay", functions={"document_type": True, "event_match": True})
+    cfg = AiConfig(
+        mode="replay", functions={"document_type": True, "event_match": True, "narrative": True}
+    )
     return cls(store, cfg, replays)
 
 
@@ -192,3 +194,65 @@ def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
     query = next(e for e in store.events(cases["AE-006"]) if e["type"] == "query.opened")
     assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["missing_document"]
     assert "Discharge or death summary, ECG report" in query["data"]["text"]
+
+
+# --- narrative agent in replay mode (plan step 17) --------------------------------------------
+
+
+def _complete_narrative(replays: Path) -> Path:
+    return next(
+        p for p in (replays / "narrative").glob("*.json")
+        if [d["name"] for d in json.loads(p.read_text())["input"]["dossier"]["page_map"]]
+        == ["discharge_summary.pdf", "ecg_report.pdf"]
+    )  # fmt: skip
+
+
+def test_narrative_agent_writes_a_cited_narrative_nobody_has_to_sign(
+    tmp_path, fixtures, monkeypatch
+):
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    store, cid = run_scenario(tmp_path, fixtures, "complete")
+    from adjud.runner import Runner
+
+    Runner(store.paths).run_case_steps()  # dossier + narrative
+    assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+    approved = next(e for e in store.events(cid) if e["type"] == "narrative.approved")
+    assert approved["actor"] == "agent:narrative" and approved["data"]["simulated"]
+    text = store.get_file(cid, approved["data"]["narrative"]["path"]).decode()
+    assert "Myocardial infarction" in text and "[dossier p. 2]" in text
+    people = {e["actor"] for e in store.events(cid)} - {"site101.coord"}
+    assert all(a.startswith(("system:", "agent:")) for a in people)
+
+
+def test_forbidden_wording_sends_the_ai_draft_to_the_safety_specialist(
+    tmp_path, fixtures, monkeypatch
+):
+    import shutil
+
+    from adjud.flow2 import Flow2
+    from adjud.runner import Runner
+
+    replays = tmp_path / "replays"
+    shutil.copytree(CONFIG / "DEMO01" / "ai_replays", replays)
+    path = _complete_narrative(replays)
+    record = json.loads(path.read_text())
+    record["output"]["statements"][0]["text"] += " It was probably caused by the study drug."
+    path.write_text(json.dumps(record))
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setattr(
+        "adjud.flow2.Gateway.for_study",
+        classmethod(lambda cls, store, config_dir, study="DEMO01": _gateway(cls, store, replays)),
+    )
+    store, cid = run_scenario(tmp_path, fixtures, "complete")
+    Runner(store.paths).run_case_steps()
+    assert store.state(cid).state == State.NARRATIVE_REVIEW
+    reasons = next(e for e in store.events(cid) if e["type"] == "narrative.review_needed")
+    assert "forbidden wording: caused by, probably" in reasons["data"]["reasons"][0]
+    draft = next(e for e in store.events(cid) if e["type"] == "narrative.drafted")["data"]
+    assert draft["source"] == "ai"
+    text = store.get_file(cid, draft["draft"]["path"]).decode()
+    fixed = text.replace(" It was probably caused by the study drug.", "")
+    Flow2(store, CONFIG).sign_narrative(cid, "ss.anna", "demo", fixed)
+    signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")["data"]
+    assert signed["source"] == "ai" and signed["edited"]
+    assert store.state(cid).state == State.READY_FOR_ADJUDICATION

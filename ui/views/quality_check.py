@@ -155,18 +155,29 @@ signed = [e for e in events if e["type"] in ("narrative.signed", "narrative.appr
 drafts = [e for e in events if e["type"] == "narrative.drafted"]
 if signed:
     e = signed[-1]
-    by = e["signature"]["signer"] if e.get("signature") else "the narrative check"
+    if e.get("signature"):
+        by = e["signature"]["signer"]
+        if e["data"].get("source") == "ai":
+            by += ", from an AI draft"
+    else:
+        label = "Simulated AI" if e["data"].get("simulated") else "AI"
+        by = (f"code, without a person: {label} wrote it and every statement was found on "
+              "the dossier page it cites")  # fmt: skip
     st.write(f"Approved by {by}, {when(e)}. This version is frozen for the adjudicators.")
     text = store.get_file(cid, e["data"]["narrative"]["path"]).decode()
     st.text_area("Narrative", text, height=260, disabled=True)
 elif state == State.NARRATIVE_REVIEW and drafts:
     draft = store.get_file(cid, drafts[-1]["data"]["draft"]["path"]).decode()
     source = drafts[-1]["data"]["source"]
-    st.write(
-        "Drafted from the study template."
-        if source == "template"
-        else "Drafted by AI. Every statement must come from a document or the EDC."
-    )
+    reasons = next((x["data"]["reasons"] for x in reversed(events)
+                    if x["type"] == "narrative.review_needed"), [])  # fmt: skip
+    if source == "template":
+        st.write("Drafted from the study template. Complete it from the dossier.")
+    else:
+        label = "Simulated AI" if drafts[-1]["data"].get("simulated") else "AI"
+        st.write(f"Drafted by {label}. It needs a person because: {'; '.join(reasons)}.")
+    st.caption("Every statement must come from the dossier. No opinion on cause, no "
+               "adjudication wording, nothing that reveals allocation.")  # fmt: skip
     if not is_ss:
         st.text_area("Draft", draft, height=260, disabled=True)
     else:

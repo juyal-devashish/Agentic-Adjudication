@@ -38,7 +38,7 @@ EVENT_WORDS = {
     "query.opened": "Query sent to the site",
     "dossier.built": "Dossier built",
     "narrative.drafted": "Narrative drafted",
-    "narrative.approved": "Narrative approved automatically",
+    "narrative.approved": "Narrative approved by code (AI draft, every statement checked)",
     "narrative.review_needed": "Narrative needs a person",
     "narrative.signed": "Narrative signed",
     "handoff.flow3_ready": "Ready for adjudication",

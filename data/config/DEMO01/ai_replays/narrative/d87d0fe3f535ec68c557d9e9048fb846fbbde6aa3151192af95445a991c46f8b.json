@@ -1,0 +1,67 @@
+{
+  "simulated": true,
+  "function": "narrative",
+  "input": {
+    "ae": {
+      "ae_term": "Transient ischaemic attack",
+      "onset_date": "2026-01-08",
+      "end_date": "2026-01-09",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "outcome": "RECOVERED",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "version": 1,
+      "page_map": [
+        {
+          "name": "entlassungsbrief.pdf",
+          "type": "discharge_summary",
+          "first_page": 3,
+          "pages": 1
+        },
+        {
+          "name": "entlassungsbrief_scan_150dpi.png",
+          "type": "discharge_summary",
+          "first_page": 4,
+          "pages": 1
+        },
+        {
+          "name": "roentgen_thorax.pdf",
+          "type": "imaging_report",
+          "first_page": 5,
+          "pages": 1
+        }
+      ]
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "text": "The EDC records Transient ischaemic attack with onset on 2026-01-08.",
+        "page": 2,
+        "quote": "Event term: Transient ischaemic attack"
+      },
+      {
+        "text": "The event was reported as serious (hospitalisation), with the outcome recovered.",
+        "page": 2,
+        "quote": "Outcome: RECOVERED"
+      },
+      {
+        "text": "The dossier contains the discharge or death summary (entlassungsbrief.pdf) from page 3.",
+        "page": 3,
+        "quote": "DEMO01-104-0006"
+      },
+      {
+        "text": "The dossier contains the discharge or death summary (entlassungsbrief_scan_150dpi.png) from page 4.",
+        "page": 4,
+        "quote": "Subject DEMO01-104-0006 Case DEMO01-0007 Dossier v1 Page 4 of 5"
+      },
+      {
+        "text": "The dossier contains the imaging report (roentgen_thorax.pdf) from page 5.",
+        "page": 5,
+        "quote": "Subject DEMO01-104-0006 Case DEMO01-0007 Dossier v1 Page 5 of 5"
+      }
+    ]
+  }
+}

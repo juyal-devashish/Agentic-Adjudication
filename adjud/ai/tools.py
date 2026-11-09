@@ -120,6 +120,15 @@ def page_text(store: FileCaseStore, case_id: str, file: str, page: int) -> str |
     return pages[page - 1] if 1 <= page <= len(pages) else None
 
 
+def dossier_page_text(store: FileCaseStore, case_id: str, page: int) -> str | None:
+    """Text of one page of the case's latest dossier, or None."""
+    built = [e["data"] for e in store.events(case_id) if e["type"] == "dossier.built"]
+    if not built:
+        return None
+    pages = output_pages(store, case_id, built[-1]["dossier"]["path"])
+    return pages[page - 1] if 1 <= page <= len(pages) else None
+
+
 def case_toolbox(store: FileCaseStore, case_id: str) -> Toolbox:
     """The tools an agent may use on one case."""
 
@@ -144,8 +153,21 @@ def case_toolbox(store: FileCaseStore, case_id: str) -> Toolbox:
             raise ToolError("this case has no AE snapshot")
         return store.get_json(case_id, snapshot)
 
+    def read_dossier_page(args: dict[str, Any]) -> dict[str, Any]:
+        text = dossier_page_text(store, case_id, int(args["page"]))
+        if text is None:
+            raise ToolError(f"the dossier has no page {args['page']}")
+        return {"page": args["page"], "text": text}
+
     return Toolbox(
         [
+            Tool(
+                "read_dossier_page",
+                "Read the text of one page of the case's adjudication dossier (de-identified; "
+                "page 1 is the cover, then the EDC summary, then the documents).",
+                _schema({"page": {"type": "integer", "description": "Page number, from 1"}}),
+                read_dossier_page,
+            ),
             Tool(
                 "list_documents",
                 "List the case's de-identified documents with their page counts.",
