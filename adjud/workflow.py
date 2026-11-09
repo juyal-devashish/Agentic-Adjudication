@@ -96,6 +96,7 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "notification.sent": dict.fromkeys(ALL_STATES, SAME),
     "notification.failed": dict.fromkeys(ALL_STATES, SAME),
     "ai.called": dict.fromkeys(ALL_STATES, SAME),
+    "ai.gate": dict.fromkeys(ALL_STATES, SAME),
 }
 
 

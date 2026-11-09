@@ -1,0 +1,39 @@
+{
+  "simulated": true,
+  "function": "event_match",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "onset_date": "2026-03-14",
+      "end_date": "2026-03-21",
+      "outcome": "RECOVERED"
+    },
+    "documents": [
+      {
+        "file": "discharge_summary.pdf",
+        "pages": 1
+      },
+      {
+        "file": "ecg_report.pdf",
+        "pages": 1
+      }
+    ]
+  },
+  "output": {
+    "verdict": "different_event",
+    "confidence": 0.93,
+    "evidence": [
+      {
+        "file": "discharge_summary.pdf",
+        "page": 1,
+        "quote": "Fractured neck of femur"
+      },
+      {
+        "file": "discharge_summary.pdf",
+        "page": 1,
+        "quote": "Admitted on 02/11/2025"
+      }
+    ],
+    "reason": "The documents describe a hip fracture admitted on 2 November 2025, not a myocardial infarction with onset on 14 March 2026."
+  }
+}

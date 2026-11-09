@@ -1,0 +1,27 @@
+{
+  "simulated": true,
+  "function": "document_type",
+  "input": {
+    "file": "summary_letter_lowquality.jpg",
+    "pages": 1,
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ]
+  },
+  "output": {
+    "document_type": "discharge_summary",
+    "confidence": 0.86,
+    "evidence": {
+      "file": "summary_letter_lowquality.jpg",
+      "page": 1,
+      "quote": "SUMMARY LETTER TO GENERAL PRACTITIONER"
+    }
+  }
+}

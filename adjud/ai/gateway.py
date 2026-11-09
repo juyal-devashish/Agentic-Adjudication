@@ -85,18 +85,23 @@ class Gateway:
     replay_dir: Path
     client: Any = None  # an anthropic.Anthropic; built lazily in live mode
     env: Mapping[str, str] = field(default_factory=lambda: os.environ)
+    # replay inputs with no recorded output: (function, input hash, input), for tools that
+    # record or simulate answers (tools/simulate_ai.py)
+    missing: list[tuple[str, str, dict[str, Any]]] = field(default_factory=list)
 
     @classmethod
     def for_study(
         cls, store: FileCaseStore, config_dir: Path, study: str = "DEMO01", **kw: Any
     ) -> Gateway:
-        """Settings from `<config>/<study>/study.yaml`; replays from its `ai_replays/`."""
+        """Settings from `<config>/<study>/study.yaml`; replays from its `ai_replays/`.
+        `ADJUD_AI_MODE` in the environment overrides the mode (off / replay / live)."""
         import yaml
 
         folder = Path(config_dir) / study
-        cfg = AiConfig.model_validate(
-            (yaml.safe_load((folder / "study.yaml").read_text()) or {}).get("ai") or {}
-        )
+        raw = dict((yaml.safe_load((folder / "study.yaml").read_text()) or {}).get("ai") or {})
+        if os.environ.get("ADJUD_AI_MODE"):  # operational override, e.g. a replay demo
+            raw["mode"] = os.environ["ADJUD_AI_MODE"]
+        cfg = AiConfig.model_validate(raw)
         return cls(store, cfg, folder / "ai_replays", **kw)
 
     @property
@@ -135,6 +140,7 @@ class Gateway:
     ) -> AiResult:
         path = self.replay_dir / function.name / f"{h}.json"
         if not path.exists():
+            self.missing.append((function.name, h, payload))
             return AiResult(
                 function.name, "replay", "unavailable",
                 note="no recorded output for this input; continuing without AI",

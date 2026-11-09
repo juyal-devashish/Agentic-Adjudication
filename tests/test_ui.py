@@ -212,3 +212,30 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     assert not at.exception, at.exception
     assert store.state(cid).state.value == "READY_FOR_ADJUDICATION"
     assert 'aria-current="step">Ready for adjudication' in html_text(at)
+
+
+def test_quality_check_page_shows_simulated_ai_proposals(demo, monkeypatch, tmp_path):
+    import json
+
+    from adjud.documents import upload
+    from adjud.review import submit
+    from adjud.runner import Runner
+    from tools import make_flow2_fixtures
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    fixtures = tmp_path / "flow2"
+    make_flow2_fixtures.make(fixtures)
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for(json.loads((fixtures / "expected.json").read_text())["case"])
+    files = sorted((fixtures / "different_event").iterdir())
+    upload(store, cid, [(f.name, f.read_bytes()) for f in files], "site101.coord")
+    runner.run_case_steps()
+    submit(store, cid, "site101.coord", "demo", demo.config)
+    for _ in range(2):
+        runner.run_case_steps()
+    at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
+    table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
+    assert table.iloc[0]["Source"] == "Simulated AI" and table.iloc[0]["Accepted"] == "Yes"
+    assert any("hip fracture" in i.value for i in at.info)  # the query the agent sent

@@ -134,7 +134,13 @@ def run_checks(
     case_id: str,
     manifest: dict[str, Any],
     checklist: Checklist,
+    *,
+    ai_types: dict[str, str] | None = None,
+    event: dict[str, str] | None = None,
 ) -> QcOutcome:
+    """`ai_types` (file -> type) and `event` ({"verdict", "reason"}) are agent answers
+    that already passed their gate (step 15); they fill in only what code left unknown."""
+    ai_types = ai_types or {}
     ae = store.get_json(case_id, manifest["ae_snapshot"]["path"])
     docs = manifest["documents"]
     texts = {d["source_name"]: output_pages(store, case_id, d["path"]) for d in docs}
@@ -174,6 +180,8 @@ def run_checks(
             texts[name][0] if texts[name] else "", spreadsheet=d["path"].endswith(".xlsx")
         ):
             types[name] = {"type": kw, "source": "title"}
+        elif name in ai_types:
+            types[name] = {"type": ai_types[name], "source": "AI"}
         else:
             types[name] = {"type": "unknown", "source": ""}
     untyped = [n for n, t in types.items() if t["type"] == "unknown"]
@@ -236,12 +244,15 @@ def run_checks(
         onset_found = any(abs(d - onset) <= window for d in _dates(everything))
     missing_bits = [w for w, ok in (("subject ID", subject_found), ("onset date", onset_found))
                     if not ok]  # fmt: skip
-    checks.append(
-        Check(
-            "subject_and_onset",
-            "The subject ID and the onset date appear in the documents",
-            "unknown" if missing_bits else "passed",
-            f"Not found: {' and '.join(missing_bits)}" if missing_bits else "",
-        )  # fmt: skip
-    )
+    label = "The documents describe this event (subject ID and onset date)"
+    if not missing_bits:
+        checks.append(Check("subject_and_onset", label, "passed"))
+    elif event and event["verdict"] == "matches":
+        checks.append(Check("subject_and_onset", label, "passed", f"AI: {event['reason']}"))
+    elif event and event["verdict"] == "different_event":
+        reason = f"AI: {event['reason']}"
+        checks.append(Check("subject_and_onset", label, "failed", reason, "wrong_event"))
+    else:
+        detail = f"Not found: {' and '.join(missing_bits)}"
+        checks.append(Check("subject_and_onset", label, "unknown", detail))
     return QcOutcome(checks, types)

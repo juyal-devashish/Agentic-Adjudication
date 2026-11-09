@@ -28,8 +28,9 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
   price_per_mtok:            # Claude Haiku 5.5, prompts up to 100K tokens; check the
     input: 0.10              # pricing page at go-live (P-28)
     output: 0.50
-  functions:                 # each agent function on or off
-    document_type: false     # AI-2
+  functions:                 # each agent function on or off; `mode` is the master switch
+    document_type: true      # AI-2: QC step, documents without a recognisable title
+    event_match: true        # QC step: do the documents describe this AE?
     phi_detection: false     # AI-1: unredacted page images, synthetic data only
 # Synthetic data only: verification also searches each output
 # for the generator's seeded identifiers of the case's subject. Relative to the data dir.

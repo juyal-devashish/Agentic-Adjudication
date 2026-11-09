@@ -61,6 +61,30 @@ else:
             hide_index=True,
             width="stretch",
         )
+    proposals = [a for a in latest.get("ai", []) if a["status"] != "unavailable"]
+    if proposals:
+        st.subheader("What the AI proposed")
+        st.write(
+            "Agents answer only what the checks could not. Code accepts an answer only if "
+            "it is confident enough and every quote is found on the page it names."
+        )
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Question": f"{a['task']} of {a['about']}",
+                        "Source": a["label"],
+                        "Answer": a["answer"] or a["note"],
+                        "Accepted": "Yes"
+                        if a["gate"] and a["gate"]["passed"]
+                        else "No: " + "; ".join((a["gate"] or {}).get("reasons", [a["note"]])),
+                    }
+                    for a in proposals
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+        )
     if latest.get("reasons"):
         items = "".join(f"<li>{html.escape(r)}</li>" for r in latest["reasons"])
         st.html(f"<p>Why a person is needed:</p><ul>{items}</ul>")

@@ -29,6 +29,7 @@ EVENT_WORDS = {
     "notification.sent": "Notification e-mailed",
     "notification.failed": "Notification e-mail failed",
     "ai.called": "AI asked",
+    "ai.gate": "AI answer checked by code",
     "qc.started": "Quality check started",
     "qc.checks_completed": "Quality checks run",
     "qc.passed": "Quality check passed automatically",

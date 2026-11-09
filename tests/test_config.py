@@ -41,7 +41,8 @@ def test_study_config_has_ai_off_by_default():
     study = load(CONFIG, "DEMO01/study.yaml")
     assert study["study"] == "DEMO01"
     ai = AiConfig.model_validate(study["ai"])
-    assert ai.mode == "off" and not any(ai.functions.values())
+    assert ai.mode == "off"  # the master switch: no agent runs
+    assert ai.functions["phi_detection"] is False  # AI-1 sends unredacted images
     assert ai.model == "claude-haiku-5-5"  # plan P-26
     assert study["sites"] == load(KIT_CONFIG, "DEMO01/study.yaml")["sites"]
 

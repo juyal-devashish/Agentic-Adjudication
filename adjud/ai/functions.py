@@ -36,6 +36,16 @@ class DocumentTypeOutput(BaseModel):
     evidence: Citation
 
 
+class EventMatchOutput(BaseModel):
+    """Do the case's documents describe this adverse event? (plan step 15)"""
+
+    model_config = ConfigDict(extra="forbid")
+    verdict: str  # matches | different_event | unclear (checked by the gate)
+    confidence: float
+    evidence: list[Citation]
+    reason: str
+
+
 @dataclass(frozen=True)
 class AgentFunction:
     name: str
@@ -70,4 +80,6 @@ def inline_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 DOCUMENT_TYPE = AgentFunction("document_type", 1, DocumentTypeOutput)
-FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE,)}
+EVENT_MATCH = AgentFunction("event_match", 1, EventMatchOutput)
+FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH)}
+EVENT_VERDICTS = ("matches", "different_event", "unclear")

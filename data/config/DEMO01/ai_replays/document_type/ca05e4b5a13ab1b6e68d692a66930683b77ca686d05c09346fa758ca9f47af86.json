@@ -1,0 +1,27 @@
+{
+  "simulated": true,
+  "function": "document_type",
+  "input": {
+    "file": "clinic_letter.pdf",
+    "pages": 1,
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ]
+  },
+  "output": {
+    "document_type": "clinic_letter",
+    "confidence": 0.9,
+    "evidence": {
+      "file": "clinic_letter.pdf",
+      "page": 1,
+      "quote": "Cardiology Outpatients"
+    }
+  }
+}

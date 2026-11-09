@@ -19,6 +19,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from adjud.ai.functions import DOCUMENT_TYPE, EVENT_MATCH, EVENT_VERDICTS
+from adjud.ai.gates import GateResult, gate
+from adjud.ai.gateway import AiResult, Gateway
+from adjud.ai.tools import case_toolbox, output_pages, page_text
 from adjud.events import EventDraft
 from adjud.handoff import latest_manifest_ref
 from adjud.notify import Outbox
@@ -28,6 +32,7 @@ from adjud.store import FileCaseStore, json_bytes
 from adjud.workflow import State
 
 SYSTEM_QC = "system:qc"
+AGENT_QC = "agent:qc"  # a QC decision that used an agent answer which passed its gate
 SYSTEM_NARRATIVE = "system:narrative"
 QC_PASS_MEANING = "Quality check passed — the documents are complete and fit for adjudication"  # noqa: S105
 QUERY_MEANING = "Quality check failed — a query is sent to the site"
@@ -71,12 +76,15 @@ class Flow2:
     store: FileCaseStore
     config_dir: Path
     study: str = "DEMO01"
+    gateway: Gateway | None = None  # from study.yaml when not given
     outbox: Outbox = field(init=False)
     checklist: Checklist = field(init=False)
 
     def __post_init__(self) -> None:
         self.outbox = Outbox(self.store.paths, self.study, clock=self.store.clock)
         self.checklist = Checklist.for_study(self.config_dir, self.study)
+        if self.gateway is None:
+            self.gateway = Gateway.for_study(self.store, self.config_dir, self.study)
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
                **kw: Any) -> None:  # fmt: skip
@@ -115,6 +123,14 @@ class Flow2:
         manifest_ref = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
         manifest = self.store.get_json(case_id, manifest_ref["path"])
         outcome = run_checks(self.store, case_id, manifest, self.checklist)
+        ai: list[dict[str, Any]] = []
+        actor = SYSTEM_QC
+        if outcome.unknown and not outcome.failed:  # step 15: agents fill in the unknowns
+            ai_types, event = self._qc_agents(case_id, manifest, outcome, ai)
+            if ai_types or event:
+                outcome = run_checks(self.store, case_id, manifest, self.checklist,
+                                     ai_types=ai_types, event=event)  # fmt: skip
+                actor = AGENT_QC
         if outcome.failed:
             decision, reasons = "query", [c.detail for c in outcome.failed]
         elif not outcome.unknown:
@@ -122,7 +138,10 @@ class Flow2:
         else:
             decision = "review"
             reasons = [c.detail or c.label for c in outcome.unknown]
-            reasons.append("AI is off: the Safety Specialist decides what code could not")
+            if not any(a["status"] != "unavailable" for a in ai):
+                reasons.append("AI is off: the Safety Specialist decides what code could not")
+            reasons += [f"{a['task']} for {a['about']}: {r}" for a in ai
+                        for r in (a["gate"] or {}).get("reasons", [])]  # fmt: skip
         result = {
             "round": n,
             "manifest": manifest_ref,
@@ -130,6 +149,7 @@ class Flow2:
             "types": outcome.types,
             "decision": decision,
             "reasons": reasons,
+            "ai": ai,
         }
         rel = f"qc/checks_v{n}.json"
         sha = self.store.put_file(case_id, rel, json_bytes(result))
@@ -138,14 +158,92 @@ class Flow2:
                      "decision": decision})  # fmt: skip
         if decision == "query":
             codes = list(dict.fromkeys(c.query_code for c in outcome.failed if c.query_code))
-            self.open_query(case_id, codes, " ".join(f"{r}." for r in reasons))
+            self.open_query(case_id, codes, " ".join(f"{r}." for r in reasons), actor=actor)
         elif decision == "pass":
-            self._event(case_id, "qc.passed", SYSTEM_QC,
-                        {"results": {"path": rel, "sha256": sha}, "by": "checks"})  # fmt: skip
+            by = "checks and AI" if actor == AGENT_QC else "checks"
+            self._event(case_id, "qc.passed", actor,
+                        {"results": {"path": rel, "sha256": sha}, "by": by})  # fmt: skip
         else:
             self._event(case_id, "qc.review_needed", SYSTEM_QC, {"reasons": reasons})
             self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
         return result
+
+    # -- QC agents (step 15) -----------------------------------------------------------------
+
+    def _qc_agents(
+        self,
+        case_id: str,
+        manifest: dict[str, Any],
+        outcome: Any,
+        log: list[dict[str, Any]],
+    ) -> tuple[dict[str, str], dict[str, str] | None]:
+        """Ask the agents about what code left unknown; keep only gated answers."""
+        assert self.gateway is not None
+        cfg, toolbox = self.gateway.cfg, case_toolbox(self.store, case_id)
+        pages_of = {d["source_name"]: len(output_pages(self.store, case_id, d["path"]))
+                    for d in manifest["documents"]}  # fmt: skip
+
+        def text_of(file: str, page: int) -> str | None:
+            return page_text(self.store, case_id, file, page)
+
+        allowed = list(self.checklist.types)
+        ai_types: dict[str, str] = {}
+        for name, typed in outcome.types.items():
+            if typed["type"] != "unknown":
+                continue
+            payload = {"file": name, "pages": pages_of[name], "allowed_types": allowed}
+            r = self.gateway.run(case_id, DOCUMENT_TYPE, payload, toolbox)
+            out = r.output or {}
+            evidence = out.get("evidence") or {}
+            g = None
+            if r.status != "unavailable":
+                g = gate(r, min_confidence=cfg.min_confidence, page_text=text_of,
+                         citations=[evidence] if evidence else [],
+                         checks=[(f"type {out.get('document_type')!r} is not on the list",
+                                  out.get("document_type") in allowed),
+                                 ("the quote is from another file",
+                                  evidence.get("file") == name)])  # fmt: skip
+                if g.passed:
+                    ai_types[name] = out["document_type"]
+            answer = self.checklist.label(out["document_type"]) if out else ""
+            self._log_ai(case_id, log, "Document type", name, r, g, answer)
+
+        event = None
+        check = next(c for c in outcome.checks if c.id == "subject_and_onset")
+        if check.status == "unknown":
+            ae = self.store.get_json(case_id, manifest["ae_snapshot"]["path"])
+            payload = {
+                "ae": {k: ae.get(k) for k in ("ae_term", "onset_date", "end_date", "outcome")},
+                "documents": [{"file": n, "pages": c} for n, c in sorted(pages_of.items())],
+            }
+            r = self.gateway.run(case_id, EVENT_MATCH, payload, toolbox)
+            out = r.output or {}
+            g = None
+            if r.status != "unavailable":
+                verdict = out.get("verdict")
+                g = gate(r, min_confidence=cfg.min_confidence, page_text=text_of,
+                         citations=out.get("evidence") or [],
+                         checks=[(f"verdict {verdict!r} is not allowed", verdict in EVENT_VERDICTS),
+                                 ("the AI could not tell", verdict != "unclear"),
+                                 ("no quote given", bool(out.get("evidence")))])  # fmt: skip
+                if g.passed:
+                    event = {"verdict": out["verdict"], "reason": out["reason"]}
+            answer = f"{out.get('verdict', '').replace('_', ' ')}: {out.get('reason', '')}"
+            self._log_ai(case_id, log, "Event match", "all documents", r, g,
+                         answer if out else "")  # fmt: skip
+        return ai_types, event
+
+    def _log_ai(self, case_id: str, log: list[dict[str, Any]], task: str, about: str,
+                r: AiResult, g: GateResult | None, answer: str) -> None:  # fmt: skip
+        log.append({
+            "task": task, "about": about, "function": r.function, "status": r.status,
+            "label": r.label, "note": r.note, "answer": answer, "call": r.call,
+            "gate": g.as_dict() if g else None,
+        })  # fmt: skip
+        if g is not None:
+            self._event(case_id, "ai.gate", SYSTEM_QC,
+                        {"function": r.function, "about": about, "call": r.call,
+                         **g.as_dict()})  # fmt: skip
 
     def run_narrative(self, case_id: str) -> str:
         """Draft the narrative. With AI off (or its draft failing the gate) the study
@@ -207,7 +305,8 @@ class Flow2:
                     signature=signature, reason=(reason or "").strip() or None)  # fmt: skip
 
     def open_query(self, case_id: str, codes: list[str], text: str, *,
-                   user_id: str | None = None, password: str | None = None) -> None:  # fmt: skip
+                   user_id: str | None = None, password: str | None = None,
+                   actor: str = SYSTEM_QC) -> None:  # fmt: skip
         """A query to the site: signed by the Safety Specialist from QC_REVIEW, or opened by
         the QC step itself when a required check fails for a clear reason."""
         codes = [c for c in codes if c in QUERY_CODES]
@@ -218,8 +317,7 @@ class Flow2:
         if user_id is None:
             if state != State.QC_CHECKS:
                 raise Flow2Refused("an automatic query is only possible during the checks")
-            self._event(case_id, "query.opened", SYSTEM_QC, data)
-            actor = SYSTEM_QC
+            self._event(case_id, "query.opened", actor, data)
         else:
             if state != State.QC_REVIEW:
                 raise Flow2Refused("the case is not waiting for a QC review")

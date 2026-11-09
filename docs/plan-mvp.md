@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–14 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–15 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -173,14 +173,16 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** all five fixtures get their expected decision (`tests/test_qc.py`). On the kit's own cases: AE-001, -002, -003 and -007 pass with nobody involved; AE-005 and AE-006 each have a letter without a recognisable title, so they go to review (the QC agent's job in step 15). A first version typed documents by the first keyword anywhere on the page and mistyped two kit letters ("Catheter Laboratory" in a letterhead); types now come only from title lines and whole words. The same-patient comparison runs during de-identification and stores only verdicts; no false conflict on the corpus. The de-identification gate still passes.
 
-### Step 15 — QC agent (AI-2, AI-3, document–event match)
+### Step 15 — QC agent (AI-2, document–event match) ✅
 
-- [ ] Agent functions: document type (AI-2), documents against the EDC (AI-3), "does this document belong to this subject and event" with citations
-- [ ] Gate: every deterministic check passed, every agent finding verified, confidence ≥ threshold → `qc.passed` by `agent:qc`; otherwise a `QC_REVIEW` task with the reasons, or a query to the site when the cause is clear (missing or wrong document)
-- [ ] Safety Specialist exception page: the agent's findings, override with reason, sign pass or fail
-- [ ] Replay fixtures for every Flow 2 fixture case
+- [x] Agent functions: document type (AI-2) for documents without a recognisable title; event match ("do these documents describe this AE?") with quotes. AI-3 (field-by-field EDC consistency) is left out: the event match covers what QC needs from it
+- [x] Gate: valid answer, confidence ≥ threshold, every quote found on its page, the type on the study's list, the verdict not "unclear" → the answer fills in the unknown check, and the round then passes or queries the site with actor `agent:qc`; otherwise the gate's reasons go to the Safety Specialist (`ai.gate` event each time)
+- [x] Safety Specialist exception page: the agent's proposals with their source (AI / Simulated AI) and whether code accepted them, override with reason, sign pass or fail
+- [x] Simulated replays for every agent input of the demo cases (`tools/simulate_ai.py`, three answers); `ADJUD_AI_MODE=replay` switches a demo to them without editing config
 
 **Done when:** in replay mode the complete case passes QC with no person involved, and each faulty case ends in the right exception or query.
+
+**Result:** in replay mode the agent types kit AE-005's GP summary letter (the case then passes with nobody involved) and AE-006's clinic letter (the case gets a query for the missing discharge summary and ECG), and spots that the "different event" fixture is a hip fracture (query `wrong_event`). A doctored answer whose quote is not on the page is refused by the gate and goes to the Safety Specialist. The complete fixture needs no agent at all.
 
 ### Step 16 — Dossier (QC-04, QC-08)
 

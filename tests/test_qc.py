@@ -113,3 +113,82 @@ def test_identity_compares_dates_and_names_leniently():
     }
     assert conflicts({"a": a, "c": c})["a"] == {"dob": ["c"], "name": ["c"]}
     assert conflicts({"a": a, "d": DocIdentity()})["a"] == {"dob": [], "name": []}  # no data
+
+
+# --- QC agent in replay mode (plan step 15) ---------------------------------------------------
+
+
+def test_agent_spots_a_different_event_and_queries_the_site(tmp_path, fixtures, monkeypatch):
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    store, cid = run_scenario(tmp_path, fixtures, "different_event")
+    result = store.get_json(cid, "qc/checks_v1.json")
+    assert result["decision"] == "query"
+    query = next(e for e in store.events(cid) if e["type"] == "query.opened")
+    assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["wrong_event"]
+    assert "hip fracture" in query["data"]["text"]
+    (entry,) = result["ai"]
+    assert entry["label"] == "Simulated AI" and entry["gate"]["passed"]
+    assert any(e["type"] == "ai.gate" and e["data"]["passed"] for e in store.events(cid))
+
+
+def test_a_quote_the_page_does_not_contain_sends_the_case_to_a_person(
+    tmp_path, fixtures, monkeypatch
+):
+    import shutil
+
+    replays = tmp_path / "replays"
+    shutil.copytree(CONFIG / "DEMO01" / "ai_replays", replays)
+    (path,) = (replays / "event_match").glob("*.json")
+    record = json.loads(path.read_text())
+    record["output"]["evidence"][0]["quote"] = "Admitted with pneumonia"  # not on the page
+    path.write_text(json.dumps(record))
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setattr(
+        "adjud.flow2.Gateway.for_study",
+        classmethod(lambda cls, store, config_dir, study="DEMO01": _gateway(cls, store, replays)),
+    )
+    store, cid = run_scenario(tmp_path, fixtures, "different_event")
+    result = store.get_json(cid, "qc/checks_v1.json")
+    assert result["decision"] == "review"
+    assert any("quote not found on discharge_summary.pdf page 1" in r for r in result["reasons"])
+    assert store.state(cid).state == State.QC_REVIEW
+
+
+def _gateway(cls, store, replays):
+    from adjud.ai.config import AiConfig
+
+    cfg = AiConfig(mode="replay", functions={"document_type": True, "event_match": True})
+    return cls(store, cfg, replays)
+
+
+def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
+    """Kit AE-005 (fatal, a GP summary letter) passes; AE-006 (a clinic letter and an
+    angiography report, no discharge summary or ECG) gets a query for both."""
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(CONFIG)
+    (data / "flow1-testkit").symlink_to(ROOT / "data" / "flow1-testkit")
+    paths = DataPaths(data)
+    reset(paths, preload=True)
+    runner = Runner(paths)
+    runner.run_once()
+    store, docs = runner.pipeline.store, ROOT / "data" / "flow1-testkit" / "documents"
+    cases = {}
+    for folder, site in (("DEMO01-102-0004_AE-005", "102"), ("DEMO01-101-0005_AE-006", "101")):
+        subject, ae = folder.split("_")
+        cid = runner.pipeline.case_for(f"DEMO01|{subject}|{ae}")
+        files = sorted((docs / folder).iterdir())
+        upload(store, cid, [(f.name, f.read_bytes()) for f in files], f"site{site}.coord")
+        cases[ae] = cid
+    runner.run_case_steps()
+    for cid in cases.values():
+        submit(store, cid, store.state(cid).subject.replace("DEMO01-", "site")[:7] + ".coord",
+               "demo", paths.config)  # fmt: skip
+    for _ in range(2):
+        runner.run_case_steps()
+    passed = next(e for e in store.events(cases["AE-005"]) if e["type"] == "qc.passed")
+    assert passed["actor"] == "agent:qc" and passed["data"]["by"] == "checks and AI"
+    query = next(e for e in store.events(cases["AE-006"]) if e["type"] == "query.opened")
+    assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["missing_document"]
+    assert "Discharge or death summary, ECG report" in query["data"]["text"]
