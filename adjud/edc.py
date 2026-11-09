@@ -14,6 +14,7 @@ def _load(path: Path) -> list[dict[str, str]]:
 class MockEdc:
     def __init__(self, edc_dir: Path):
         edc_dir = Path(edc_dir)
+        self.root = edc_dir
         self.demographics = {r["subject_id"]: r for r in _load(edc_dir / "demographics.csv")}
         self.medical_history = _load(edc_dir / "medical_history.csv")
         self.conmeds = _load(edc_dir / "conmeds.csv")

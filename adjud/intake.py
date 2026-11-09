@@ -212,6 +212,7 @@ class IntakePipeline:
         self.study = study
         self.clock = clock
         cfg = Path(config_dir) / study
+        self.study_dir = cfg
         self.rules = yaml.safe_load((cfg / "eligibility_rules.yaml").read_text(encoding="utf-8"))
         self.related_cfg = yaml.safe_load((cfg / "related_data.yaml").read_text(encoding="utf-8"))
         self.edc = MockEdc(Path(edc_dir))

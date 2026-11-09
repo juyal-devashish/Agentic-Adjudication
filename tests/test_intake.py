@@ -105,3 +105,22 @@ def test_runner_checks_the_inbox_on_its_first_tick_then_on_its_interval(tmp_path
     assert (data / "inbox" / "03_updates.csv").exists()
     runner.tick(now=5.0 + 300)
     assert not (data / "inbox" / "03_updates.csv").exists()
+
+
+def test_edc_pull_imports_study_records_but_not_history(tmp_path, clock):
+    from adjud.edc_pull import pull
+
+    data = tmp_path / "data"
+    (data / "edc_mock").mkdir(parents=True)
+    for f in (KIT / "edc_mock").iterdir():
+        (data / "edc_mock" / f.name).write_bytes(f.read_bytes())
+    pipe = IntakePipeline(data, Path(__file__).resolve().parents[1] / "data" / "config",
+                          data / "edc_mock", clock=clock)  # fmt: skip
+    pipe.import_file(SCEN / "01_initial.csv")
+    (result,) = pull(pipe, "dm.dana")
+    assert result.status == "ACCEPTED" and result.file.startswith("edc_pull_")
+    keys = [o["key"] for o in result.outcomes]
+    assert keys and not any(k.split("|")[2].startswith("H-") for k in keys)
+    assert result.new_cases > 0  # AEs the EDC has but the first file did not
+    (again,) = pull(pipe, "dm.dana")
+    assert again.new_cases == 0 and again.count("changed") == 0  # idempotent

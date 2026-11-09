@@ -43,3 +43,5 @@ narrative:                   # plan step 17; checked by code in the narrative ga
   forbidden: [caused by, due to the study, related to the study, relatedness,
     attributable, causal, adjudicat, we conclude, in my opinion, probably, likely,
     placebo, active arm, treatment arm, allocation, randomised to, randomized to, unblind]
+edc_pull:                    # "Pull data from EDC" demo stand-in (plan step 21)
+  exclude_ae_id_prefixes: ["H-"]   # history kept in the mock EDC for earlier-event lookups

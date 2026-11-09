@@ -13,6 +13,7 @@ import theme
 from common import context, paths, pipeline
 from wording import IMPORT_OUTCOME, import_summary
 
+from adjud.edc_pull import pull
 from adjud.intake import OPTIONAL_COLUMNS, REQUIRED_COLUMNS
 from adjud.store import read_log, write_atomic
 
@@ -30,6 +31,20 @@ st.write(
 if not can_import:
     st.info("Importing is done by the data manager. Switch role in the sidebar to try it.")
 
+# --- pull from the EDC (plan step 21) ---------------------------------------------------------
+st.header("Pull from the EDC")
+st.write(
+    "Fetch the study's AE records and import them in one step. Records already imported "
+    "and unchanged are skipped."
+)
+theme.quiet("Demo stand-in: this reads the mock EDC's AE table. There is no live EDC connection.")
+if st.button("Pull AE records now", disabled=not can_import):
+    for r in pull(pipe, ctx.actor):
+        (st.success if r.status == "ACCEPTED" else st.error)(
+            import_summary({**r.summary(), "file": r.file})
+        )
+
+st.header("Import a file")
 # --- import -------------------------------------------------------------------------------
 upload = st.file_uploader(
     "AE export from the EDC (CSV or XLSX)", type=["csv", "xlsx"], disabled=not can_import
