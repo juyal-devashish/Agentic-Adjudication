@@ -7,12 +7,17 @@ proposal, and only the runner moves a case after a gate passes.
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 import pymupdf
+from openpyxl import load_workbook
+from PIL import Image
 
 from adjud.deid import ocr
 from adjud.documents import documents_of
@@ -72,25 +77,47 @@ def redacted_outputs(store: FileCaseStore, case_id: str) -> dict[str, dict[str, 
     }
 
 
-def page_text(store: FileCaseStore, case_id: str, file: str, page: int) -> str | None:
-    """Text of one page of a redacted PDF output: the text layer, or OCR for image-only
-    pages. None if there is no such file or page. Used by tools and by the gates."""
-    out = redacted_outputs(store, case_id).get(file)
-    if out is None or not out["output"]["path"].endswith(".pdf"):
-        return None
-    content = store.get_file(case_id, out["output"]["path"])
+@lru_cache(maxsize=64)
+def _pages(content_sha: str, content: bytes, kind: str) -> tuple[str, ...]:
+    if kind == "xlsx":  # one "page" per sheet: its non-empty cells, row by row
+        wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+        return tuple(
+            "\n".join(
+                " | ".join(str(v) for v in row if v not in (None, ""))
+                for row in ws.iter_rows(values_only=True)
+            )[:MAX_PAGE_CHARS]
+            for ws in wb.worksheets
+        )
+    pages = []
     with pymupdf.open(stream=content, filetype="pdf") as doc:
-        if not 1 <= page <= doc.page_count:
-            return None
-        p = doc[page - 1]
-        text = p.get_text()
-        if not text.strip() and ocr.available():
-            pix = p.get_pixmap(dpi=ocr.TARGET_DPI, colorspace=pymupdf.csGRAY)
-            from PIL import Image
+        for p in doc:
+            text = p.get_text()
+            if not text.strip() and ocr.available():
+                pix = p.get_pixmap(dpi=ocr.TARGET_DPI, colorspace=pymupdf.csGRAY)
+                img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+                text = ocr.ocr_unit(img, ocr.TARGET_DPI).text
+            pages.append(text[:MAX_PAGE_CHARS])
+    return tuple(pages)
 
-            img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
-            text = ocr.ocr_unit(img, ocr.TARGET_DPI).text
-    return text[:MAX_PAGE_CHARS]
+
+def output_pages(store: FileCaseStore, case_id: str, rel_path: str) -> list[str]:
+    """Text of every page (PDF: text layer, or OCR for image-only pages; XLSX: one page per
+    sheet) of a **redacted** output, by its path in the case folder."""
+    if rel_path.startswith("documents/original/"):
+        raise ToolError("originals are never read here")
+    content = store.get_file(case_id, rel_path)
+    kind = "xlsx" if rel_path.endswith(".xlsx") else "pdf"
+    return list(_pages(hashlib.sha256(content).hexdigest(), content, kind))
+
+
+def page_text(store: FileCaseStore, case_id: str, file: str, page: int) -> str | None:
+    """Text of one page of a redacted output, by the original file name. None if there is
+    no such file or page. Used by tools and by the gates."""
+    out = redacted_outputs(store, case_id).get(file)
+    if out is None:
+        return None
+    pages = output_pages(store, case_id, out["output"]["path"])
+    return pages[page - 1] if 1 <= page <= len(pages) else None
 
 
 def case_toolbox(store: FileCaseStore, case_id: str) -> Toolbox:

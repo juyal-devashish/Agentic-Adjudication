@@ -21,6 +21,7 @@ from pathlib import PurePath
 from typing import Any
 
 from adjud.deid.detect import KnownValues
+from adjud.deid.identity import DocIdentity, conflicts
 from adjud.deid.pdf import (
     Box,
     learn_image,
@@ -57,6 +58,8 @@ class DocResult:
     residuals: list[dict[str, Any]] = field(default_factory=list)
     verification: dict[str, Any] = field(default_factory=dict)
     pages: int | None = None
+    # other files of the case that name a different patient (P-32); never the values
+    identity: dict[str, list[str]] = field(default_factory=dict)
 
     def report(self) -> dict[str, Any]:
         """The JSON report written next to the redacted file (no identifiers in it)."""
@@ -72,6 +75,7 @@ class DocResult:
             "findings": self.findings,
             "residuals": self.residuals,
             "verification": self.verification,
+            "identity": self.identity,
         }
 
 
@@ -89,22 +93,28 @@ def deidentify_case(
     checks = {d.name: check_upload(d.name, d.content, max_file_mb=max_file_mb,
                                    max_pdf_pages=max_pdf_pages) for d in docs}  # fmt: skip
 
+    identities: dict[str, DocIdentity] = {}
     for d in docs:  # pass 1: learn from every accepted file
         c = checks[d.name]
         if c.rejected:
             continue
+        doc_known = KnownValues()
         if c.kind == "pdf":
-            learn_pdf(d.content, policy, known)
+            learn_pdf(d.content, policy, doc_known)
         elif c.kind == "image":
-            learn_image(d.content, policy, known)
+            learn_image(d.content, policy, doc_known)
         elif c.kind == "xlsx":
-            learn_xlsx(d.content, policy, known)
+            learn_xlsx(d.content, policy, doc_known)
+        identities[d.name] = DocIdentity.of(doc_known)
+        known.merge(doc_known)
+    same_patient = conflicts(identities)
 
     results = []
     for d in docs:  # pass 2: redact and verify
         c = checks[d.name]
         res = DocResult(name=d.name, kind=c.kind, status="pending", warnings=list(c.warnings),
                         pages=c.pages)  # fmt: skip
+        res.identity = same_patient.get(d.name, {"dob": [], "name": []})
         if c.rejected:
             res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
         elif c.kind in ("pdf", "image"):

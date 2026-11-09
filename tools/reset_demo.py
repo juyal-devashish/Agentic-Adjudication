@@ -18,6 +18,7 @@ import shutil
 from pathlib import Path
 
 from adjud.paths import DataPaths
+from tools import make_flow2_fixtures
 
 RUNTIME = (
     "cases",
@@ -45,6 +46,7 @@ def reset(paths: DataPaths, *, preload: bool = False) -> None:
     staging = paths.root / "demo_uploads"
     shutil.copytree(KIT / "inbox_scenarios", staging / "inbox_files")
     shutil.copytree(KIT / "documents", staging / "documents")
+    make_flow2_fixtures.make(staging / "flow2")  # Flow 2 QC scenarios (plan step 14)
     if preload:
         shutil.copy(KIT / "inbox_scenarios" / "01_initial.csv", paths.inbox)
 

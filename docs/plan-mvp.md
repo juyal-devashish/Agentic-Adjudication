@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–13 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–14 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -84,6 +84,7 @@ Change any of these by editing this table first.
 | P-33 | Flow 2 sign-offs | QC pass and narrative approval are **automated decisions** when every gate passes. The Safety Specialist signs only on exceptions or overrides. *Confirm with the team; spec.md QC-06 and NAR-04 had the SS sign every case* | P-24 |
 | P-34 | "Pull data from EDC" | A demo tab that copies the mock EDC export into the import queue. No integration | Meeting (optional) |
 | P-35 | No redaction tracker | No separate list of redacted or mapped values; the approval process and the audit log are enough; the site keeps its original | Meeting |
+| P-36 | QC pass without AI | When every deterministic check passes, QC passes automatically (`system:qc`); a check that fails for a clear reason sends a query to the site automatically; only what code cannot tell goes to the QC agent, then a person | Plan (P-24) |
 
 ## 5. How we work
 
@@ -161,14 +162,16 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Result:** `tests/test_flow2.py` runs the whole path, including a query that sends the case back through Flow 1 (upload, de-identification, signature, `flow2_manifest_v2.json`) before QC passes and the narrative is signed. Each resubmission gets a new manifest version, so a handed-off manifest is never overwritten. The QC round has no checks yet (step 14), so it always asks the Safety Specialist.
 
-### Step 14 — QC checks: deterministic layer (QC-01, QC-02, P-32)
+### Step 14 — QC checks: deterministic layer (QC-01, QC-02, P-32) ✅
 
-- [ ] `tools/make_flow2_fixtures.py`: seeded synthetic cases for QC (complete, missing document, wrong patient, different event, unreadable page), built from the kit's documents and Faker; never edits the kit
-- [ ] `data/config/DEMO01/document_checklist.yaml`: required documents per event type
-- [ ] Checks: required documents present, every file readable with page counts, no residual PHI, subject ID and onset date found, **same patient across documents**, event term and dates match the EDC
-- [ ] Results written as `qc/checks_v<n>.json` with an event; a failed required check opens a query to the site automatically, with reason codes
+- [x] `tools/make_flow2_fixtures.py`: seeded synthetic cases for QC (complete, missing document, wrong patient, different event, unreadable page), built from the kit's documents and Faker; never edits the kit
+- [x] `data/config/DEMO01/document_checklist.yaml`: required documents per event type
+- [x] Checks: required documents present, every file readable with page counts, no residual PHI, subject ID and onset date found, **same patient across documents**, event term and dates match the EDC
+- [x] Results written as `qc/checks_v<n>.json` with an event; a failed required check opens a query to the site automatically, with reason codes
 
 **Done when:** each Flow 2 fixture gets the expected check results with AI off.
+
+**Result:** all five fixtures get their expected decision (`tests/test_qc.py`). On the kit's own cases: AE-001, -002, -003 and -007 pass with nobody involved; AE-005 and AE-006 each have a letter without a recognisable title, so they go to review (the QC agent's job in step 15). A first version typed documents by the first keyword anywhere on the page and mistyped two kit letters ("Catheter Laboratory" in a letterhead); types now come only from title lines and whole words. The same-patient comparison runs during de-identification and stores only verdicts; no false conflict on the corpus. The de-identification gate still passes.
 
 ### Step 15 — QC agent (AI-2, AI-3, document–event match)
 

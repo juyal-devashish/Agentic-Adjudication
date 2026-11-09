@@ -184,9 +184,15 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     runner.run_once()
     store = runner.pipeline.store
     cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
-    with pymupdf.open() as doc:
-        doc.new_page().insert_text((72, 72), "DISCHARGE SUMMARY. Chest pain.")
-        upload(store, cid, [("summary.pdf", doc.tobytes())], "site101.coord")
+    files = []
+    for name, text in (
+        ("summary.pdf", "DISCHARGE SUMMARY. Chest pain."),
+        ("ecg.pdf", "ECG REPORT. Sinus rhythm."),
+    ):
+        with pymupdf.open() as doc:
+            doc.new_page().insert_text((72, 72), text)
+            files.append((name, doc.tobytes()))
+    upload(store, cid, files, "site101.coord")  # complete, but no subject ID: a person decides
     runner.run_case_steps()
     submit(store, cid, "site101.coord", "demo", demo.config)
     for _ in range(3):  # handoff, QC start, QC round

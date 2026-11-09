@@ -43,7 +43,9 @@ def submitted(tmp_path, clock):
     runner.run_once()
     store = runner.pipeline.store
     cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
-    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY. Chest pain."))], SITE)
+    upload(
+        store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain since the morning."))], SITE
+    )
     runner.run_case_steps()  # de-identification
     submit(store, cid, SITE, "demo", paths.config)
     return runner, store, cid
@@ -64,20 +66,12 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     assert state(store, cid) == State.QC_CHECKS
     started = next(e for e in store.events(cid) if e["type"] == "qc.started")
     assert started["data"]["manifest"]["path"] == "handoff/flow2_manifest.json"
-    runner.run_case_steps()  # QC round 1: no agent, so a person decides
-    assert state(store, cid) == State.QC_REVIEW
-    assert "qc_review_needed" in templates(store)
-
-    with pytest.raises(SignatureRefused):
-        flow2.open_query(cid, ["missing_document"], "x", user_id=SS, password="wrong")
-    with pytest.raises(Flow2Refused, match="reason"):
-        flow2.open_query(cid, [], "x", user_id=SS, password="demo")
-    with pytest.raises(SignatureRefused, match="Safety Specialist"):
-        flow2.sign_qc_pass(cid, SITE, "demo")
-    flow2.open_query(cid, ["missing_document"], "Please add the ECG report.", user_id=SS,
-                     password="demo")  # fmt: skip
+    runner.run_case_steps()  # QC round 1: a cardiac event needs an ECG report
     assert state(store, cid) == State.QUERY_OPEN
-    assert query_of(store, cid)["text"] == "Please add the ECG report."
+    query = query_of(store, cid)
+    assert query["codes"] == ["missing_document"] and "ECG report" in query["text"]
+    opened = next(e for e in store.events(cid) if e["type"] == "query.opened")
+    assert opened["actor"] == "system:qc"  # no person was needed to send it
     assert "query_opened" in templates(store)
 
     # The site answers through Flow 1 again; a new manifest version is handed off.
@@ -89,9 +83,16 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     assert read_manifest(store, cid)["documents"][1]["source_name"] == "summary.pdf"
     assert (store.case_dir(cid) / "handoff" / "flow2_manifest.json").exists()
     assert (store.case_dir(cid) / "handoff" / "flow2_manifest_v2.json").exists()
-    runner.run_case_steps()
+    runner.run_case_steps()  # round 2: documents complete, but no subject ID or onset date
     assert state(store, cid) == State.QC_REVIEW
+    assert "qc_review_needed" in templates(store)
 
+    with pytest.raises(SignatureRefused):
+        flow2.open_query(cid, ["other"], "x", user_id=SS, password="wrong")
+    with pytest.raises(Flow2Refused, match="reason"):
+        flow2.open_query(cid, [], "x", user_id=SS, password="demo")
+    with pytest.raises(SignatureRefused, match="Safety Specialist"):
+        flow2.sign_qc_pass(cid, SITE, "demo")
     flow2.sign_qc_pass(cid, SS, "demo", "Both documents present")
     assert state(store, cid) == State.NARRATIVE
     runner.run_case_steps()  # template draft

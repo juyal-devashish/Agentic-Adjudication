@@ -1,0 +1,42 @@
+# Document types and what each event needs (plan step 14, QC-02; adjud/qc.py).
+#
+# Type of a document: the site's label if it gave one; otherwise a keyword in the first
+# title line of the first page that has one (title = mostly capitals, as letters print
+# them; whole words; English and German). Spreadsheets have no title: all their text
+# counts. No keyword means "unknown": the QC agent or the Safety Specialist decides.
+types:
+  discharge_summary:
+    label: Discharge or death summary
+    keywords: [discharge summary, death summary, summary letter, entlassungsbrief, arztbrief, discharge]
+  ecg_report:
+    label: ECG report
+    keywords: [ecg report, 12-lead ecg, electrocardiogram, ekg-befund, ekg]
+  lab_results:
+    label: Laboratory results
+    keywords: [troponin, laboratory, laborbefund, lab results]
+  imaging_report:
+    label: Imaging report
+    keywords: [angiography, x-ray, röntgen, rontgen, radiology, computed tomography, mri]
+  autopsy_report:
+    label: Post-mortem request or report
+    keywords: [post-mortem, autopsy, obduktion]
+  referral_letter:
+    label: Referral letter
+    keywords: [referral, überweisung]
+  clinic_letter:
+    label: Clinic letter
+    keywords: [outpatients, clinic letter, ambulanz]
+  other:
+    label: Other
+    keywords: []
+
+# Required document types. A fatal event needs the death or discharge summary; otherwise
+# the list for the event's system organ class (synthetic MedDRA codes), else the default.
+required:
+  default: [discharge_summary]
+  fatal: [discharge_summary]
+  by_soc:
+    "90010001": [discharge_summary, ecg_report]   # cardiac disorders
+
+# Dates in the documents count as the onset when they are this close to the EDC onset.
+onset_window_days: 3

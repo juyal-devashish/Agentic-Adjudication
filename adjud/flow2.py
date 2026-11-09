@@ -22,6 +22,7 @@ from typing import Any
 from adjud.events import EventDraft
 from adjud.handoff import latest_manifest_ref
 from adjud.notify import Outbox
+from adjud.qc import Checklist, run_checks
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes
 from adjud.workflow import State
@@ -71,9 +72,11 @@ class Flow2:
     config_dir: Path
     study: str = "DEMO01"
     outbox: Outbox = field(init=False)
+    checklist: Checklist = field(init=False)
 
     def __post_init__(self) -> None:
         self.outbox = Outbox(self.store.paths, self.study, clock=self.store.clock)
+        self.checklist = Checklist.for_study(self.config_dir, self.study)
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
                **kw: Any) -> None:  # fmt: skip
@@ -103,23 +106,45 @@ class Flow2:
         self._event(case_id, "qc.started", SYSTEM_QC, {"manifest": ref})
 
     def run_qc(self, case_id: str) -> dict[str, Any]:
-        """One QC round: deterministic checks (step 14) and the QC agent (step 15) decide
-        between passing, querying the site and asking the Safety Specialist."""
+        """One QC round. Deterministic checks first (step 14):
+        - a check failed for a clear reason → a query goes to the site automatically
+        - every check passed                 → QC passes, no person involved (P-36)
+        - code cannot tell                   → the QC agent (step 15), else a person
+        """
         n = _rounds(self.store, case_id, "qc.checks_completed") + 1
-        manifest = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
+        manifest_ref = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
+        manifest = self.store.get_json(case_id, manifest_ref["path"])
+        outcome = run_checks(self.store, case_id, manifest, self.checklist)
+        if outcome.failed:
+            decision, reasons = "query", [c.detail for c in outcome.failed]
+        elif not outcome.unknown:
+            decision, reasons = "pass", []
+        else:
+            decision = "review"
+            reasons = [c.detail or c.label for c in outcome.unknown]
+            reasons.append("AI is off: the Safety Specialist decides what code could not")
         result = {
             "round": n,
-            "manifest": manifest,
-            "checks": [],
-            "decision": "review",
-            "reasons": ["Automatic checks are not available yet: the Safety Specialist decides"],
+            "manifest": manifest_ref,
+            "checks": outcome.as_dicts(),
+            "types": outcome.types,
+            "decision": decision,
+            "reasons": reasons,
         }
         rel = f"qc/checks_v{n}.json"
         sha = self.store.put_file(case_id, rel, json_bytes(result))
         self._event(case_id, "qc.checks_completed", SYSTEM_QC,
-                    {"round": n, "results": {"path": rel, "sha256": sha}})  # fmt: skip
-        self._event(case_id, "qc.review_needed", SYSTEM_QC, {"reasons": result["reasons"]})
-        self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
+                    {"round": n, "results": {"path": rel, "sha256": sha},
+                     "decision": decision})  # fmt: skip
+        if decision == "query":
+            codes = list(dict.fromkeys(c.query_code for c in outcome.failed if c.query_code))
+            self.open_query(case_id, codes, " ".join(f"{r}." for r in reasons))
+        elif decision == "pass":
+            self._event(case_id, "qc.passed", SYSTEM_QC,
+                        {"results": {"path": rel, "sha256": sha}, "by": "checks"})  # fmt: skip
+        else:
+            self._event(case_id, "qc.review_needed", SYSTEM_QC, {"reasons": reasons})
+            self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
         return result
 
     def run_narrative(self, case_id: str) -> str:
