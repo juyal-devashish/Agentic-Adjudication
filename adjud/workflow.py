@@ -63,6 +63,8 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "source.stale_ignored": dict.fromkeys(ALL_STATES, SAME),
     "case.flagged": dict.fromkeys(ALL_STATES, SAME),
     "notification.queued": dict.fromkeys(ALL_STATES, SAME),
+    "notification.sent": dict.fromkeys(ALL_STATES, SAME),
+    "notification.failed": dict.fromkeys(ALL_STATES, SAME),
 }
 
 

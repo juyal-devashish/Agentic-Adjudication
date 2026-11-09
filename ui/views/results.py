@@ -24,7 +24,9 @@ store = pipe.store
 EVENT_WORDS = {
     "case.created": "Case created",
     "edc.related_data_pulled": "Related EDC data pulled",
-    "notification.queued": "Notification sent",
+    "notification.queued": "Notification queued",
+    "notification.sent": "Notification e-mailed",
+    "notification.failed": "Notification e-mail failed",
     "documents.uploaded": "Documents uploaded",
     "deid.started": "Identifier removal started",
     "deid.file_processed": "File processed",
@@ -267,6 +269,13 @@ with tabs[3]:
 st.header("Notifications")
 notes = [json.loads(f.read_text()) for f in sorted(paths().outbox.glob("*.json"))]
 mine = [n for n in notes if n.get("case_id") == cid]
+emailed: dict[str, str] = {}  # notification id -> last delivery status
+delivery = paths().outbox / "delivery.jsonl"
+if delivery.exists():
+    for line in delivery.read_text().splitlines():
+        if line.strip():
+            d = json.loads(line)
+            emailed[d["id"]] = d["status"]
 if mine:
     st.write("Messages carry no clinical content: only the case number, the task and a link.")
     st.dataframe(
@@ -278,6 +287,9 @@ if mine:
                     .replace("site:", "Site ")
                     .replace("role:safety_specialist", "Safety Specialist"),
                     "Message": n["subject"],
+                    "E-mail": {"sent": "Sent", "failed": "Failed"}.get(
+                        emailed.get(n["id"], ""), "Not sent"
+                    ),
                 }
                 for n in mine
             ]

@@ -24,6 +24,8 @@ uv run python -m adjud.runner &           # background worker: inbox import, de-
 uv run streamlit run ui/app.py
 ```
 
+E-mail notifications are off until SMTP is set in `.env` (see `.env.example`). To see them locally, run `docker compose --profile mail up`, set `SMTP_HOST=mailpit` (or `localhost` outside Docker) and `SMTP_PORT=1025`, and open the inbox on http://localhost:8025. For Outlook, use `smtp.office365.com`, port 587 and an app password, if your tenant allows it; `SMTP_REDIRECT_TO` sends every message to one address for a demo.
+
 Measure de-identification against the test kit (about 30 s):
 
 ```bash

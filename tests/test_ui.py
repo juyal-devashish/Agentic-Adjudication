@@ -125,3 +125,16 @@ def test_reset_keeps_corpus_metrics_and_stages_demo_files(demo):
     assert (demo.root / "demo_uploads" / "inbox_files" / "01_initial.csv").exists()
     assert (demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001").is_dir()
     assert not any(demo.inbox.iterdir())
+
+
+def test_email_link_opens_the_case_as_a_user_of_its_site(demo):
+    from adjud.runner import Runner
+
+    Runner(demo).run_once()
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.query_params["role"] = "site"
+    at.query_params["case"] = "DEMO01-0005"  # site 102
+    at.run()
+    assert not at.exception, at.exception
+    assert at.session_state["user_site"]["id"] == "site102.coord"
+    assert at.session_state["case_id"] == "DEMO01-0005"

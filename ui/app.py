@@ -36,8 +36,18 @@ if "user" in qp and "role" in st.session_state:
     match = [
         u for u in all_users if u["id"] == qp["user"] and u["role"] == st.session_state["role"]
     ]
-    if match and f"user_{match[0]['role']}" not in st.session_state:
-        st.session_state[f"user_{match[0]['role']}"] = match[0]
+elif "case" in qp and st.session_state.get("role") == "site":
+    # E-mail links name the case, not the person: open it as a user of the case's site.
+    subject = next(
+        (cs.subject for cs in pipeline().store.list_case_states() if cs.case_id == qp["case"]),
+        None,
+    )
+    site = subject.split("-")[1] if subject else None
+    match = [u for u in all_users if u["role"] == "site" and u.get("site") == site]
+else:
+    match = []
+if match and f"user_{match[0]['role']}" not in st.session_state:
+    st.session_state[f"user_{match[0]['role']}"] = match[0]
 with st.sidebar:
     st.subheader("You are")
     role = st.selectbox(

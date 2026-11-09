@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–9 done. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–10 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -112,14 +112,16 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Done when:** only the data manager sees the import controls, and every test passes.
 
-### Step 10 — E-mail notifications (P-29)
+### Step 10 — E-mail notifications (P-29) ✅
 
-- [ ] `adjud/mailer.py`: send each queued notification by SMTP when configured; record `notification.sent` or `notification.failed` (no retry storm: one attempt per runner tick, at most 3)
-- [ ] User e-mail addresses in `users.yaml`; `.env.example` lists the SMTP variable names
-- [ ] Fix the notification link (`/review` → `/documents` or `/record`)
-- [ ] Tests with a fake SMTP server; one manual send to Mailpit or Outlook
+- [x] `adjud/mailer.py`: send each queued notification by SMTP when configured; record `notification.sent` or `notification.failed` (no retry storm: one attempt per runner tick, at most 3)
+- [x] User e-mail addresses in `users.yaml`; `.env.example` lists the SMTP variable names
+- [x] Fix the notification link (`/review` → `/documents` or `/record`)
+- [x] Tests with a fake SMTP server; one manual send to Mailpit or Outlook
 
 **Done when:** creating a case sends the site an e-mail with only the case ID, task and link.
+
+**Result:** 11 e-mails delivered to Mailpit from one runner pass. E-mail links name the case, not the person, so a `role=site&case=…` link now opens the case as a user of the case's own site.
 
 ### Step 11 — Draw a box (P-30)
 

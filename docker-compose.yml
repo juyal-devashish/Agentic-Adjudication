@@ -19,3 +19,13 @@ services:
       - path: .env
         required: false
     restart: unless-stopped
+
+  # Optional local mailbox for e-mail notifications (plan P-29):
+  #   docker compose --profile mail up      then set SMTP_HOST=mailpit, SMTP_PORT=1025 in .env
+  # Web inbox on http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.21
+    profiles: ["mail"]
+    ports:
+      - "8025:8025"
+      - "1025:1025"

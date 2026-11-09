@@ -28,6 +28,16 @@ TEMPLATES = {
 }
 
 
+def link(case_id: str | None, to: str) -> str | None:
+    """Deep link into the UI for the recipient: a site lands on the case's documents, a
+    role on the case record (ui/app.py reads role and case from the query string)."""
+    if not case_id:
+        return None
+    if to.startswith("site:"):
+        return f"/documents?role=site&case={case_id}"
+    return f"/record?role={to.removeprefix('role:')}&case={case_id}"
+
+
 @dataclass
 class Outbox:
     paths: DataPaths
@@ -45,7 +55,7 @@ class Outbox:
             "to": to,
             "template": template,
             "subject": TEMPLATES[template],
-            "link": f"/review?case={case_id}" if case_id else None,
+            "link": link(case_id, to),
             "created_at": at,
         }
         name = f"{at.replace(':', '')}-{note['id'][:8]}-{template}.json"

@@ -21,6 +21,7 @@ from adjud.documents import DocumentProcessor
 from adjud.events import Clock, utc_now
 from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
+from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
 
 log = logging.getLogger("adjud.runner")
@@ -41,6 +42,18 @@ class Runner:
         )
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
         self.last_inbox: float | None = None
+        smtp = SmtpSettings.from_env()
+        self.mailer = (
+            Mailer(self.pipeline.store, self.paths.config, smtp, clock=self.clock) if smtp else None
+        )
+
+    def send_mail(self) -> None:
+        """E-mail queued notifications when SMTP is configured (plan P-29)."""
+        if self.mailer is None:
+            return
+        counts = self.mailer.deliver_pending()
+        if counts["sent"] or counts["failed"]:
+            log.info("e-mail: %d sent, %d failed", counts["sent"], counts["failed"])
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -88,6 +101,7 @@ class Runner:
     def run_once(self) -> None:
         self.import_inbox()
         self.run_case_steps()
+        self.send_mail()
 
     def tick(self, now: float) -> None:
         """One loop iteration at monotonic time `now`. The inbox is checked on the very
@@ -96,6 +110,7 @@ class Runner:
             self.import_inbox()
             self.last_inbox = now
         self.run_case_steps()
+        self.send_mail()
 
     def run_forever(self) -> None:
         while True:
