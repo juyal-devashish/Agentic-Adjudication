@@ -19,7 +19,7 @@ from adjud.store import read_log, write_atomic
 ctx = context()
 p = paths()
 pipe = pipeline()
-can_import = ctx.role in ("study_admin", "safety_specialist")
+can_import = ctx.role == "data_manager"  # plan P-25
 
 st.title("AE import")
 st.write(
@@ -28,10 +28,7 @@ st.write(
 )
 
 if not can_import:
-    st.info(
-        "Importing is done by the study admin or the Safety Specialist. Switch role in "
-        "the sidebar to try it."
-    )
+    st.info("Importing is done by the data manager. Switch role in the sidebar to try it.")
 
 # --- import -------------------------------------------------------------------------------
 upload = st.file_uploader(
@@ -130,7 +127,7 @@ else:
 # --- manual entry (F1-08) ----------------------------------------------------------------------
 st.header("Enter an AE by hand")
 if not can_import:
-    st.write("Only the study admin or the Safety Specialist can enter an AE by hand.")
+    st.write("Only the data manager can enter an AE by hand.")
 else:
     st.write(
         "Use this when the EDC entry is not available yet. The record goes through the "

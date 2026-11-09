@@ -1,4 +1,5 @@
-# Demo users (from the Flow 1 test kit). SYNTHETIC DEMO ONLY: no real authentication.
+# Demo users (from the Flow 1 test kit, with the study admin replaced by a data manager:
+# plan P-25). SYNTHETIC DEMO ONLY: no real authentication.
 # Every demo password is "demo"; only its bcrypt hash is stored here.
 users:
   - id: site101.coord
@@ -20,7 +21,7 @@ users:
     name: Anna Safety
     role: safety_specialist
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
-  - id: admin.sam
-    name: Sam Admin
-    role: study_admin
+  - id: dm.dana
+    name: Dana Data
+    role: data_manager
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"

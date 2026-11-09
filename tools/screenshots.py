@@ -101,7 +101,7 @@ def main() -> None:
         from playwright.sync_api import sync_playwright
 
         shots = [
-            ("1_import", "?role=study_admin"),
+            ("1_import", "?role=data_manager"),
             (
                 "2_documents_review",
                 f"documents?role=site&user=site104.coord&case={cases['review']}",

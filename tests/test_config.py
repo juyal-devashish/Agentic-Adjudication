@@ -20,12 +20,17 @@ def test_rules_and_related_data_are_the_kits():
         assert load(CONFIG, rel) == load(KIT_CONFIG, rel), rel
 
 
-def test_users_are_the_kits_with_bcrypt_hashes():
+def test_users_are_the_kits_with_a_data_manager_and_bcrypt_hashes():
     ours = load(CONFIG, "users.yaml")["users"]
     kit = load(KIT_CONFIG, "users.yaml")["users"]
-    assert [{k: u[k] for k in ("id", "role")} for u in ours] == [
-        {k: u[k] for k in ("id", "role")} for u in kit
+    # Plan P-25: the data manager replaces the kit's study admin; everyone else is the kit's.
+    expected = [
+        {"id": "dm.dana", "role": "data_manager"}
+        if u["role"] == "study_admin"
+        else {k: u[k] for k in ("id", "role")}
+        for u in kit
     ]
+    assert [{k: u[k] for k in ("id", "role")} for u in ours] == expected
     for u in ours:
         assert bcrypt.checkpw(b"demo", u["password_hash"].encode())
 

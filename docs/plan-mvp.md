@@ -5,7 +5,7 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8 onwards not started. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–9 done. Tick boxes as steps are completed and committed |
 
 ---
 
@@ -104,11 +104,11 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - [x] This plan; Flow 1 spec, plan and test-case documents removed; AGENTS.md, CLAUDE.md, README and code references updated
 
-### Step 9 — Data manager role (P-25)
+### Step 9 — Data manager role (P-25) ✅
 
-- [ ] `data_manager` role and a demo user in `users.yaml`; `study_admin` removed
-- [ ] AE import, manual entry and "Import queued files" only for the data manager; UI tests updated
-- [ ] Kit tests still green (the kit's own `users.yaml` is not ours and is not changed)
+- [x] `data_manager` role and a demo user in `users.yaml`; `study_admin` removed
+- [x] AE import, manual entry and "Import queued files" only for the data manager; UI tests updated
+- [x] Kit tests still green (the kit's own `users.yaml` is not ours and is not changed)
 
 **Done when:** only the data manager sees the import controls, and every test passes.
 

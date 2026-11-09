@@ -5,7 +5,7 @@ Applies [frontend-design-skill.md](frontend-design-skill.md) to the Streamlit UI
 ## Brief, as understood
 
 - **Subject:** the intake desk of a clinical events committee. Adverse-event records come in, sites send hospital paperwork, identifiers are blacked out, the site signs, and a sealed package goes on to adjudication.
-- **Audience:** site coordinators (occasional users who need the next step spelled out), a Safety Specialist, a study admin, and stakeholders watching a demo.
+- **Audience:** site coordinators (occasional users who need the next step spelled out), a Safety Specialist, a data manager, and stakeholders watching a demo.
 - **Primary job:** move a case from "AE arrived" to "signed, de-identified package", with proof at every step.
 - **The subject's own vernacular:** the redaction bar, controlled-document stamps, case folders, signatures, audit trails, hospital forms.
 

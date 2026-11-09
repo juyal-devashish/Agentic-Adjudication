@@ -50,7 +50,7 @@ def test_app_without_edc_asks_for_a_reset(tmp_path, monkeypatch):
 
 
 def test_import_now_from_page_1_creates_cases(demo):
-    at = run(role="study_admin")
+    at = run(role="data_manager")
     assert "Synthetic data only." in html_text(at)
     import_now = next(b for b in at.button if b.label == "Import queued files")
     import_now.click().run()
@@ -62,10 +62,12 @@ def test_import_now_from_page_1_creates_cases(demo):
     assert len([p for p in demo.cases.iterdir() if p.is_dir()]) == 11
 
 
-def test_site_user_cannot_import(demo):
-    at = run(role="site")
+@pytest.mark.parametrize("role", ["site", "safety_specialist"])
+def test_only_the_data_manager_can_import(demo, role):
+    at = run(role=role)
     assert next(b for b in at.button if b.label == "Import queued files").disabled
     assert next(b for b in at.button if b.label == "Import file").disabled
+    assert "Only the data manager can enter an AE by hand." in [m.value for m in at.markdown]
 
 
 def test_results_and_documents_pages_render_for_a_case(demo):

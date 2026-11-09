@@ -16,7 +16,7 @@ IMPORT_OUTCOME = {
 ROLE_NAMES = {
     "site": "Site user",
     "safety_specialist": "Safety Specialist",
-    "study_admin": "Study admin",
+    "data_manager": "Data manager",
 }
 
 

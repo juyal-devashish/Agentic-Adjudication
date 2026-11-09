@@ -36,7 +36,7 @@ More commands are in [AGENTS.md](AGENTS.md).
 
 | Page | Who | What |
 |---|---|---|
-| AE import | Study admin, Safety Specialist | Import AE files (CSV/XLSX) and see why each record did or did not become a case. Also manual entry, and cases to check (AE changed, no longer meets the rules, possible duplicate). |
+| AE import | Data manager | Import AE files (CSV/XLSX) and see why each record did or did not become a case. Also manual entry, and cases to check (AE changed, no longer meets the rules, possible duplicate). |
 | Documents | Site user | Each case shows its progress and the next step. Upload files and see their status (verified, needs attention, or rejected with a reason). Review redacted pages, keep a wrongly blacked-out term (a reason is required), black out more text, remove a file, and **Sign and submit** (password `demo`). |
 | Case record | Everyone | The package for adjudication with downloads, the audit trail with its integrity check, the EDC source data in plain words, notifications, and how well identifiers are removed on the test kit. |
 
