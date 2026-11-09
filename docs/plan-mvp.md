@@ -238,14 +238,23 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - [x] A button on the import page that exports the mock EDC's AE table (without its `H-` history records, set in `study.yaml`) into the queue and imports it, labelled as a demo stand-in; pulling again only adds or updates
 
-### Step 22 — Go live with the API key (blocked: waiting for the key)
+### Step 22 — Go live with the API key ✅
 
-- [ ] Key in the environment only; `ai.mode: live`; prices entered; budget cap set
-- [ ] Record real outputs for every fixture and replace the simulated replays; measure cost per case and repeatability (5 runs per function)
-- [ ] `tools.deid_check` with AI-1 off vs on, live (ask before running)
-- [ ] Re-run the full demo live; report cost
+- [x] Key in the environment only (`.env`, gitignored; `ADJUD_AI_MODE=live`); prices checked ($0.10 / $0.50 per MTok, Haiku 5.5); budget cap $1 while testing on a personal key
+- [x] Record real outputs for every fixture and replace the simulated replays; measure cost per case and repeatability (5 runs per function): `tools.ai_eval --runs 5 --record`
+- [x] `tools.deid_check` with AI-1 off vs on, live (`--ai`)
+- [x] Re-run the full demo live; report cost (each `ai_eval` run is the full demo: 6 kit cases and 5 Flow 2 scenarios)
 
 **Done when:** the full Flows 1+2 demo runs live with measured cost per case.
+
+**Result** (2026-11-09, `claude-haiku-5-5`, 5 live runs, `data/metrics/ai_eval/`):
+
+- 40 agent calls, all schema-valid; total $0.072, about $0.014 per full demo run. Mean cost per case: $0.001–0.004 (narrative ≈ $0.0025, 14 s median; document type $0.0006, 3 s; event match $0.0009, 5 s).
+- Outcomes as expected in 5/5 runs for every case except kit AE-005: the agent types its poor-quality GP letter as a discharge summary but with confidence 0.55–0.60 in every run, so the gate sends it to the Safety Specialist (the simulated answer had assumed 0.86). The answer itself is consistent; the gate does its job. With the citation fix below, 4 of 6 kit cases reach adjudication with only the site's signature (AE-005 to review, AE-006 queried for missing documents).
+- Found by the evaluation and fixed: narrative quotes from **scanned** documents always failed the citation gate, because the dossier footer gave the image-only page a text layer and its OCR text was never read (AE-002 in 5/5 runs, AE-007 in 2/5). Dossier pages now carry their source page's text; re-checked, citation failures on the 25 live narratives fall from 7 to 0.
+- Repeatability: document type and event verdicts identical in 5/5 runs. Narrative wording varies run to run (expected); gate outcome now identical once the fix applies.
+- AI-1 (7 scanned pages, $0.0039): identical scores to AI off, because the rule-based detectors already remove 100% on every scan variant; the agent found the same identifiers (including on the German letter) and flagged no clinical content. It adds a second, independent reader rather than measurable recall on this corpus.
+- Limitation seen in the first live narrative: the gate checks that each quote is on its page, not that the quote supports every fact in the statement (a statement may add a second value from the same page). Open: tighten (one quote per fact, or numbers in the statement must appear in its quote).
 
 ### Step 23 — Process document and demo ✅ (live rehearsal outstanding)
 
