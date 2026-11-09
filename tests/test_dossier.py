@@ -106,9 +106,39 @@ def test_flow3_handoff_lists_dossier_narrative_and_qc_with_matching_hashes(tmp_p
         assert sha256_bytes((store.case_dir(cid) / ref["path"]).read_bytes()) == ref["sha256"]
     assert "documents/original" not in json.dumps(manifest)
     assert manifest["narrative"]["approved_by"] == "agent:narrative"
-    assert manifest["narrative"]["simulated_ai"] is True
+    assert manifest["narrative"]["simulated_ai"] is False  # a recorded live answer
     notes = [json.loads(p.read_text()) for p in paths.outbox.glob("*.json")]
     assert any(n["template"] == "ready_for_adjudication" and n["case_id"] == cid for n in notes)
     runner.run_case_steps()  # nothing left to do: written once
     assert sum(e["type"] == "handoff.flow3_ready" for e in store.events(cid)) == 1
     assert all(r.ok for r in verify_all(paths))
+
+
+def test_dossier_page_of_a_scan_carries_the_scans_text_for_citations(tmp_path):
+    """Plan step 22: live narratives quoting a scanned page failed the gate, because the
+    dossier footer gave that page a text layer and its OCR text was never read."""
+    from adjud.ai.gates import citation_found
+    from adjud.ai.tools import dossier_page_text
+
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True)
+    runner = Runner(paths)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0002|AE-002")
+    scan = KIT / "documents" / "DEMO01-101-0002_AE-002" / "discharge_summary_scan.png"
+    upload(store, cid, [(scan.name, scan.read_bytes())], "site101.coord")
+    runner.run_case_steps()
+    submit(store, cid, "site101.coord", "demo", paths.config)
+    for _ in range(3):
+        runner.run_case_steps()
+    d = latest_dossier(store, cid)
+    first = d["page_map"][0]["first_page"]
+    text = dossier_page_text(store, cid, first)
+    assert f"Page {first} of" in text  # the dossier's own footer
+    assert citation_found("acute right middle cerebral artery infarct", text)  # the scan
+    assert not citation_found("cerebral artery infarct", dossier_page_text(store, cid, 1))

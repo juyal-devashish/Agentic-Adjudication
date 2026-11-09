@@ -121,12 +121,23 @@ def page_text(store: FileCaseStore, case_id: str, file: str, page: int) -> str |
 
 
 def dossier_page_text(store: FileCaseStore, case_id: str, page: int) -> str | None:
-    """Text of one page of the case's latest dossier, or None."""
+    """Text of one page of the case's latest dossier, or None. A page copied from a
+    redacted PDF also gets that source page's text: a scanned page has only the dossier
+    footer in its text layer, so without it the scan's own words (OCR) would be missing."""
     built = [e["data"] for e in store.events(case_id) if e["type"] == "dossier.built"]
     if not built:
         return None
     pages = output_pages(store, case_id, built[-1]["dossier"]["path"])
-    return pages[page - 1] if 1 <= page <= len(pages) else None
+    if not 1 <= page <= len(pages):
+        return None
+    text = pages[page - 1]
+    for doc in built[-1]["page_map"]:
+        offset = page - doc["first_page"]
+        if 0 <= offset < doc["pages"] and not doc["name"].lower().endswith(".xlsx"):
+            source = page_text(store, case_id, doc["name"], offset + 1)
+            if source:
+                text = f"{text}\n{source}"
+    return text
 
 
 def case_toolbox(store: FileCaseStore, case_id: str) -> Toolbox:
