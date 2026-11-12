@@ -261,3 +261,14 @@ def test_forbidden_wording_sends_the_ai_draft_to_the_safety_specialist(
     signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")["data"]
     assert signed["source"] == "ai" and signed["edited"]
     assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+
+
+def test_case_match_tells_the_site_whether_a_document_belongs_to_the_case():
+    from adjud.qc import case_match
+
+    subject = "DEMO01-101-0001"
+    assert case_match("Patient ID DEMO01-101-0001", subject, "DEMO01")[0] == "yes"
+    assert case_match("ID DEMOO1-1O1-0001 (OCR)", subject, "DEMO01")[0] == "yes"
+    status, detail = case_match("Subject DEMO01-102-0003", subject, "DEMO01")
+    assert status == "other" and "DEMO01-102-0003" in detail
+    assert case_match("Discharge summary, no ID", subject, "DEMO01")[0] == "none"

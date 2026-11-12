@@ -103,6 +103,8 @@ def test_site_flow_upload_process_review_and_sign(demo):
     assert pipe.store.state(cid).state.value == "AWAITING_SITE_CONFIRMATION"
     assert 'aria-current="step">Site review' in html_text(at)
     assert "Check the redacted pages, then sign and submit." in html_text(at)
+    files = next(df.value for df in at.dataframe if "This case?" in df.value)
+    assert files["This case?"].str.startswith("Yes: subject DEMO01-101-0001").all(), files
 
     at.text_input[-1].input("wrong")  # the signing form's password field
     next(b for b in at.button if b.label == "Sign and submit").click().run()

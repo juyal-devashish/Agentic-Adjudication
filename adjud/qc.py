@@ -118,6 +118,20 @@ def _ids(text: str, study: str) -> set[str]:
     return {f"{study.upper()}-{a.replace('O', '0')}-{b.replace('O', '0')}" for a, b in found}
 
 
+def case_match(text: str, subject: str, study: str) -> tuple[str, str]:
+    """Does a redacted document belong to this case? Shown to the site before signing, so
+    a file uploaded to the wrong case is caught early (QC's same_patient and
+    subject_and_onset checks decide later). Returns (status, detail): `yes` (this subject's
+    ID is on it), `other` (another subject's ID is on it) or `none` (no subject ID found)."""
+    found = _ids(text, study)
+    own = _ids(subject, study)
+    if found - own:
+        return "other", f"names another subject ({', '.join(sorted(found - own))})"
+    if found & own:
+        return "yes", f"subject {subject} found"
+    return "none", "no subject ID found: check it belongs to this case"
+
+
 def _dates(text: str) -> set[date]:
     out = set()
     for m in DATE_RE.finditer(text):
