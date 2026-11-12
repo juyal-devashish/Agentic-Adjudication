@@ -185,10 +185,13 @@ class Gateway:
         if self.client is None:
             import anthropic  # imported here: the rest of the package never needs the SDK
 
+            # A key that is not scoped to a workspace must name one on every request
+            workspace = self.env.get("ANTHROPIC_WORKSPACE_ID")
             self.client = anthropic.Anthropic(
                 api_key=self.env["ANTHROPIC_API_KEY"],
                 timeout=self.cfg.timeout_seconds,
                 max_retries=2,
+                default_headers={"anthropic-workspace-id": workspace} if workspace else None,
             )
         return self.client
 
@@ -270,7 +273,9 @@ class Gateway:
         except anthropic.RateLimitError:
             note = "rate limited by the API"
         except anthropic.APIStatusError as exc:
-            note = f"API error {exc.status_code}"
+            # the API's own explanation (it names the problem, not the request content)
+            err = (exc.body or {}).get("error", {}) if isinstance(exc.body, dict) else {}
+            note = f"API error {exc.status_code}: {str(err.get('message', ''))[:200]}".rstrip(": ")
         cost = self.cfg.cost(usage)
         record = {
             "function": function.name,

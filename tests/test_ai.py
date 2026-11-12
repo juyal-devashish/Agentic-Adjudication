@@ -170,6 +170,34 @@ def test_refusal_is_recorded_as_an_error(case, tmp_path):
     assert r.status == "error" and "declined" in r.note
 
 
+def test_api_errors_keep_the_apis_explanation(case, tmp_path):
+    import anthropic
+    import httpx
+
+    class Failing:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**_):
+                req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+                body = {"error": {"type": "invalid_request_error", "message": "needs a workspace"}}
+                raise anthropic.BadRequestError("bad", response=httpx.Response(400, request=req),
+                                                body=body)  # fmt: skip
+
+    store, cid = case
+    r = run(gateway(store, tmp_path, client=Failing(), mode="live",
+                    env={"ANTHROPIC_API_KEY": "k"}), store, cid)  # fmt: skip
+    assert not r.ok and r.note == "API error 400: needs a workspace"
+
+
+def test_workspace_id_is_sent_with_every_request(case, tmp_path):
+    store, _ = case
+    env = {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_WORKSPACE_ID": "wrkspc_test"}
+    client = gateway(store, tmp_path, mode="live", env=env)._client()
+    assert client.default_headers["anthropic-workspace-id"] == "wrkspc_test"
+    plain = gateway(store, tmp_path, mode="live", env={"ANTHROPIC_API_KEY": "k"})._client()
+    assert "anthropic-workspace-id" not in plain.default_headers
+
+
 def test_budget_cap_stops_live_calls(case, tmp_path):
     store, cid = case
     client = FakeClient(reply(text(json.dumps(ANSWER)), tokens=(10_000_000, 0)))
