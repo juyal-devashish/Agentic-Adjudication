@@ -106,7 +106,7 @@ def main() -> None:
         from playwright.sync_api import sync_playwright
 
         shots = [
-            ("1_import", "import?role=data_manager"),
+            ("1_import", "?role=data_manager"),  # the default page lives at /
             (
                 "2_documents_review",
                 f"documents?role=site&user=site104.coord&case={cases['review']}",

@@ -1,7 +1,7 @@
 [project]
 name = "adjud"
 version = "0.1.0"
-description = "Clinical event adjudication: Flow 1 (intake) proof of concept. Synthetic data only."
+description = "Agentic clinical event adjudication: AI agents prepare adverse events for independent review, code gates every agent answer, people sign. Flows 1-2 proof of concept; synthetic data only."
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "anthropic==1.17.0",
