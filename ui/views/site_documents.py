@@ -14,10 +14,8 @@ from boxdraw import page_box
 from common import case_header, context, pipeline, processor, study_config
 from openpyxl import load_workbook
 
-from adjud.ai.tools import output_pages
 from adjud.documents import documents_of, upload
 from adjud.flow2 import QUERY_CODES, query_of
-from adjud.qc import case_match
 from adjud.review import (
     SUBMIT_MEANING,
     ReviewRefused,
@@ -115,18 +113,6 @@ if not docs.files:
     st.write("No documents yet." + (" Add them above." if can_upload else ""))
     st.stop()
 
-MATCH_WORDS = {"yes": "Yes", "other": "No", "none": "Check"}
-
-
-def _match(done: dict | None) -> str | None:
-    """Document-to-case check on the redacted text (adjud.qc.case_match)."""
-    if not done or not done.get("output"):
-        return None
-    text = "\n".join(output_pages(store, cid, done["output"]["path"]))
-    status, detail = case_match(text, cs.subject or "", cs.study or "DEMO01")
-    return f"{MATCH_WORDS[status]}: {detail}"
-
-
 rows = []
 for name, f in sorted(docs.files.items()):
     done = docs.processed.get(name)
@@ -138,7 +124,6 @@ for name, f in sorted(docs.files.items()):
             "Status": word,
             "Identifiers removed": done["findings"] if done else None,
             "Still found": done["residuals"] if done else None,
-            "This case?": _match(done),
         }
     )
 
