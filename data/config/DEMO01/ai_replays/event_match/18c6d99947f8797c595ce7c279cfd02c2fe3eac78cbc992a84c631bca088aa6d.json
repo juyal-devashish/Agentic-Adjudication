@@ -1,7 +1,7 @@
 {
   "simulated": false,
   "function": "event_match",
-  "model": "claude-haiku-5-5",
+  "model": "claude-opus-5-5",
   "prompt": "event_match_v1",
   "input": {
     "ae": {
@@ -22,7 +22,7 @@
     ]
   },
   "output": {
-    "confidence": 0.85,
+    "confidence": 0.8,
     "evidence": [
       {
         "file": "discharge_summary.pdf",
@@ -32,7 +32,7 @@
       {
         "file": "discharge_summary.pdf",
         "page": 1,
-        "quote": "Admitted on 02/11/2025. Fell at home; hemiarthroplasty"
+        "quote": "Admitted on 02/11/2025. Fell at home; hemiarthroplasty on the day of admission."
       },
       {
         "file": "ecg_report.pdf",
@@ -40,16 +40,10 @@
         "quote": "ST elevation in V1-V4, consistent with an acute anterior"
       }
     ],
-    "reason": "The discharge summary records a femoral neck fracture admitted 02/11/2025, and the ECG recorded 02/11/2025 reports ST elevation consistent with an acute anterior infarct, but both are about a year before the recorded myocardial infarction onset of 2026-03-14 and the summary does not mention an infarction.",
+    "reason": "The discharge summary records an admission for a fractured neck of femur on 02/11/2025, and the ECG recorded on 02/11/2025 reports anterior ST elevation consistent with an acute infarct; both are dated about four months before the reported myocardial infarction onset of 2026-03-14, and no document covers the March 2026 episode or its 2026-03-21 recovery, so a person should review this case.",
     "verdict": "different_event"
   },
   "tool_calls": [
-    {
-      "error": false,
-      "input": {},
-      "result_sha256": "3b9a83e05f10896bc8b242420cfbe94eda8cb69436e652a2a2a55bb697d6d7a7",
-      "tool": "get_ae_record"
-    },
     {
       "error": false,
       "input": {
@@ -72,8 +66,8 @@
   "usage": {
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
-    "input_tokens": 4331,
-    "output_tokens": 859
+    "input_tokens": 4038,
+    "output_tokens": 618
   },
-  "cost_usd": 0.000863
+  "cost_usd": 0.028512
 }

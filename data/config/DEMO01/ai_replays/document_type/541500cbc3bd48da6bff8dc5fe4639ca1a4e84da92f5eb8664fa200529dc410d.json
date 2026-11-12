@@ -1,7 +1,7 @@
 {
   "simulated": false,
   "function": "document_type",
-  "model": "claude-haiku-5-5",
+  "model": "claude-opus-5-5",
   "prompt": "document_type_v1",
   "input": {
     "allowed_types": [
@@ -18,12 +18,12 @@
     "pages": 1
   },
   "output": {
-    "confidence": 0.6,
+    "confidence": 0.7,
     "document_type": "discharge_summary",
     "evidence": {
       "file": "summary_letter_lowquality.jpg",
       "page": 1,
-      "quote": "SUMMARY LETTER TO GENERAL PRACTITIONER"
+      "quote": "LETTER TO GENERAL PRACTITIONER"
     }
   },
   "tool_calls": [
@@ -41,7 +41,7 @@
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
     "input_tokens": 3388,
-    "output_tokens": 450
+    "output_tokens": 260
   },
-  "cost_usd": 0.000564
+  "cost_usd": 0.018752
 }

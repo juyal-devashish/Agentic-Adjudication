@@ -1,0 +1,133 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "discharge_summary.pdf",
+          "pages": 2,
+          "type": "discharge_summary"
+        },
+        {
+          "first_page": 5,
+          "name": "ecg_report.pdf",
+          "pages": 1,
+          "type": "ecg_report"
+        },
+        {
+          "first_page": 6,
+          "name": "troponin_results.xlsx",
+          "pages": 1,
+          "type": "lab_results"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Seriousness: HOSPITALISATION",
+        "text": "The trial database records a severe serious adverse event of myocardial infarction with onset on 2026-03-14 and end on 2026-03-21; it was classed as serious because it led to hospitalisation, and the outcome is recorded as recovered."
+      },
+      {
+        "page": 3,
+        "quote": "Past medical history: hypertension and type 2 diabetes mellitus.",
+        "text": "The patient is a 70-year-old man with a history of hypertension and type 2 diabetes mellitus."
+      },
+      {
+        "page": 2,
+        "quote": "dose: 75 mg OD, drug: Clopidogrel, end date: 2026-03-14, start date: 2025-06-01",
+        "text": "His recorded concomitant medications include aspirin 75 mg once daily since 2025-03-10 and clopidogrel 75 mg once daily from 2025-06-01, with an end date of 2026-03-14."
+      },
+      {
+        "page": 3,
+        "quote": "was admitted on 14/03/2026 with central chest pain of two hours' duration.",
+        "text": "He was admitted on 14/03/2026 with central chest pain that had lasted two hours."
+      },
+      {
+        "page": 5,
+        "quote": "ST elevation of 3 mm in II, III and aVF with reciprocal depression",
+        "text": "The 12-lead ECG recorded at 08:52 on 14/03/2026 showed sinus rhythm at 92 bpm, 3 mm ST elevation in leads II, III and aVF, and reciprocal ST depression in leads I and aVL."
+      },
+      {
+        "page": 6,
+        "quote": "2026-03-16 08:05:00 | TROPONIN_T | 3860 | ng/L | < 14",
+        "text": "Troponin T was 1240 ng/L and 2410 ng/L on 2026-03-14, and 3860 ng/L on 2026-03-16 (reference < 14 ng/L)."
+      },
+      {
+        "page": 4,
+        "quote": "showed an occluded right coronary artery, treated with a",
+        "text": "Coronary angiography on 15/03/2026 showed an occluded right coronary artery, which was treated with a drug-eluting stent, and 24-hour Holter monitoring showed no significant arrhythmia."
+      },
+      {
+        "page": 4,
+        "quote": "He was discharged home on 21/03/2026 on aspirin 75 mg, clopidogrel 75 mg",
+        "text": "He was discharged home on 21/03/2026 on aspirin 75 mg, clopidogrel 75 mg, atorvastatin 80 mg and bisoprolol 2.5 mg."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "a788c7227e58d0f47168653b72c9d2021f8767f2704a9fd4ad1ab08ac3c15ca9",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "6f3604a0eeccac06d3d5ed89d8bd36d7f488d436552a98fbc6b7c6a124c11835",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "03131f6e89bb9afd5e81c81cf2bb17fc7e00b969c855537b73311a2f5f22d0bd",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 5
+      },
+      "result_sha256": "0f4bf52779ad7f4bc01add6805891b61f393f7bf297a5c0913069c136399be48",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 6
+      },
+      "result_sha256": "97d3640e69361f73b52c6fce4ca035d306978509ad6e13d2fcbc9cf230f7356e",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 7113,
+    "output_tokens": 1800
+  },
+  "cost_usd": 0.064452
+}

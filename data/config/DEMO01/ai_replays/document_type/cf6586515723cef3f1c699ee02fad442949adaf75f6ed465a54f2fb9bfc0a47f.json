@@ -1,7 +1,7 @@
 {
   "simulated": false,
   "function": "document_type",
-  "model": "claude-haiku-5-5",
+  "model": "claude-opus-5-5",
   "prompt": "document_type_v1",
   "input": {
     "allowed_types": [
@@ -18,7 +18,7 @@
     "pages": 1
   },
   "output": {
-    "confidence": 0.95,
+    "confidence": 0.93,
     "document_type": "clinic_letter",
     "evidence": {
       "file": "clinic_letter.pdf",
@@ -35,22 +35,13 @@
       },
       "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
       "tool": "read_page_text"
-    },
-    {
-      "error": false,
-      "input": {
-        "file": "clinic_letter.pdf",
-        "page": 1
-      },
-      "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
-      "tool": "read_page_text"
     }
   ],
   "usage": {
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
-    "input_tokens": 5926,
-    "output_tokens": 417
+    "input_tokens": 3471,
+    "output_tokens": 165
   },
-  "cost_usd": 0.000801
+  "cost_usd": 0.017184
 }

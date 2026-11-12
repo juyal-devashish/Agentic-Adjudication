@@ -1,0 +1,125 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Transient ischaemic attack",
+      "end_date": "2026-01-09",
+      "onset_date": "2026-01-08",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "entlassungsbrief.pdf",
+          "pages": 1,
+          "type": "discharge_summary"
+        },
+        {
+          "first_page": 4,
+          "name": "entlassungsbrief_scan_150dpi.png",
+          "pages": 1,
+          "type": "discharge_summary"
+        },
+        {
+          "first_page": 5,
+          "name": "roentgen_thorax.pdf",
+          "pages": 1,
+          "type": "imaging_report"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Event term: Transient ischaemic attack\nOnset: 2026-01-08\nEnd: 2026-01-09",
+        "text": "The EDC records a transient ischaemic attack with onset on 2026-01-08 and end on 2026-01-09."
+      },
+      {
+        "page": 2,
+        "quote": "Seriousness: HOSPITALISATION\nOutcome: RECOVERED\nSeverity: SEVERE",
+        "text": "The event is recorded as serious because it led to hospitalisation, with severity severe and outcome recovered."
+      },
+      {
+        "page": 2,
+        "quote": "condition: Osteoarthritis, ongoing: Y, start year: 2015",
+        "text": "The subject is a 66-year-old male whose medical history includes ongoing osteoarthritis since 2015."
+      },
+      {
+        "page": 2,
+        "quote": "dose: standard, drug: Amlodipine, start date: 2024-11-01",
+        "text": "Concomitant medication includes amlodipine at a standard dose, started on 2024-11-01."
+      },
+      {
+        "page": 3,
+        "quote": "ischämischen Attacke (rechtsseitige Schwäche über 40 Minuten) aufgenommen",
+        "text": "According to the neurology discharge letter, the patient was admitted on 08.01.2026 with a transient ischaemic attack involving right-sided weakness lasting 40 minutes."
+      },
+      {
+        "page": 3,
+        "quote": "08.01.2026 zeigte keine Diffusionsstörung.",
+        "text": "An MRI performed on 08.01.2026 showed no diffusion abnormality."
+      },
+      {
+        "page": 3,
+        "quote": "wurde ausgeschlossen.\nEntlassung am 09.01.2026.",
+        "text": "The discharge letter states that Parkinson's disease was ruled out, and the patient was discharged on 09.01.2026."
+      },
+      {
+        "page": 5,
+        "quote": "RONTGEN THORAX p.a.",
+        "text": "A posteroanterior chest X-ray is dated 08.01.2026, but the report on file contains no findings."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "82099de1199525f891edebbc7f7413a82ac8146e4b2e5e4382e03671a93813ec",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "97fc39aef56038901717572358bed81b2d00cd92310c55eddfa92b45beec5f31",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "29ce6879c265fc57cac44ccaa50458e0757ebeba905b96a445d6571f6e1a97e6",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 5
+      },
+      "result_sha256": "5688693b5e1bfd5a0a5ee4088b70a861801cc43c9d4a81af830594d588197c10",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5646,
+    "output_tokens": 905
+  },
+  "cost_usd": 0.040684
+}

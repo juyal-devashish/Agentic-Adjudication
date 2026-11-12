@@ -128,7 +128,7 @@ Where an agent is not confident enough, or a gate fails, the Safety Specialist g
   - DICOM redaction.
   - Flows 3 and 4.
   - Anything for real patient data, which would need IT and a validated, restricted setup.
-- **Cost per case:** about $0.01 on the small model, and roughly 40 times that on Opus. See [plan step 22](plan-mvp.md).
+- **Cost:** $0.02–0.06 per case on Opus 5.5, about $0.30 for the whole demo. See [plan step 22](plan-mvp.md).
 
 ## After the demo
 

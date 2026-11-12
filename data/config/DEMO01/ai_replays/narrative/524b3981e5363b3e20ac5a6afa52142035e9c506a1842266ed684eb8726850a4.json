@@ -1,0 +1,122 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Sudden cardiac death",
+      "end_date": "2026-05-19",
+      "onset_date": "2026-05-19",
+      "outcome": "FATAL",
+      "serious": "Y",
+      "seriousness_criteria": "DEATH",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "death_summary.pdf",
+          "pages": 3,
+          "type": "discharge_summary"
+        },
+        {
+          "first_page": 6,
+          "name": "autopsy_request_scan.pdf",
+          "pages": 1,
+          "type": "autopsy_report"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Event term: Sudden cardiac death\nOnset: 2026-05-19",
+        "text": "The event in the EDC is sudden cardiac death with onset and end on 2026-05-19, recorded as serious (death), severe and fatal."
+      },
+      {
+        "page": 2,
+        "quote": "condition: Hypertension, ongoing: Y, start year: 2018",
+        "text": "The subject is a 77-year-old man with ongoing hypertension since 2018, taking amlodipine since 2024-11-01."
+      },
+      {
+        "page": 3,
+        "quote": "myocardial infarction (troponin T 2950 ng/L)",
+        "text": "He was admitted to the coronary care unit on 17/05/2026 with an acute anterior myocardial infarction and troponin T of 2950 ng/L."
+      },
+      {
+        "page": 4,
+        "quote": "On 18/05/2026 he developed cardiogenic shock requiring inotropic support.",
+        "text": "On 18/05/2026 he developed cardiogenic shock that needed inotropic support, and TIMI flow grade 0 was seen in the left anterior descending artery."
+      },
+      {
+        "page": 4,
+        "quote": "Resuscitation was unsuccessful\nand death was confirmed at 04:15.",
+        "text": "On 19/05/2026 at 03:40 he had a ventricular fibrillation arrest, resuscitation was unsuccessful, and death was confirmed at 04:15."
+      },
+      {
+        "page": 5,
+        "quote": "Cause of death: 1a cardiogenic shock, 1b acute anterior myocardial infarction.",
+        "text": "The death summary records the cause of death as 1a cardiogenic shock and 1b acute anterior myocardial infarction, and says the death was reported to the coroner."
+      },
+      {
+        "page": 6,
+        "quote": "REQUEST FOR POST-MORTEM EXAMINATION",
+        "text": "A post-mortem examination was requested, with the clinical summary given as acute anterior myocardial infarction complicated by cardiogenic shock."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "f83b91c442c71577ab53564b7b48e64edb8ec8d5e5ae413e7e477689139f028a",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "30648a3519c4c03e303a9629e9cf04c463a48ae98cc4122ef914ba4710031947",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "7c40fedea8da6069e0fb558f5af816b154327ad1c6713ab073aa94abf4d31477",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 5
+      },
+      "result_sha256": "ec7979ac07dd6f598c3ca5465bfdaa2767fb0abdd4edacd71a11affe8baf5640",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 6
+      },
+      "result_sha256": "7b0c0bd67b45c43e364002c7762ff8b55109e556f8456f2232d73831e373f2c0",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5735,
+    "output_tokens": 1077
+  },
+  "cost_usd": 0.04448
+}

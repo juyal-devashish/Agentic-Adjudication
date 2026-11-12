@@ -17,17 +17,17 @@ requested_documents:
   - lab_results
 ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
   mode: "off"                # off | replay | live (live also needs ANTHROPIC_API_KEY)
-  model: "claude-haiku-5-5"  # pinned small model (P-26)
+  model: "claude-opus-5-5"   # pinned (P-26, revised: see the plan's decisions table)
   effort: medium
   max_tokens: 16000
   timeout_seconds: 120
   max_tool_turns: 8
   max_retries: 2             # schema-invalid answers re-asked, then continue without AI
   min_confidence: 0.8        # gates send anything below this to a person
-  budget_usd: 1.0            # live calls stop when the usage ledger reaches this
-  price_per_mtok:            # Claude Haiku 5.5, prompts up to 100K tokens; check the
-    input: 0.10              # pricing page at go-live (P-28)
-    output: 0.50
+  budget_usd: 10.0           # live calls stop when the usage ledger reaches this
+  price_per_mtok:            # Claude Opus 5.5; check the pricing page at go-live (P-28).
+    input: 4.0               # Cache reads are 0.05x on Opus 5.5; the ledger counts 0.1x,
+    output: 20.0             # so recorded costs err slightly high
   functions:                 # each agent function on or off; `mode` is the master switch
     document_type: true      # AI-2: QC step, documents without a recognisable title
     event_match: true        # QC step: do the documents describe this AE?

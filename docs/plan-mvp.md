@@ -74,7 +74,7 @@ Change any of these by editing this table first.
 | P-23 | Scope | Flows 1 and 2. Flow 2 ends at `READY_FOR_ADJUDICATION` with a handoff manifest for Flow 3 | User |
 | P-24 | Autonomy | Agents act, code gates decide, people handle exceptions (§2) | User |
 | P-25 | AE import role | **Data manager** replaces study admin (import and manual entry). The study admin role is removed | Meeting, user |
-| P-26 | Model | Small model pinned in `study.yaml`: `claude-haiku-5-5`. A bigger model only per function, by config, if measurements show the small one is not good enough | Checklist |
+| P-26 | Model | Pinned in `study.yaml`. First `claude-haiku-5-5` (small, tested on a personal key); since 2026-11-12 `claude-opus-5-5`, the originally intended model, on the company key: every narrative passes its gate (Haiku 18 of 25), at about 20 times the cost (step 22 results) | Checklist |
 | P-27 | AI provider modes | `off` / `replay` / `live` in `study.yaml`. `live` also needs `ANTHROPIC_API_KEY`; without it the gateway falls back to `off` and says so | Plan |
 | P-28 | Cost control | Every call logs input and output tokens; prices per million tokens are entered in `study.yaml` from the pricing page at go-live; a budget cap (`ai.budget_usd`) stops live calls when reached | Checklist |
 | P-29 | E-mail | Bare minimum: SMTP via environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`); Outlook through `smtp.office365.com:587` if the presenter's tenant allows SMTP AUTH, otherwise Mailpit. Not configured → outbox only, as today. Body: case ID, task, link; never clinical content | User |
@@ -254,6 +254,14 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - Found by the evaluation and fixed: narrative quotes from **scanned** documents always failed the citation gate, because the dossier footer gave the image-only page a text layer and its OCR text was never read (AE-002 in 5/5 runs, AE-007 in 2/5). Dossier pages now carry their source page's text; re-checked, citation failures on the 25 live narratives fall from 7 to 0.
 - Repeatability: document type and event verdicts identical in 5/5 runs. Narrative wording varies run to run (expected); gate outcome now identical once the fix applies.
 - AI-1 (7 scanned pages, $0.0039): identical scores to AI off, because the rule-based detectors already remove 100% on every scan variant; the agent found the same identifiers (including on the German letter) and flagged no clinical content. It adds a second, independent reader rather than measurable recall on this corpus.
+
+**Result on Opus** (2026-11-12, `claude-opus-5-5`, company key and workspace, 5 live runs, `data/metrics/ai_eval/`; replays re-recorded from these answers, Haiku's removed):
+
+- 40 agent calls, all schema-valid; total $1.48, about $0.30 per full demo run. Mean cost per case $0.02–0.06 (narrative ≈ $0.046, 10 s median; document type $0.018, 4 s; event match $0.028, 8 s).
+- Narratives: 25 of 25 pass the citation gate (Haiku: 18 of 25 before the fix).
+- Outcomes as expected in 5/5 runs except kit AE-005 (document type confidence 0.6–0.7, so the Safety Specialist reviews, as with Haiku) and the `different_event` fixture in 1 of 5 runs (event-match confidence 0.75: to the Safety Specialist rather than an automatic query). 4 of 6 kit cases reach adjudication with only the site's signature.
+- Repeatability: no inconsistent verdicts across the 5 runs. Spending cap raised to $10 for the company key.
+
 - Limitation seen in the first live narrative: the gate checks that each quote is on its page, not that the quote supports every fact in the statement (a statement may add a second value from the same page). Open: tighten (one quote per fact, or numbers in the statement must appear in its quote).
 
 ### Step 23 — Process document and demo ✅ (live rehearsal outstanding)

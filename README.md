@@ -159,15 +159,15 @@ All results are on synthetic data.
 | Scans, image-only, rotated, mixed and mislabelled images | **100% on every variant** (reference tool: 0–40%) | 3 items scored "lost" by the harness's OCR, intact on visual check |
 | Encrypted, corrupt and unsupported files | Rejected, no output | — |
 
-**Agents, live on `claude-haiku-5-5`**: 5 full runs over 6 kit cases and 5 QC scenarios:
+**Agents, live on `claude-opus-5-5`**: 5 full runs over 6 kit cases and 5 QC scenarios:
 
 | | |
 |---|---|
 | Schema-valid answers | 40 / 40 |
-| Cost | **≈ $0.014 per full demo run**, under $0.004 per case |
-| Median latency | document type 3 s · event match 5 s · narrative 14 s |
-| Repeatability | Document type and event verdicts identical in 5 of 5 runs |
-| Autonomy | 4 of 6 kit cases reach adjudication with only the site's signature. One is queried automatically for missing documents; one goes to a person because the agent's confidence on a poor-quality scan was 0.6 |
+| Cost | **≈ $0.30 per full demo run**, $0.02–0.06 per case (on Haiku 5.5: $0.014 per run) |
+| Median latency | document type 4 s · event match 8 s · narrative 10 s |
+| Repeatability | Document type and event verdicts identical in 5 of 5 runs; 25 / 25 narratives pass their citation check |
+| Autonomy | 4 of 6 kit cases reach adjudication with only the site's signature. One is queried automatically for missing documents; one goes to a person because the agent's confidence on a poor-quality scan was 0.6–0.7 |
 | Bug found by the evaluation | Citations from scanned pages were not being verified correctly. Fixed: 25 / 25 narratives pass |
 
 How these were measured: `tools/deid_check.py` and `tools/ai_eval.py`, with details in [docs/plan-mvp.md](docs/plan-mvp.md), step 22.
@@ -203,7 +203,7 @@ The roles are simulated in the sidebar: data manager, site user and Safety Speci
 |---|---|---|
 | AI mode | `ai.mode` in `data/config/DEMO01/study.yaml`, or `ADJUD_AI_MODE` in `.env` | `off` (default), `replay` (recorded answers, no API calls) or `live` |
 | API key | `ANTHROPIC_API_KEY` in the environment or `.env` | Environment only, never in config or logs. `live` without a key falls back to `off` and says so |
-| Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned small model by default; minimum gate confidence 0.8 |
+| Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned `claude-opus-5-5`; minimum gate confidence 0.8 |
 | Agent switches | `ai.functions` | `document_type`, `event_match`, `narrative`; `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
 | E-mail | `SMTP_*` in `.env` | `docker compose --profile mail up` starts Mailpit on http://localhost:8025 |
 | Upload folders | `ADJUD_UPLOAD_DIR` | One folder per case waiting for documents |

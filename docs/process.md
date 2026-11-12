@@ -43,7 +43,7 @@ Every step appends a hash-chained event to the case's `events.jsonl`; `tools/ver
 |---|---|
 | One entry point | `adjud/ai/gateway.py`; no other module uses the Anthropic SDK |
 | Modes | `off` (default), `replay` (recorded answers; hand-written ones are shown as "Simulated AI"), `live` (needs `ANTHROPIC_API_KEY` in the environment) |
-| Model | Small and pinned: `claude-haiku-5-5` in `study.yaml` |
+| Model | Pinned in `study.yaml`: `claude-opus-5-5` |
 | What agents can touch | Read-only local tools over redacted files and EDC snapshots. Agents never write files or move a case |
 | Records | Every call in `cases/<id>/ai/`, every check of an answer as an `ai.gate` event, tokens and cost in `data/ai/usage.jsonl`, with a budget cap |
 | Real data | Would need IT input and a restricted production setup. AI-1 in particular sends unredacted page images to the provider |

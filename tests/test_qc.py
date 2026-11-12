@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from adjud.deid.identity import DocIdentity, conflicts, dob_keys
 from adjud.documents import upload
@@ -157,8 +158,11 @@ def test_a_quote_the_page_does_not_contain_sends_the_case_to_a_person(
 def _gateway(cls, store, replays):
     from adjud.ai.config import AiConfig
 
+    model = yaml.safe_load((CONFIG / "DEMO01" / "study.yaml").read_text())["ai"]["model"]
     cfg = AiConfig(
-        mode="replay", functions={"document_type": True, "event_match": True, "narrative": True}
+        mode="replay",
+        model=model,  # the study's pinned model: replays are keyed by it
+        functions={"document_type": True, "event_match": True, "narrative": True},
     )
     return cls(store, cfg, replays)
 
