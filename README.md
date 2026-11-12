@@ -288,7 +288,7 @@ uv run python -m tools.ai_eval --mode replay                           # free dr
 
 | Document | Contents |
 |---|---|
-| [docs/demo-guide.md](docs/demo-guide.md) | Preparing and presenting the end-to-end demo with live AI |
+| [docs/demo-guide.md](docs/demo-guide.md) | One-page run sheet for the end-to-end demo with live AI |
 | [docs/process.md](docs/process.md) | Every step of Flows 1 and 2: trigger, component, actor, AI use |
 | [docs/plan-mvp.md](docs/plan-mvp.md) | Build plan, autonomy model, decisions log, measured results |
 | [docs/mvp-spec.md](docs/mvp-spec.md) | Storage design, Flow 2 states, AI rules |
