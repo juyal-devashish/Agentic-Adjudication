@@ -141,6 +141,41 @@ class Gateway:
             )  # fmt: skip
         return self._live(case_id, function, payload, h, toolbox, images or [])
 
+    def check(self) -> tuple[bool, str]:
+        """One tiny live request (a few tokens) to confirm the key, the workspace and the
+        pinned model work from this environment. Not about any case; its cost goes to the
+        ledger like any call. Returns (ok, what happened)."""
+        if not self.env.get("ANTHROPIC_API_KEY") and self.client is None:
+            return False, "no ANTHROPIC_API_KEY in the environment"
+        import anthropic
+
+        usage = dict.fromkeys(("input_tokens", "output_tokens", "cache_creation_input_tokens",
+                               "cache_read_input_tokens"), 0)  # fmt: skip
+        try:
+            response = self._client().messages.create(
+                model=self.cfg.model,
+                max_tokens=64,
+                messages=[{"role": "user", "content": "Reply with the word OK."}],
+                output_config={"effort": "low"},
+            )
+        except anthropic.APIConnectionError:
+            return False, "could not reach the API (network or proxy)"
+        except anthropic.APIStatusError as exc:
+            err = (exc.body or {}).get("error", {}) if isinstance(exc.body, dict) else {}
+            return False, f"API error {exc.status_code}: {err.get('message', '')}".rstrip(": ")
+        for k, v in _usage_dict(response.usage).items():
+            usage[k] += v
+        cost = round(self.cfg.cost(usage), 6)
+        self.ledger.append({"case_id": None, "function": "key_check", "mode": "live",
+                            "model": self.cfg.model, "valid": True, "usage": usage,
+                            "cost_usd": cost})  # fmt: skip
+        workspace = (
+            "with workspace header"
+            if self.env.get("ANTHROPIC_WORKSPACE_ID")
+            else ("no workspace header")
+        )
+        return True, f"{self.cfg.model} answered ({workspace}); cost ${cost:.6f}"
+
     # -- replay ------------------------------------------------------------------------------
 
     def _replay(
