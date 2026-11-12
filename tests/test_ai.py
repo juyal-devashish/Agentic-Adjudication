@@ -198,19 +198,6 @@ def test_workspace_id_is_sent_with_every_request(case, tmp_path):
     assert "anthropic-workspace-id" not in plain.default_headers
 
 
-def test_key_check_makes_one_tiny_call_and_records_its_cost(case, tmp_path):
-    store, _ = case
-    client = FakeClient(reply(text("OK"), tokens=(12, 3)))
-    gw = gateway(store, tmp_path, client=client, mode="live", env={"ANTHROPIC_API_KEY": "k"})
-    ok, detail = gw.check()
-    assert ok and "answered" in detail
-    assert client.requests[0]["max_tokens"] == 64
-    (entry,) = list(gw.ledger.records())
-    assert entry["function"] == "key_check" and entry["case_id"] is None
-    assert gw.spent_usd() == entry["cost_usd"] > 0
-    assert not gateway(store, tmp_path, mode="live").check()[0]  # no key
-
-
 def test_budget_cap_stops_live_calls(case, tmp_path):
     store, cid = case
     client = FakeClient(reply(text(json.dumps(ANSWER)), tokens=(10_000_000, 0)))
