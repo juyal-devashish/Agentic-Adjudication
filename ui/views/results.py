@@ -131,7 +131,9 @@ def measurements() -> None:
 
 if ctx.case_id is None:
     st.title("Case record")
-    states = store.list_case_states()
+    states = [cs for cs in store.list_case_states() if ctx.sees(cs.subject)]
+    if ctx.role == "site":
+        theme.quiet(f"Only cases of site {ctx.user['site']} are shown.")
     if states:
         st.write("Choose a case in the sidebar to see its full record.")
         st.dataframe(

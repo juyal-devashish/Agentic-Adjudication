@@ -239,3 +239,27 @@ def test_quality_check_page_shows_ai_proposals(demo, monkeypatch, tmp_path):
     table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
     assert table.iloc[0]["Source"] == "AI" and table.iloc[0]["Accepted"] == "Yes"
     assert any("fracture" in i.value for i in at.info)  # the query the agent sent
+
+
+def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
+    """Site segregation (demo checklist): the case list, the case record overview and the
+    import results show a site user only subjects of their own site."""
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()  # imports 01_initial.csv: cases at sites 101, 102 and 104
+    states = runner.pipeline.store.list_case_states()
+    own = {cs.case_id for cs in states if cs.subject.startswith("DEMO01-101-")}
+    assert own and len(own) < len(states)
+    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
+               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    for page in (None, "views/results.py"):
+        at = run(page, role="site", user_site=site101)
+        shown = [df.value for df in at.dataframe]
+        subjects = {s for df in shown if "Subject" in df for s in df["Subject"]}
+        assert subjects and all(s.startswith("DEMO01-101-") for s in subjects), subjects
+        listed = {o.split(",")[0] for o in at.selectbox(key="case_id").options}
+        assert listed == own, listed
+    at = run(role="data_manager")
+    subjects = {s for df in at.dataframe if "Subject" in df.value for s in df.value["Subject"]}
+    assert {s.split("-")[1] for s in subjects} >= {"101", "102"}

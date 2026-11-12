@@ -86,8 +86,12 @@ else:
         "File", reports, format_func=lambda f: f.name.removesuffix(".report.json")
     )
     rep = json.loads(chosen.read_text())
-    st.write(import_summary(rep))
-    if rep["errors"]:
+    outcomes = [o for o in rep.get("outcomes") or [] if ctx.sees(o["key"].split("|")[1])]
+    if ctx.role == "site":  # site segregation: no totals or rows from other sites
+        theme.quiet(f"Only records of site {ctx.user['site']} are shown.")
+    else:
+        st.write(import_summary(rep))
+    if rep["errors"] and ctx.role != "site":
         st.dataframe(
             pd.DataFrame(
                 [
@@ -103,7 +107,7 @@ else:
             hide_index=True,
             width="stretch",
         )
-    if rep.get("outcomes"):
+    if outcomes:
         st.dataframe(
             pd.DataFrame(
                 [
@@ -116,7 +120,7 @@ else:
                         "Case": o.get("case_id") or "",
                         "Flags": theme.flag_words(o.get("flags") or []),
                     }
-                    for o in rep["outcomes"]
+                    for o in outcomes
                 ]
             ),
             hide_index=True,
@@ -126,7 +130,7 @@ else:
         latest = {
             e["key"]: e for e in read_log(pipe.store.evaluations_path) if e.get("explanation")
         }
-        keys = [o["key"] for o in rep["outcomes"]]
+        keys = [o["key"] for o in outcomes]
         key = st.selectbox(
             "Why?", keys, format_func=lambda k: f"{k.split('|')[1]}, {k.split('|')[2]}"
         )
@@ -175,7 +179,7 @@ else:
 
 # --- flagged cases ----------------------------------------------------------------------------
 st.header("Cases to check")
-flagged = [cs for cs in pipe.store.list_case_states() if cs.flags]
+flagged = [cs for cs in pipe.store.list_case_states() if cs.flags and ctx.sees(cs.subject)]
 if flagged:
     st.write("These cases changed after they were created. Nothing is withdrawn automatically.")
     st.dataframe(

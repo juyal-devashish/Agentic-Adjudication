@@ -50,6 +50,15 @@ class Context:
     def actor(self) -> str:
         return self.user["id"]
 
+    def sees(self, subject: str | None) -> bool:
+        """Site segregation: a site user sees only subjects of their own site (subject IDs
+        are <study>-<site>-<number>, e.g. DEMO01-101-0001 -> site 101). Shown, not enforced: roles
+        are simulated."""
+        if self.role != "site":
+            return True
+        parts = (subject or "").split("-")
+        return len(parts) > 1 and parts[1] == self.user.get("site")
+
 
 def context() -> Context:
     return st.session_state["ctx"]
