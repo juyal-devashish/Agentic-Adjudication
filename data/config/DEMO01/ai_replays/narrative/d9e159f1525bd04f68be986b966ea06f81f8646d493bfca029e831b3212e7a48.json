@@ -1,0 +1,106 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2025-05-20",
+      "onset_date": "2025-05-20",
+      "outcome": "FATAL",
+      "serious": "Y",
+      "seriousness_criteria": "DEATH",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "referral_letter_mixed.pdf",
+          "pages": 1,
+          "type": "referral_letter"
+        },
+        {
+          "first_page": 4,
+          "name": "summary_letter_lowquality.jpg",
+          "pages": 1,
+          "type": "unknown"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Event term: Myocardial infarction\nOnset: 2025-05-20\nEnd: 2025-05-20\nSerious: Y\nSeriousness: DEATH",
+        "text": "The EDC records a serious adverse event of myocardial infarction, rated severe, with onset and end date 2025-05-20, death as the seriousness criterion and a fatal outcome."
+      },
+      {
+        "page": 2,
+        "quote": "age: 68\n  first dose date: 2025-06-02\n  sex: F",
+        "text": "The subject is a 68-year-old woman whose EDC first dose date is 2025-06-02, which is after the event date."
+      },
+      {
+        "page": 2,
+        "quote": "condition: Hyperlipidaemia, ongoing: Y, start year: 2018",
+        "text": "Her recorded medical history is ongoing hyperlipidaemia since 2018, and her recorded concomitant medication is ramipril started on 2024-11-01."
+      },
+      {
+        "page": 3,
+        "quote": "exertional chest pain\nand T-wave inversion in V1-V4",
+        "text": "A cardiology referral states that she was seen in the emergency department on 19/05/2025 with exertional chest pain and T-wave inversion in V1-V4."
+      },
+      {
+        "page": 4,
+        "quote": "was admitted on 20/05/2025 with chest pain and collapsed on the ward",
+        "text": "The acute medicine summary letter states that she was admitted on 20/05/2025 with chest pain and collapsed on the ward the same evening."
+      },
+      {
+        "page": 4,
+        "quote": "Despite resuscitation she died on 20/05/2025.",
+        "text": "She was resuscitated without success and died on 20/05/2025."
+      },
+      {
+        "page": 4,
+        "quote": "Post-mortem findings are\nawaited",
+        "text": "The post-mortem findings were still awaited at the time of the summary letter."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "11def2a22897453134f4939687c02566b1904c2c31040d7e69dd127946b583ee",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "ea3a25f99675a473daa6a54a816349813c402acac1516ea6053b444ca1a3b3d2",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "97c30c684fc19b733d7ab041f25eae7c32bc9cef60aadee9b8001233305887b0",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 4601,
+    "output_tokens": 968
+  },
+  "cost_usd": 0.037764
+}
