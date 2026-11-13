@@ -129,3 +129,11 @@ def test_edc_pull_imports_study_records_but_not_history(tmp_path, clock):
     assert result.new_cases > 0  # AEs the EDC has but the first file did not
     (again,) = pull(pipe, "dm.dana")
     assert again.new_cases == 0 and again.count("changed") == 0  # idempotent
+
+
+def test_manual_entry_reports_every_problem_at_once(pipe):
+    """The reason and the empty fields in one answer, reason first (kit TC-INT-11)."""
+    r = pipe.manual_entry({"study_id": "DEMO01"}, "", "dm.dana")
+    codes = [(e["column"], e["code"]) for e in r.errors]
+    assert r.status == "REJECTED" and codes[0] == ("reason", "MISSING_REASON")
+    assert ("subject_id", "MISSING_VALUE") in codes and ("onset_date", "MISSING_VALUE") in codes

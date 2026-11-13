@@ -305,12 +305,10 @@ class IntakePipeline:
     def manual_entry(self, record: dict[str, Any], reason: str, actor: str) -> ImportResult:
         """F1-08: an AE typed in by an authorised user, with a mandatory reason."""
         res = ImportResult(file="manual_entry")
-        if not (reason or "").strip():
-            res.status = "REJECTED"
-            res.errors = [_error(None, "reason", "MISSING_REASON", "a reason is required")]
-            return res
         r = normalise(record)
-        errs = self.validate_row(r, None)
+        errs = self.validate_row(r, None)  # every problem at once, the reason first
+        if not (reason or "").strip():
+            errs.insert(0, _error(None, "reason", "MISSING_REASON", "a reason is required"))
         if errs:
             res.status, res.errors = "REJECTED", errs
             return res
