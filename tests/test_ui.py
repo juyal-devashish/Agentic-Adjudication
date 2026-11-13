@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from tools.reset_demo import reset
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = str(ROOT / "ui" / "app.py")
+KIT_SCEN = ROOT / "data" / "flow1-testkit" / "inbox_scenarios"
 
 
 @pytest.fixture
@@ -353,3 +355,14 @@ def test_manual_ae_form_uses_pickers_and_saves_a_case(demo):
     assert not at.exception, at.exception
     assert any(s.value.startswith("Saved: new case") for s in at.success), at.error
     assert len(next(s for s in at.selectbox if s.label == "Case").options) == 1
+
+
+def test_cases_to_check_names_the_case_a_duplicate_may_repeat(demo):
+    at = run(role="data_manager")
+    next(b for b in at.button if b.label == "Import queued files").click().run()
+    shutil.copy(KIT_SCEN / "07_duplicate_candidate.csv", demo.inbox)
+    at.run()  # the button shows only while a file is queued
+    next(b for b in at.button if b.label == "Import queued files").click().run()
+    assert not at.exception, at.exception
+    flagged = at.dataframe[-1].value
+    assert list(flagged["Why"]) == ["Possible duplicate of DEMO01-0011"]

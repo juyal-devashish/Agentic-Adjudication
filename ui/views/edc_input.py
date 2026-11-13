@@ -212,8 +212,27 @@ else:
 # --- flagged cases ----------------------------------------------------------------------------
 st.header("Cases to check")
 flagged = [cs for cs in pipe.store.list_case_states() if cs.flags and ctx.sees(cs.subject)]
+
+
+def why_flagged(cs) -> str:
+    """The flags in words; a possible duplicate names the case it may duplicate."""
+    words = []
+    for flag in cs.flags:
+        text = theme.flag_words([flag])
+        if flag == "possible_duplicate":
+            events = pipe.store.events(cs.case_id)
+            marks = [e["data"] for e in events if e["type"] == "case.flagged"]
+            of = next((d.get("of_case") for d in marks if d.get("flag") == flag), None)
+            text += f" of {of}" if of else ""
+        words.append(text if not words else text[0].lower() + text[1:])
+    return "; ".join(words)
+
+
 if flagged:
-    st.write("These cases changed after they were created. Nothing is withdrawn automatically.")
+    st.write(
+        "These cases changed in the EDC after they were created, or may duplicate another "
+        "case. Nothing is withdrawn or merged automatically."
+    )
     st.dataframe(
         pd.DataFrame(
             [
@@ -222,7 +241,7 @@ if flagged:
                     "Subject": cs.subject,
                     "AE": cs.ae_id,
                     "Status": theme.state_words(cs.state),
-                    "Why": theme.flag_words(cs.flags),
+                    "Why": why_flagged(cs),
                 }
                 for cs in flagged
             ]

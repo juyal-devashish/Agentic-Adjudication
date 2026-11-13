@@ -137,3 +137,13 @@ def test_manual_entry_reports_every_problem_at_once(pipe):
     codes = [(e["column"], e["code"]) for e in r.errors]
     assert r.status == "REJECTED" and codes[0] == ("reason", "MISSING_REASON")
     assert ("subject_id", "MISSING_VALUE") in codes and ("onset_date", "MISSING_VALUE") in codes
+
+
+def test_a_semicolon_file_is_rejected_with_a_hint(pipe):
+    """Still rejected, codes as in the kit (TC-INT-05); the detail says what to do."""
+    from adjud.intake import SEMICOLON_HINT
+
+    r = pipe.import_file(SCEN / "10_semicolon_delimited.csv")
+    assert r.status == "REJECTED"
+    assert {e["code"] for e in r.errors} == {"MISSING_COLUMN"}
+    assert {e["message"] for e in r.errors} == {SEMICOLON_HINT}

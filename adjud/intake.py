@@ -70,6 +70,7 @@ REQUIRED_VALUES = (
 )
 CODED_UPPER = ("serious", "outcome", "severity", "relatedness_investigator", "seriousness_criteria")
 DATE_COLUMNS = ("onset_date", "end_date")
+SEMICOLON_HINT = "the file uses semicolons; save it as comma-separated CSV"
 OUTCOMES = frozenset(
     {"RECOVERED", "RECOVERING", "NOT_RECOVERED", "RECOVERED_WITH_SEQUELAE", "FATAL", "UNKNOWN"}
 )
@@ -265,7 +266,10 @@ class IntakePipeline:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         missing = [c for c in REQUIRED_COLUMNS if c not in header]
         if missing:
-            return [], [_error(1, c, "MISSING_COLUMN", "required column absent") for c in missing]
+            detail = "required column absent"
+            if len(header) == 1 and ";" in header[0]:  # European Excel: still rejected (kit)
+                detail = SEMICOLON_HINT
+            return [], [_error(1, c, "MISSING_COLUMN", detail) for c in missing]
         rows, errors, seen = [], [], {}
         for raw in raw_rows:
             r = normalise(raw)

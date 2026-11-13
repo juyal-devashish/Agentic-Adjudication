@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from adjud.intake import SEMICOLON_HINT
 from adjud.workflow import State
 
 IMPORT_OUTCOME = {
@@ -145,10 +146,13 @@ def next_step(
 
 def import_summary(rep: dict) -> str:
     if rep["status"] != "ACCEPTED":
-        return (
-            f"{rep['file']} was not imported: {len(rep['errors'])} problem(s) found. "
-            "Nothing from this file was saved. Fix the rows below and import it again."
-        )
+        head = f"{rep['file']} was not imported. Nothing from this file was saved."
+        if any(e.get("message") == SEMICOLON_HINT for e in rep["errors"]):
+            return f"{head} It uses semicolons: save it as comma-separated CSV and import it again."
+        where = "columns" if all(e["code"] == "MISSING_COLUMN" for e in rep["errors"]) else "rows"
+        n = len(rep["errors"])
+        found = f"{n} problem{'s' if n != 1 else ''} found"
+        return f"{head} {found}: fix the {where} below and import it again."
     parts = [f"{rep['records']} record{'s' if rep['records'] != 1 else ''}"]
     details = [
         (rep["new_cases"], "new case", "new cases"),
