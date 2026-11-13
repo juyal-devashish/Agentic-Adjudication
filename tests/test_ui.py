@@ -263,3 +263,24 @@ def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
     at = run(role="data_manager")
     subjects = {s for df in at.dataframe if "Subject" in df.value for s in df.value["Subject"]}
     assert {s.split("-")[1] for s in subjects} >= {"101", "102"}
+
+
+def test_a_refresh_comes_back_to_the_chosen_case(demo):
+    """The sidebar writes role, user and case into the URL; a new session (a browser
+    refresh) reads them back instead of falling back to "Choose a case"."""
+    from adjud.runner import Runner
+
+    Runner(demo).run_once()
+    at = run("views/site_documents.py", role="site")
+    next(s for s in at.selectbox if s.label == "Case").select("DEMO01-0001").run()
+    assert not at.exception, at.exception
+    url = {k: at.query_params[k] for k in ("role", "user", "case")}
+    assert url == {"role": "site", "user": "site101.coord", "case": "DEMO01-0001"}
+
+    fresh = AppTest.from_file(APP, default_timeout=30)
+    for k, v in url.items():
+        fresh.query_params[k] = v
+    fresh.run()
+    assert not fresh.exception, fresh.exception
+    assert fresh.session_state["case_id"] == "DEMO01-0001"
+    assert fresh.session_state["user_site"]["id"] == "site101.coord"

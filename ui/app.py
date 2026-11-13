@@ -79,6 +79,12 @@ with st.sidebar:
         st.caption("No cases yet." if role != "site" else "No cases for your site yet.")
 
 st.session_state["ctx"] = Context(user=user, case_id=case_id)
+# Keep who and which case in the URL, so a browser refresh comes back to the same place.
+st.query_params.update({"role": role, "user": user["id"]})
+if case_id:
+    st.query_params["case"] = case_id
+else:
+    st.query_params.pop("case", None)
 
 st.navigation(
     [

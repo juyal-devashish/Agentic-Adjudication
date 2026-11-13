@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import io
+import time
 
 import pandas as pd
 import pymupdf
@@ -46,6 +47,18 @@ if not is_site:
         "You are viewing as a reviewer. Uploading, corrections and signing are done "
         "by the site user."
     )
+
+
+def apply_change(**change) -> None:
+    """Record a redaction change, then wait for the runner to redact again, so the page
+    shows the new version without a browser refresh (which would lose the chosen case)."""
+    change_redactions(store, cid, ctx.actor, **change)
+    with st.spinner("Removing identifiers again. This takes a few seconds."):
+        deadline = time.monotonic() + 30
+        while store.state(cid).state == State.DEIDENTIFYING and time.monotonic() < deadline:
+            time.sleep(1)
+    st.rerun()
+
 
 # Once signed, files are fixed until a QC query reopens the case.
 SIGNED_STATES = {
@@ -188,11 +201,7 @@ if reviewable:
                 box = page_box(png, key=f"box_{done['output']['path']}_{n}")
                 if box and st.button(f"Black out the selected area on page {n}", type="primary"):
                     try:
-                        change_redactions(
-                            store, cid, ctx.actor, boxes=[{"file": name, "page": n, "rect": box}]
-                        )
-                        st.toast("Area added. Identifiers are being removed again.")
-                        st.rerun()
+                        apply_change(boxes=[{"file": name, "page": n, "rect": box}])
                     except ReviewRefused as exc:
                         st.error(f"Nothing changed: {exc}.")
     with right:
@@ -250,8 +259,7 @@ if reviewable:
                 if r["Keep"]
             ]
             try:
-                change_redactions(store, cid, ctx.actor, reason=reason, keep=keep)
-                st.rerun()
+                apply_change(reason=reason, keep=keep)
             except ReviewRefused as exc:
                 st.error(f"Nothing changed: {exc}.")
             except TransitionRefused:
@@ -262,8 +270,7 @@ if reviewable:
             placeholder="For example a nickname or a local ID",
         )
         if st.button("Black out this text", disabled=not (can_change and term.strip())):
-            change_redactions(store, cid, ctx.actor, add_terms=[term])
-            st.rerun()
+            apply_change(add_terms=[term])
         if (
             is_site
             and cs.state not in SIGNED_STATES
