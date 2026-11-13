@@ -284,8 +284,13 @@ if reviewable:
                 disabled=not can_change,
                 placeholder="For example a nickname or a local ID",
             )
-            if st.button("Black out this text", disabled=not (can_change and term.strip())):
-                apply_change(add_terms=[term])
+            # Enabled while typing: a disabled button only wakes up after Enter or a click
+            # elsewhere, so the first click on it was lost.
+            if st.button("Black out this text", disabled=not can_change):
+                if term.strip():
+                    apply_change(add_terms=[term])
+                else:
+                    st.warning("Type the text to black out first.")
         if (
             is_site
             and cs.state not in SIGNED_STATES
