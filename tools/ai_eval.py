@@ -43,11 +43,10 @@ KIT_EXPECTED = {
     "AE-006": "query",
     "AE-007": "pass",
 }
+
+
 # make_flow2_fixtures.EXPECTED is the AI-off outcome; with the agents on, the event-match
 # agent tells the different event apart and the site gets a query (tests/test_qc.py)
-FIXTURE_WITH_AI = {"different_event": "query"}
-
-
 def _demo(tmp: Path, ledger: Path):
     from adjud.paths import DataPaths
     from adjud.runner import Runner
@@ -136,7 +135,7 @@ def one_run(tmp: Path, ledger: Path) -> list[dict[str, Any]]:
         runner = _demo(tmp / scenario, ledger)
         cid = _submit_and_check(runner, key, sorted((fixtures / scenario).iterdir()))
         _settle(runner)
-        expected = FIXTURE_WITH_AI.get(scenario, exp["decision"])
+        expected = exp.get("with_ai", exp)["decision"]
         cases.append(_case_report(runner.pipeline.store, cid, f"fixture:{scenario}", expected))
     return cases
 

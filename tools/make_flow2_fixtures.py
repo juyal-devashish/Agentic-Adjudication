@@ -10,9 +10,11 @@ myocardial infarction, onset 2026-03-14; the patient is the kit's seeded identit
     missing_document  discharge summary only (a cardiac event     → query missing_document
                       needs an ECG)
     wrong_patient     the ECG report is another person's         → query wrong_patient
-    different_event   summary and ECG are from another episode,  → review (onset not
-                      months earlier                                found; an agent or a
-                                                                    person decides)
+    different_event   summary and ECG are from another episode,  → AI off: review (onset
+                      months earlier                                not found; a person
+                                                                    decides). AI on: the
+                                                                    agent queries the site
+                                                                    (wrong_event)
     unreadable        the ECG report is a blank scan              → query unreadable
 
 The kit is never modified; the other patient comes from Faker with a fixed seed.
@@ -34,7 +36,11 @@ EXPECTED = {
     "complete": {"decision": "pass", "codes": []},
     "missing_document": {"decision": "query", "codes": ["missing_document"]},
     "wrong_patient": {"decision": "query", "codes": ["wrong_patient"]},
-    "different_event": {"decision": "review", "codes": []},
+    "different_event": {
+        "decision": "review",
+        "codes": [],
+        "with_ai": {"decision": "query", "codes": ["wrong_event"]},  # the agent's verdict
+    },
     "unreadable": {"decision": "query", "codes": ["unreadable"]},
 }
 

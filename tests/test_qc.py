@@ -122,10 +122,11 @@ def test_identity_compares_dates_and_names_leniently():
 def test_agent_spots_a_different_event_and_queries_the_site(tmp_path, fixtures, monkeypatch):
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")
     store, cid = run_scenario(tmp_path, fixtures, "different_event")
+    expected = make_flow2_fixtures.EXPECTED["different_event"]["with_ai"]
     result = store.get_json(cid, "qc/checks_v1.json")
-    assert result["decision"] == "query"
+    assert result["decision"] == expected["decision"] == "query"
     query = next(e for e in store.events(cid) if e["type"] == "query.opened")
-    assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["wrong_event"]
+    assert query["actor"] == "agent:qc" and query["data"]["codes"] == expected["codes"]
     assert "fracture" in query["data"]["text"]  # the recorded live answer's own words
     (entry,) = result["ai"]
     assert entry["label"] == "AI" and entry["gate"]["passed"]
