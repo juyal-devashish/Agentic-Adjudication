@@ -284,3 +284,24 @@ def test_a_refresh_comes_back_to_the_chosen_case(demo):
     assert not fresh.exception, fresh.exception
     assert fresh.session_state["case_id"] == "DEMO01-0001"
     assert fresh.session_state["user_site"]["id"] == "site101.coord"
+
+
+def test_typed_black_out_is_offered_only_for_spreadsheets(demo):
+    """PDF and scan pages take boxes; a spreadsheet is a table, so it keeps typed black-out."""
+    from adjud.documents import upload
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    src = demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    files = [(f.name, f.read_bytes()) for f in sorted(src.iterdir())]
+    upload(runner.pipeline.store, "DEMO01-0001", files, "site101.coord")
+    runner.run_once()
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    pick = next(s for s in at.selectbox if s.label == "File to review")
+    assert pick.value.endswith(".pdf")
+    assert not any(b.label == "Black out this text" for b in at.button)
+    pick.select("troponin_results.xlsx").run()
+    assert not at.exception, at.exception
+    assert any(b.label == "Black out this text" for b in at.button)

@@ -179,9 +179,10 @@ if reviewable:
     report = store.get_json(cid, done["report"]["path"])
     output = store.get_file(cid, done["output"]["path"])
     can_change = is_site and store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    is_sheet = done["output"]["path"].endswith(".xlsx")
     left, right = st.columns([3, 2], gap="large")
     with left:
-        if done["output"]["path"].endswith(".xlsx"):
+        if is_sheet:
             wb = load_workbook(io.BytesIO(output), data_only=True)
             for ws in wb.worksheets:
                 hidden = " (hidden in the original)" if ws.sheet_state != "visible" else ""
@@ -211,9 +212,10 @@ if reviewable:
                 f"{html.escape(r['masked'])} ({html.escape(r['source'])})</li>"
                 for r in report["residuals"]
             )
+            fix = "Add the missing term below" if is_sheet else "Drag a box over it"
             st.html(
-                f"<p>{theme.status('Still found after removal', 'bad')}. Add the "
-                f"missing term below, or replace the file.</p><ul>{items}</ul>"
+                f"<p>{theme.status('Still found after removal', 'bad')}. {fix}, "
+                f"or replace the file.</p><ul>{items}</ul>"
             )
         findings = {}
         for f in report["findings"]:
@@ -264,13 +266,14 @@ if reviewable:
                 st.error(f"Nothing changed: {exc}.")
             except TransitionRefused:
                 st.error("Nothing changed: corrections are possible only during site review.")
-        term = st.text_input(
-            "Black out more text on every page of every file",
-            disabled=not can_change,
-            placeholder="For example a nickname or a local ID",
-        )
-        if st.button("Black out this text", disabled=not (can_change and term.strip())):
-            apply_change(add_terms=[term])
+        if is_sheet:  # a table takes no boxes, so spreadsheets keep typed black-out (P-30)
+            term = st.text_input(
+                "Black out more text on every page of every file",
+                disabled=not can_change,
+                placeholder="For example a nickname or a local ID",
+            )
+            if st.button("Black out this text", disabled=not (can_change and term.strip())):
+                apply_change(add_terms=[term])
         if (
             is_site
             and cs.state not in SIGNED_STATES
