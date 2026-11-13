@@ -4,6 +4,7 @@ query sends the case back through Flow 1 before QC runs again."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pymupdf
@@ -101,7 +102,11 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     assert "Myocardial infarction with onset on 2026-03-14" in draft
     assert "ecg.pdf" in draft and "summary.pdf" in draft
 
-    flow2.sign_narrative(cid, SS, "demo", draft.replace("[Add", "Chest pain. [Add"))
+    with pytest.raises(Flow2Refused, match="instruction"):  # the template note is still there
+        flow2.sign_narrative(cid, SS, "demo", draft.replace("[Add", "Chest pain. [Add"))
+    assert state(store, cid) == State.NARRATIVE_REVIEW
+    completed = re.sub(r"\[Add[^\]]*\]", "Chest pain treated with a stent.", draft)
+    flow2.sign_narrative(cid, SS, "demo", completed)
     assert state(store, cid) == State.READY_FOR_ADJUDICATION
     signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")
     assert signed["data"]["edited"] and signed["signature"]["signer"] == "Anna Safety"

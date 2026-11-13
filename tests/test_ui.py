@@ -210,6 +210,14 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     at.text_input[-1].input("demo")
     next(b for b in at.button if b.label == "Sign narrative").click().run()
     assert not at.exception, at.exception
+    assert any("[brackets]" in e.value for e in at.error)  # the template note is still there
+    assert store.state(cid).state.value == "NARRATIVE_REVIEW"
+
+    box = next(a for a in at.text_area if a.label == "Narrative")
+    box.input(box.value.split("[Add")[0] + "Chest pain on admission.")
+    at.text_input[-1].input("demo")
+    next(b for b in at.button if b.label == "Sign narrative").click().run()
+    assert not at.exception, at.exception
     assert store.state(cid).state.value == "READY_FOR_ADJUDICATION"
     assert 'aria-current="step">Ready for adjudication' in html_text(at)
 

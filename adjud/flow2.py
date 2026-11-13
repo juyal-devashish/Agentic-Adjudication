@@ -15,6 +15,7 @@ A query sends the case back to the site; its answer goes through Flow 1 again
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -462,6 +463,12 @@ class Flow2:
             raise Flow2Refused("the case is not waiting for a narrative review")
         if not text.strip():
             raise Flow2Refused("the narrative is empty")
+        template = (self.config_dir / self.study / "narrative_template.md").read_text()
+        if any(note in text for note in re.findall(r"\[[^\]]+\]", template)):
+            raise Flow2Refused(
+                "complete the narrative first: the template's instruction in [brackets] "
+                "is still in it"
+            )
         user = _safety_specialist(self.config_dir, user_id)
         n = _rounds(self.store, case_id, "narrative.signed") + 1
         draft = _latest(self.store, case_id, "narrative.drafted")["data"]
