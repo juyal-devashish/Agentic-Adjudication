@@ -60,6 +60,9 @@ def test_import_now_from_page_1_creates_cases(demo):
         for s in at.success
     )
     assert len([p for p in demo.cases.iterdir() if p.is_dir()]) == 11
+    # The page redraws: the sidebar already lists the new cases, the queue note is gone.
+    assert len(next(s for s in at.selectbox if s.label == "Case").options) == 11
+    assert not any("waiting in the import queue" in m.value for m in at.markdown)
 
 
 @pytest.mark.parametrize("role", ["site", "safety_specialist"])

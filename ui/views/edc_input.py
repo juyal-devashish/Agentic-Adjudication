@@ -31,6 +31,21 @@ st.write(
 if not can_import:
     st.info("Importing is done by the data manager. Switch role in the sidebar to try it.")
 
+
+def finish(section: str, results: list) -> None:
+    """Keep the import messages and redraw, so the sidebar's case list and the queue note
+    already include what was just imported."""
+    st.session_state[f"import_msgs_{section}"] = [
+        (r.status == "ACCEPTED", import_summary({**r.summary(), "file": r.file})) for r in results
+    ]
+    st.rerun()
+
+
+def show_messages(section: str) -> None:
+    for ok, text in st.session_state.pop(f"import_msgs_{section}", []):
+        (st.success if ok else st.error)(text)
+
+
 # --- pull from the EDC (plan step 21) ---------------------------------------------------------
 st.header("Pull from the EDC")
 st.write(
@@ -39,10 +54,8 @@ st.write(
 )
 theme.quiet("Demo stand-in: this reads the mock EDC's AE table. There is no live EDC connection.")
 if st.button("Pull AE records now", disabled=not can_import):
-    for r in pull(pipe, ctx.actor):
-        (st.success if r.status == "ACCEPTED" else st.error)(
-            import_summary({**r.summary(), "file": r.file})
-        )
+    finish("pull", pull(pipe, ctx.actor))
+show_messages("pull")
 
 st.header("Import a file")
 # --- import -------------------------------------------------------------------------------
@@ -59,10 +72,8 @@ if st.button("Import file", type="primary", disabled=not (can_import and upload)
             "import the queued files first."
         )
     else:
-        for r in pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor):
-            (st.success if r.status == "ACCEPTED" else st.error)(
-                import_summary({**r.summary(), "file": r.file})
-            )
+        finish("file", pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor))
+show_messages("file")
 
 waiting = sorted(f.name for f in p.inbox.glob("*") if f.is_file()) if p.inbox.exists() else []
 if waiting:
@@ -71,10 +82,8 @@ if waiting:
         "The runner imports them every few minutes."
     )
     if st.button("Import queued files", disabled=not can_import):
-        for r in pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor):
-            (st.success if r.status == "ACCEPTED" else st.error)(
-                import_summary({**r.summary(), "file": r.file})
-            )
+        finish("queue", pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor))
+show_messages("queue")
 
 # --- results ----------------------------------------------------------------------------------
 st.header("Import results")
@@ -172,10 +181,13 @@ else:
                 st.error(f"Not saved. Fix these fields: {problems}.")
             else:
                 o = r.outcomes[0]
-                st.success(
+                st.session_state["manual_saved"] = (
                     f"Saved: {IMPORT_OUTCOME[o['outcome']].lower()}"
                     + (f", case {o['case_id']}." if o.get("case_id") else ".")
                 )
+                st.rerun()
+    if saved := st.session_state.pop("manual_saved", None):
+        st.success(saved)
 
 # --- flagged cases ----------------------------------------------------------------------------
 st.header("Cases to check")
