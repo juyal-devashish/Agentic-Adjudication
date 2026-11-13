@@ -155,6 +155,45 @@ def test_lab_reference_column_is_not_treated_as_an_identifier():
     assert [c.value for c in out[2]] == [REDACTED, "TROPONIN_T", 1240, "< 14"]
 
 
+def test_spreadsheet_labels_and_headers_stay_and_only_values_go():
+    """A table's header row names columns and a key/value sheet's first column names
+    fields: neither is an identifier, nor is it learned as one (else 'Date of birth' and
+    'Address' were removed from every PDF in the case)."""
+    wb = Workbook()
+    table = wb.active
+    table.title = "Results"
+    table.append(["Sample ID", "Patient Name", "Hospital no", "Collected", "Test", "Value"])
+    table.append(["S26-4412", "Philip Roberts", "2929647", "2026-03-14 07:55", "TROPONIN_T", 1240])
+    info = wb.create_sheet("PatientInfo")
+    for row in (
+        ["Name", "Philip Roberts"],
+        ["Date of birth", "24/07/1955"],
+        ["Address", "9 Victoria Ridges, South Joel W95 2AN"],
+        ["Telephone", "01632 960001"],
+    ):
+        info.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    known = KnownValues()
+    learn_xlsx(buf.getvalue(), POLICY, known)
+    assert not {"Date of birth", "Address", "Telephone", "Hospital no", "Collected"} & set(
+        known.values
+    )
+    out = load_workbook(io.BytesIO(redact_xlsx(buf.getvalue(), POLICY, known).output))
+    results, patient = out["Results"], out["PatientInfo"]
+    assert [c.value for c in results[1]] == [
+        "Sample ID",
+        "Patient Name",
+        "Hospital no",
+        "Collected",
+        "Test",
+        "Value",
+    ]
+    assert [c.value for c in results[2]][1:3] == [REDACTED, REDACTED]
+    assert [c.value for c in patient["A"]] == ["Name", "Date of birth", "Address", "Telephone"]
+    assert {c.value for c in patient["B"]} == {REDACTED}
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -168,6 +207,12 @@ def test_letterhead_address_segment_stops_at_separators_and_line_ends(text):
 
     found = [f.text for f in detect_address_segments(TextUnit.from_string(text), POLICY)]
     assert found == ["Wexmoor Road, Halbridge HB4 7QT"]
+
+
+def test_a_staff_name_stops_before_the_job_title():
+    out = redacted("Signed: Dr Amelia Hart, Consultant Cardiologist")
+    assert "Amelia" not in out and "Hart" not in out
+    assert out.endswith(", Consultant Cardiologist")
 
 
 def test_name_after_a_label_stops_at_the_next_label():

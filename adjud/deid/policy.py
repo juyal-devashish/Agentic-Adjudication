@@ -50,6 +50,7 @@ class Policy:
     ner_min_score: float
     ner_languages: list[str]
     dob_min_age_years: int = 1
+    role_words: frozenset[str] = frozenset()  # job titles: a name after a label stops at one
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -82,6 +83,7 @@ class Policy:
             ner_min_score=float(ner.get("min_score", 0.5)),
             ner_languages=list(ner.get("languages", ["en"])),
             dob_min_age_years=int(d.get("dob_min_age_years", 1)),
+            role_words=frozenset(w.casefold() for w in d.get("role_words", [])),
             raw=d,
         )
 
@@ -90,8 +92,9 @@ class Policy:
         return cls.load(Path(config_dir) / study / "deid_policy.yaml")
 
     def label_words(self) -> frozenset[str]:
-        """First word of every label, case-folded: a name value stops at one of these."""
-        return frozenset(
+        """First word of every label, and every job title, case-folded: a name value stops
+        at one of these ("Signed: Dr Amelia Hart, Consultant Cardiologist")."""
+        return self.role_words | frozenset(
             lab.split()[0].strip(":.").casefold() for v in self.labels.values() for lab in v
         )
 

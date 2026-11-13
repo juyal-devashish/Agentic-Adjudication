@@ -65,16 +65,27 @@ class XlsxOutcome:
     redacted_cells: list[str] = field(default_factory=list)
 
 
+def _is_key_value(ws: Any, policy: Policy) -> bool:
+    """A sheet of fields ("Name | Philip Roberts", "Date of birth | 24/07/1955") rather
+    than a table: at least two identifier labels down its first column."""
+    keys = [c.value for c in ws["A"] if isinstance(c.value, str)]
+    return sum(1 for k in keys if _label_category(k, policy)) >= 2
+
+
 def _forced_cells(wb: Workbook, policy: Policy) -> dict[tuple[str, str], str]:
-    """(sheet, coordinate) -> category for whole identifier columns and key/value cells."""
+    """(sheet, coordinate) -> category for whole identifier columns and key/value cells.
+    Labels themselves are never forced: in a table the header row names the columns, in a
+    key/value sheet the first column names the fields."""
     forced: dict[tuple[str, str], str] = {}
     for ws in wb.worksheets:
-        header = {c.column: _label_category(str(c.value), policy) for c in ws[1] if c.value}
-        for row in ws.iter_rows(min_row=2):
-            for c in row:
-                if header.get(c.column) and c.value not in (None, ""):
-                    forced[(ws.title, c.coordinate)] = header[c.column]
-        for row in ws.iter_rows():
+        key_value = _is_key_value(ws, policy)
+        if not key_value:
+            header = {c.column: _label_category(str(c.value), policy) for c in ws[1] if c.value}
+            for row in ws.iter_rows(min_row=2):
+                for c in row:
+                    if header.get(c.column) and c.value not in (None, ""):
+                        forced[(ws.title, c.coordinate)] = header[c.column]
+        for row in ws.iter_rows(min_row=1 if key_value else 2):
             for c in row:
                 if isinstance(c.value, str) and (cat := _label_category(c.value, policy)):
                     right = ws.cell(row=c.row, column=c.column + 1)

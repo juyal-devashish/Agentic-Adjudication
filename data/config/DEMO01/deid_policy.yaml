@@ -26,6 +26,11 @@ allow_list:                  # never redacted; "*" is a wildcard
   - Addison
   - NIHSS
   - TIMI
+# Job titles: a name after a label ends before one, so "Signed: Dr Amelia Hart,
+# Consultant Cardiologist" keeps the title.
+role_words: [Consultant, Registrar, Physician, Cardiologist, Neurologist, Radiologist,
+             Surgeon, Nurse, Oberarzt, Oberärztin, Chefarzt, Chefärztin, Facharzt, Fachärztin,
+             Assistenzarzt, Assistenzärztin]
 context_labels:
   - Name
   - Patient
