@@ -275,7 +275,8 @@ def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
         shown = [df.value for df in at.dataframe]
         subjects = {s for df in shown if "Subject" in df for s in df["Subject"]}
         assert subjects and all(s.startswith("DEMO01-101-") for s in subjects), subjects
-        listed = {o.split(",")[0] for o in at.selectbox(key="case_id").options}
+        picker = next(s for s in at.selectbox if s.label == "Case")
+        listed = {o.split(",")[0] for o in picker.options}
         assert listed == own, listed
     at = run(role="data_manager")
     subjects = {s for df in at.dataframe if "Subject" in df.value for s in df.value["Subject"]}

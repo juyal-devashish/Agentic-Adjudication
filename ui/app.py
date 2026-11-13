@@ -64,17 +64,23 @@ with st.sidebar:
     states = [cs for cs in states if Context(user, None).sees(cs.subject)]  # site segregation
     st.subheader("Case")
     labels = {cs.case_id: f"{cs.case_id}, {theme.short_state(cs.state)}" for cs in states}
-    if st.session_state.get("case_id") not in (None, *labels):
-        st.session_state["case_id"] = None  # e.g. a deep link to another site's case
+    chosen = st.session_state.get("case_id")
+    if chosen not in labels:
+        chosen = None  # e.g. a deep link to another site's case
+    # The chosen case lives in session state, not in the widget: the labels carry the case's
+    # state, and when that changes between clicks the browser sends back the old label,
+    # which no longer matches, so a keyed picker fell back to "Choose a case" and the click
+    # (e.g. Sign and submit) was lost. Unkeyed, the picker is rebuilt from `chosen`.
+    ids = list(labels)
     case_id = st.selectbox(
         "Case",
-        list(labels),
-        index=None,
-        key="case_id",
+        ids,
+        index=ids.index(chosen) if chosen else None,
         label_visibility="collapsed",
         placeholder="Choose a case",
         format_func=labels.get,
     )
+    st.session_state["case_id"] = case_id
     if not states:
         st.caption("No cases yet." if role != "site" else "No cases for your site yet.")
 
