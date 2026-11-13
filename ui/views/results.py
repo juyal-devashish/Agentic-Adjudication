@@ -67,13 +67,20 @@ def measurements() -> None:
     )
     latest = paths().metrics / "latest.json"
     if ctx.role == "safety_specialist" and st.button("Measure again (about 30 seconds)"):
+        before = latest.stat().st_mtime if latest.exists() else None
         with st.spinner("Processing the test documents and scoring them…"):
-            subprocess.run(
+            run = subprocess.run(
                 [sys.executable, "-m", "tools.deid_check"],
                 check=False,  # noqa: S603
                 capture_output=True,
+                text=True,
             )
+        if not latest.exists() or latest.stat().st_mtime == before:  # a failed gate still writes
+            tail = (run.stderr or run.stdout).strip().splitlines()[-3:]
+            st.session_state["measure_error"] = " ".join(tail) or f"exit code {run.returncode}"
         st.rerun()
+    if error := st.session_state.pop("measure_error", None):
+        st.error(f"The measurement did not finish: {error}")
     if not latest.exists():
         st.write("Not measured yet. Run `uv run python -m tools.deid_check`.")
         return
