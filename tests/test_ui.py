@@ -200,6 +200,8 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
 
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
     assert 'aria-current="step">Quality check' in html_text(at)
+    doc = next(s for s in at.selectbox if s.label == "Document")  # the submitted files, read-only
+    assert doc.options == ["ecg.pdf", "summary.pdf"] and at.get("image")
     at.text_input[-1].input("demo")
     next(b for b in at.button if b.label == "Sign decision").click().run()
     assert not at.exception, at.exception

@@ -13,9 +13,11 @@ import pandas as pd
 import streamlit as st
 import theme
 from common import case_header, context, paths, pipeline
+from preview import show_file
 
 from adjud.dossier import latest_dossier
 from adjud.flow2 import QUERY_CODES, Flow2, Flow2Refused
+from adjud.handoff import latest_manifest_ref
 from adjud.signatures import SignatureRefused
 from adjud.workflow import State
 
@@ -90,6 +92,14 @@ else:
         items = "".join(f"<li>{html.escape(r)}</li>" for r in latest["reasons"])
         lead = "Why a person is needed" if state == State.QC_REVIEW else "A person was needed"
         st.html(f"<p>{lead}:</p><ul>{items}</ul>")
+    ref = latest_manifest_ref(store, cid)
+    documents = store.get_json(cid, ref["path"])["documents"] if ref else []
+    if documents:
+        with st.expander("Documents as submitted", expanded=state == State.QC_REVIEW):
+            names = [d["source_name"] for d in documents]
+            pick = st.selectbox("Document", names, key=f"qc_doc_{cid}")
+            doc = documents[names.index(pick)]
+            show_file(store.get_file(cid, doc["path"]), doc["path"], pick, f"qc_page_{cid}_{pick}")
     for e in [e for e in events if e["type"] == "qc.signed_pass" and e["at"] >= rounds[-1]["at"]]:
         note = f" Note: {e['reason']}" if e.get("reason") else ""
         st.success(f"Passed and signed by {e['signature']['signer']}, {when(e)}.{note}")

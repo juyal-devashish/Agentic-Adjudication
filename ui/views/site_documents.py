@@ -4,16 +4,14 @@ redacted pages, corrections with reasons, and Sign and submit."""
 from __future__ import annotations
 
 import html
-import io
 import time
 
 import pandas as pd
-import pymupdf
 import streamlit as st
 import theme
 from boxdraw import page_box
 from common import case_header, context, pipeline, processor, study_config
-from openpyxl import load_workbook
+from preview import pdf_page, show_sheets
 
 from adjud.documents import documents_of, upload
 from adjud.flow2 import QUERY_CODES, query_of
@@ -203,15 +201,9 @@ if reviewable:
     left, right = st.columns([3, 2], gap="large")
     with left:
         if is_sheet:
-            wb = load_workbook(io.BytesIO(output), data_only=True)
-            for ws in wb.worksheets:
-                hidden = " (hidden in the original)" if ws.sheet_state != "visible" else ""
-                st.caption(f"Sheet {ws.title}{hidden}")
-                st.dataframe(pd.DataFrame(ws.values), hide_index=True, width="stretch")
+            show_sheets(output)
         else:
-            with pymupdf.open(stream=output, filetype="pdf") as doc:
-                n = st.number_input("Page", 1, doc.page_count, 1) if doc.page_count > 1 else 1
-                png = doc[n - 1].get_pixmap(dpi=90).tobytes("png")
+            n, png = pdf_page(output)
             if not can_change:
                 st.image(png, caption=f"{name}, page {n}, as it will be sent", width="stretch")
             else:
