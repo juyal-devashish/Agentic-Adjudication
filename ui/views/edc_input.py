@@ -11,10 +11,18 @@ import pandas as pd
 import streamlit as st
 import theme
 from common import context, paths, pipeline
-from wording import IMPORT_OUTCOME, import_summary
+from wording import (
+    AE_CHOICES,
+    AE_FIELD_LABELS,
+    ENTRY_PROBLEMS,
+    IMPORT_OUTCOME,
+    code_words,
+    import_summary,
+)
 
 from adjud.edc_pull import pull
-from adjud.intake import OPTIONAL_COLUMNS, REQUIRED_COLUMNS
+from adjud.events import format_time, utc_now
+from adjud.intake import DATE_COLUMNS, OPTIONAL_COLUMNS, REQUIRED_COLUMNS, REQUIRED_VALUES
 from adjud.store import read_log, write_atomic
 
 ctx = context()
@@ -162,20 +170,32 @@ else:
         "same rules and is marked as entered by hand."
     )
     with st.expander("Open the form"), st.form("manual"):
-        values = {}
+        values = {"study_id": pipe.study}
+        required = set(REQUIRED_VALUES)
         grid = st.columns(3)
-        for i, col in enumerate(REQUIRED_COLUMNS + OPTIONAL_COLUMNS):
-            default = "DEMO01" if col == "study_id" else ""
-            values[col] = grid[i % 3].text_input(
-                col.replace("_", " ").capitalize(), value=default, key=f"m_{col}"
-            )
-        reason = st.text_area("Why is this entered by hand?")
+        fields = [c for c in AE_FIELD_LABELS if c in REQUIRED_COLUMNS + OPTIONAL_COLUMNS]
+        for i, col in enumerate(c for c in fields if c != "study_id"):
+            label = AE_FIELD_LABELS[col] + (" *" if col in required else "")
+            box, key = grid[i % 3], f"m_{col}"
+            if col in DATE_COLUMNS:
+                day = box.date_input(label, value=None, format="YYYY-MM-DD", key=key)
+                values[col] = day.isoformat() if day else ""
+            elif col in AE_CHOICES:
+                pick = box.selectbox(label, AE_CHOICES[col], index=None, key=key,
+                                     format_func=code_words, placeholder="Choose")  # fmt: skip
+                values[col] = pick or ""
+            elif col == "last_modified":
+                values[col] = box.text_input(label, value=format_time(utc_now()), key=key)
+            else:
+                values[col] = box.text_input(label, key=key)
+        theme.quiet(f"Study {pipe.study}. Fields marked * are required.")
+        reason = st.text_area(AE_FIELD_LABELS["reason"] + " *")
         if st.form_submit_button("Save AE"):
             r = pipe.manual_entry(values, reason, ctx.actor)
             if r.status == "REJECTED":
                 problems = "; ".join(
-                    f"{(e['column'] or '').replace('_', ' ')}: "
-                    f"{e['code'].replace('_', ' ').lower()}"
+                    f"{AE_FIELD_LABELS.get(e['column'] or '', e['column'])}: "
+                    f"{ENTRY_PROBLEMS.get(e['code'], e['code'].replace('_', ' ').lower())}"
                     for e in r.errors
                 )
                 st.error(f"Not saved. Fix these fields: {problems}.")

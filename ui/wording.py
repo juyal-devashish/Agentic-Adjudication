@@ -13,6 +13,67 @@ IMPORT_OUTCOME = {
     "stale": "Older than the stored record; ignored",
 }
 
+# The manual AE form: one readable label per EDC column, in the order a person fills it in.
+AE_FIELD_LABELS = {
+    "subject_id": "Subject ID",
+    "site_id": "Site",
+    "ae_id": "AE ID",
+    "ae_term": "AE term, as reported",
+    "onset_date": "Onset date",
+    "end_date": "End date",
+    "serious": "Serious",
+    "seriousness_criteria": "Seriousness criterion",
+    "outcome": "Outcome",
+    "severity": "Severity",
+    "relatedness_investigator": "Related to study drug (investigator)",
+    "pt_code": "Preferred term code",
+    "llt_code": "Lowest level term code",
+    "soc_code": "System organ class code",
+    "meddra_version": "MedDRA version",
+    "last_modified": "Last changed in the EDC",
+    "study_id": "Study",
+    "reason": "Why it is entered by hand",
+}
+# Coded columns get a picker; the values are the EDC's codes.
+AE_CHOICES = {
+    "serious": ["Y", "N"],
+    "seriousness_criteria": [
+        "DEATH",
+        "LIFE_THREATENING",
+        "HOSPITALISATION",
+        "DISABILITY",
+        "CONGENITAL_ANOMALY",
+        "OTHER_MEDICALLY_IMPORTANT",
+    ],  # fmt: skip
+    "outcome": [
+        "RECOVERED",
+        "RECOVERING",
+        "NOT_RECOVERED",
+        "RECOVERED_WITH_SEQUELAE",
+        "FATAL",
+        "UNKNOWN",
+    ],  # fmt: skip
+    "severity": ["MILD", "MODERATE", "SEVERE"],
+    "relatedness_investigator": ["NOT_RELATED", "RELATED"],
+}
+ENTRY_PROBLEMS = {
+    "MISSING_VALUE": "required",
+    "MISSING_REASON": "required",
+    "INVALID_DATE": "use a date",
+    "END_BEFORE_ONSET": "before the onset date",
+    "UNKNOWN_SUBJECT": "not a subject of this study in the EDC",
+    "SITE_MISMATCH": "not this subject's site",
+    "WRONG_STUDY": "not this study",
+    "INVALID_VALUE": "not a valid value",
+    "INVALID_DATETIME": "use a date and time, e.g. 2026-08-21T09:00:00Z",
+}
+
+
+def code_words(code: str) -> str:
+    """'HOSPITALISATION' -> 'Hospitalisation', 'Y' -> 'Yes'."""
+    return {"Y": "Yes", "N": "No"}.get(code, code.replace("_", " ").capitalize())
+
+
 ROLE_NAMES = {
     "site": "Site user",
     "safety_specialist": "Safety Specialist",

@@ -320,3 +320,36 @@ def test_typed_black_out_is_offered_only_for_spreadsheets(demo):
     pick.select("troponin_results.xlsx").run()
     assert not at.exception, at.exception
     assert any(b.label == "Black out this text" for b in at.button)
+
+
+def test_manual_ae_form_uses_pickers_and_saves_a_case(demo):
+    """Readable labels, pickers for coded fields, date pickers; every problem at once."""
+    import datetime as dt
+
+    at = run(role="data_manager")
+    next(b for b in at.button if b.label == "Save AE").click().run()
+    error = at.error[0].value
+    assert "Why it is entered by hand: required" in error and "Subject ID: required" in error
+
+    def text(label, value):
+        next(t for t in at.text_input if t.label.startswith(label)).input(value)
+
+    def pick(label, value):
+        next(s for s in at.selectbox if s.label.startswith(label)).select(value)
+
+    text("Subject ID", "DEMO01-104-0012")
+    text("Site", "104")
+    text("AE ID", "AE-M01")
+    text("AE term", "Ischaemic stroke")
+    text("Preferred term code", "90000201")
+    next(d for d in at.date_input if d.label.startswith("Onset date")).set_value(
+        dt.date(2026, 8, 20)
+    )
+    pick("Serious", "Y")
+    pick("Seriousness criterion", "HOSPITALISATION")
+    pick("Outcome", "RECOVERING")
+    next(a for a in at.text_area if a.label.startswith("Why it is entered")).input("By phone")
+    next(b for b in at.button if b.label == "Save AE").click().run()
+    assert not at.exception, at.exception
+    assert any(s.value.startswith("Saved: new case") for s in at.success), at.error
+    assert len(next(s for s in at.selectbox if s.label == "Case").options) == 1
