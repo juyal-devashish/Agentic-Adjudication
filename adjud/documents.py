@@ -262,8 +262,17 @@ class DocumentProcessor:
             self._event(case_id, "deid.failed", summary)
         else:
             self._event(case_id, "deid.completed", summary)
-            self._notify(case_id, site, "ready_for_review")
+            if not self._after_site_correction(case_id):
+                self._notify(case_id, site, "ready_for_review")
         return summary
+
+    def _after_site_correction(self, case_id: str) -> bool:
+        """True when this run follows a correction or removal the site made on the page:
+        the site is looking at it already, so no 'ready for your review' message."""
+        causes = ("documents.uploaded", "redactions.changed", "document.deleted")
+        last = next((e["type"] for e in reversed(self.store.events(case_id))
+                     if e["type"] in causes), None)  # fmt: skip
+        return last in ("redactions.changed", "document.deleted")
 
     def run_pending(self) -> list[str]:
         """Process every case waiting in DEIDENTIFYING. Returns the case ids processed."""

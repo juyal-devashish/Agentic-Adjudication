@@ -51,6 +51,26 @@ def processed(store, cid, name):
     return documents_of(store, cid).processed[name]
 
 
+def test_the_site_is_not_mailed_about_its_own_correction(ctx):
+    """'Ready for your review' goes out after an upload (the site may have used the ZIP
+    folder and be waiting), not after a correction the site just made on the page."""
+    store, proc, cid = ctx
+
+    def review_mails():
+        return [e for e in store.events(cid) if e["type"] == "notification.queued"
+                and e["data"]["template"] == "ready_for_review"]  # fmt: skip
+
+    upload(store, cid, [("note.pdf", pdf("Seen by Dr Amelia Hart. Ward 7."))], SITE)
+    proc.process_case(cid)
+    assert len(review_mails()) == 1
+    change_redactions(store, cid, SITE, add_terms=["Ward 7"])
+    proc.process_case(cid)
+    assert len(review_mails()) == 1
+    upload(store, cid, [("more.pdf", pdf("ECG report."))], SITE)
+    proc.process_case(cid)
+    assert len(review_mails()) == 2
+
+
 def test_m2_m3_residual_blocks_submission_until_the_site_adds_the_term(ctx):
     store, proc, cid = ctx
     upload(store, cid, [("note.pdf", pdf("Sample 2929647 was sent to the lab."))], SITE)
