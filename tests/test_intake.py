@@ -85,9 +85,10 @@ def test_case_created_event_records_actor_source_and_snapshot_hash(pipe):
     assert pipe.case_state(created["case_id"])["state"] == "AWAITING_DOCUMENTS"
 
 
-def test_runner_checks_the_inbox_on_its_first_tick_then_on_its_interval(tmp_path):
-    """Regression: with a fresh machine (monotonic clock < poll interval) the first
-    import used to wait until the clock passed the interval."""
+def test_runner_checks_the_inbox_one_interval_after_its_first_tick(tmp_path):
+    """The first automatic import comes one interval after start, so a demo reset leaves
+    the queued file for "Import queued files". Regression: it must not depend on the
+    machine's monotonic clock (a fresh machine once waited until the clock passed it)."""
     from adjud.paths import DataPaths
     from adjud.runner import Runner
 
@@ -98,12 +99,16 @@ def test_runner_checks_the_inbox_on_its_first_tick_then_on_its_interval(tmp_path
     runner = Runner(DataPaths(data))
     (data / "inbox").mkdir()
     shutil.copy(SCEN / "01_initial.csv", data / "inbox")
-    runner.tick(now=5.0)  # 5 s after boot
+    runner.tick(now=5.0)  # first tick, 5 s after boot: the timer starts, nothing imported
+    assert not runner.pipeline.store.list_cases()
+    runner.tick(now=60.0)  # before the 5-minute interval: still queued
+    assert (data / "inbox" / "01_initial.csv").exists()
+    runner.tick(now=5.0 + 300)  # one interval after the first tick
     assert len(runner.pipeline.store.list_cases()) == 11
     shutil.copy(SCEN / "03_updates.csv", data / "inbox")
-    runner.tick(now=60.0)  # before the 5-minute interval: not imported yet
+    runner.tick(now=5.0 + 400)
     assert (data / "inbox" / "03_updates.csv").exists()
-    runner.tick(now=5.0 + 300)
+    runner.tick(now=5.0 + 600)
     assert not (data / "inbox" / "03_updates.csv").exists()
 
 

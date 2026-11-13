@@ -139,9 +139,12 @@ class Runner:
         self.send_mail()
 
     def tick(self, now: float) -> None:
-        """One loop iteration at monotonic time `now`. The inbox is checked on the very
-        first tick and then every `inbox_poll_minutes`."""
-        if self.last_inbox is None or now - self.last_inbox >= self.inbox_poll_seconds:
+        """One loop iteration at monotonic time `now`. The inbox is checked every
+        `inbox_poll_minutes`, counted from the first tick: a file queued by a demo reset
+        stays for the data manager's "Import queued files" until one interval has passed."""
+        if self.last_inbox is None:
+            self.last_inbox = now
+        elif now - self.last_inbox >= self.inbox_poll_seconds:
             self.import_inbox()
             self.last_inbox = now
         self.take_uploads()
