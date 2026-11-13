@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 import theme
 from boxdraw import page_box
-from common import case_header, context, pipeline, processor, study_config
+from common import case_header, context, doc_label, pipeline, processor, study_config
 from preview import pdf_page, show_sheets
 
 from adjud.documents import documents_of, upload
@@ -104,9 +104,7 @@ if can_upload:
             label = st.selectbox(
                 f.name,
                 [None, *requested],
-                format_func=lambda r: (
-                    "Not specified" if r is None else r.replace("_", " ").capitalize()
-                ),
+                format_func=lambda r: "Not specified" if r is None else doc_label(r),
                 key=f"label_{cid}_{n}_{i}",
             )
             if label:
@@ -125,8 +123,8 @@ if can_upload:
 
 if can_upload:
     theme.quiet(
-        f"Or put one ZIP file with all the documents in the upload folder {cid} "
-        f"({pipe.paths.uploads / cid}). It is picked up within a minute."
+        f"Or put one ZIP file with all the documents in this case's upload folder, "
+        f"{cid}. It is picked up within a minute."
     )
 
 if store.state(cid).state == State.DEIDENTIFYING:
@@ -258,7 +256,10 @@ if reviewable:
                 column_config={
                     "id": None,
                     "category": None,
-                    "Keep": st.column_config.CheckboxColumn(help="Show this text again"),
+                    "Keep": st.column_config.CheckboxColumn(help="Show this text again", width=65),
+                    "Text": st.column_config.TextColumn(width=75),
+                    "Kind": st.column_config.TextColumn(width=140),
+                    "Where": st.column_config.TextColumn(width=70),
                 },
                 key=f"findings_{done['report']['path']}",
             )

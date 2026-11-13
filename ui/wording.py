@@ -75,15 +75,21 @@ def code_words(code: str) -> str:
     return {"Y": "Yes", "N": "No"}.get(code, code.replace("_", " ").capitalize())
 
 
-ROLE_NAMES = {
+ROLE_NAMES = {  # in demo order; the first is where the app opens (on AE import)
+    "data_manager": "Data manager",
     "site": "Site user",
     "safety_specialist": "Safety Specialist",
-    "data_manager": "Data manager",
 }
 
 
+def in_sentence(name: str) -> str:
+    """'Laboratory results' -> 'laboratory results'; 'ECG report' stays."""
+    name = name.replace("_", " ")
+    return name if name[1:2].isupper() else name[:1].lower() + name[1:]
+
+
 def doc_list(requested: list[str]) -> str:
-    names = [r.replace("_", " ") for r in requested]
+    names = [in_sentence(r) for r in requested]
     if len(names) <= 1:
         return "".join(names)
     return ", ".join(names[:-1]) + " and " + names[-1]

@@ -15,6 +15,7 @@ import yaml
 
 from adjud.intake import IntakePipeline
 from adjud.paths import DataPaths
+from adjud.qc import Checklist
 
 STUDY = "DEMO01"
 
@@ -79,6 +80,11 @@ def processor():
     return _processor(str(paths().root))
 
 
+def doc_label(type_: str) -> str:
+    """'ecg_report' -> 'ECG report', as the study's document checklist names it."""
+    return Checklist.for_study(paths().config, STUDY).label(type_)
+
+
 def study_config() -> dict[str, Any]:
     return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
 
@@ -106,7 +112,7 @@ def case_header(ctx: Context) -> None:
             ctx.role,
             cs.state,
             site=snap["site_id"],
-            requested=study_config().get("requested_documents", []),
+            requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
             ready=submission_status(pipe.store, ctx.case_id).ready,
             has_files=bool(documents_of(pipe.store, ctx.case_id).files),
         )

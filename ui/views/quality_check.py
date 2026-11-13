@@ -63,6 +63,11 @@ else:
             ),
             hide_index=True,
             width="stretch",
+            column_config={
+                "Check": st.column_config.TextColumn(width=400),
+                "Result": st.column_config.TextColumn(width=80),
+                "Details": st.column_config.TextColumn(width="large"),
+            },
         )
     proposals = [a for a in latest.get("ai", []) if a["status"] != "unavailable"]
     if proposals:
@@ -170,7 +175,7 @@ if dossier:
         file_name=f"{cid}_dossier_v{dossier['version']}.pdf",
         mime="application/pdf",
     )
-    theme.quiet(f"SHA-256 {dossier['dossier']['sha256'][:16]}…")
+    theme.quiet(f"SHA-256 {dossier['dossier']['sha256'].removeprefix('sha256:')[:16]}…")
 
 # --- narrative --------------------------------------------------------------------------------
 st.header("Narrative")
