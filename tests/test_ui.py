@@ -204,6 +204,8 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     next(b for b in at.button if b.label == "Sign decision").click().run()
     assert not at.exception, at.exception
     assert store.state(cid).state.value == "NARRATIVE"
+    assert any("Passed and signed by Anna Safety" in s.value for s in at.success)
+    assert "A person was needed:" in html_text(at)
 
     runner.run_case_steps()  # template draft
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)

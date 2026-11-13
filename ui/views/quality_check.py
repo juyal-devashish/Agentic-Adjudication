@@ -88,11 +88,24 @@ else:
         )
     if latest.get("reasons"):
         items = "".join(f"<li>{html.escape(r)}</li>" for r in latest["reasons"])
-        st.html(f"<p>Why a person is needed:</p><ul>{items}</ul>")
+        lead = "Why a person is needed" if state == State.QC_REVIEW else "A person was needed"
+        st.html(f"<p>{lead}:</p><ul>{items}</ul>")
+    for e in [e for e in events if e["type"] == "qc.signed_pass" and e["at"] >= rounds[-1]["at"]]:
+        note = f" Note: {e['reason']}" if e.get("reason") else ""
+        st.success(f"Passed and signed by {e['signature']['signer']}, {when(e)}.{note}")
+
+
+def by_whom(e: dict) -> str:
+    if e["actor"].startswith("system:"):
+        return "the automatic check"
+    if e["actor"].startswith("agent:"):
+        return "the AI agent, after code checked its answer"
+    return e["signature"]["signer"] if e.get("signature") else e["actor"]
+
 
 for e in [e for e in events if e["type"] == "query.opened"]:
     d = e["data"]
-    by = "the automatic check" if e["actor"].startswith("system:") else e["actor"]
+    by = by_whom(e)
     reasons = ", ".join(QUERY_CODES[c].lower() for c in d["codes"])
     st.info(f"Query sent {when(e)} by {by}: {reasons}. {d['text']}")
 
