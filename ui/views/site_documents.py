@@ -88,28 +88,42 @@ can_upload = is_site and cs.state in (
     State.QUERY_OPEN,
 )
 if can_upload:
-    with st.form("upload", clear_on_submit=True, border=False):
-        files = st.file_uploader(
-            "Add documents: PDF, scans (PNG, JPG, TIFF) or spreadsheets (XLSX), up to 50 MB each",
-            accept_multiple_files=True,
+    # A new uploader key after each upload empties it (st.file_uploader has no reset).
+    round_key = f"upload_round_{cid}"
+    n = st.session_state.get(round_key, 0)
+    files = st.file_uploader(
+        "Add documents: PDF, scans (PNG, JPG, TIFF) or spreadsheets (XLSX), up to 50 MB each",
+        accept_multiple_files=True,
+        key=f"uploader_{cid}_{n}",
+    )
+    labels: dict[str, str] = {}
+    if files:
+        st.caption(
+            "What is each file? Leave it as Not specified and the type is recognised "
+            "from the document."
         )
-        label = st.selectbox(
-            "What are they?",
-            [None, *requested],
-            format_func=lambda r: (
-                "Not specified" if r is None else r.replace("_", " ").capitalize()
-            ),
-        )
-        if st.form_submit_button("Add to case") and files:
-            names = upload(
-                store,
-                cid,
-                [(f.name, f.getvalue()) for f in files],
-                ctx.actor,
-                labels={f.name: label for f in files} if label else None,
+        for i, f in enumerate(files):
+            label = st.selectbox(
+                f.name,
+                [None, *requested],
+                format_func=lambda r: (
+                    "Not specified" if r is None else r.replace("_", " ").capitalize()
+                ),
+                key=f"label_{cid}_{n}_{i}",
             )
-            st.toast(f"Added {', '.join(names)} to the case")
-            wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
+            if label:
+                labels[f.name] = label
+    if st.button("Add to case", disabled=not files):
+        names = upload(
+            store,
+            cid,
+            [(f.name, f.getvalue()) for f in files],
+            ctx.actor,
+            labels=labels or None,
+        )
+        st.session_state[round_key] = n + 1
+        st.toast(f"Added {', '.join(names)} to the case")
+        wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
 
 if can_upload:
     theme.quiet(
