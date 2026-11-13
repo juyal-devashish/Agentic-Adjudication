@@ -49,15 +49,21 @@ if not is_site:
     )
 
 
-def apply_change(**change) -> None:
-    """Record a redaction change, then wait for the runner to redact again, so the page
-    shows the new version without a browser refresh (which would lose the chosen case)."""
-    change_redactions(store, cid, ctx.actor, **change)
-    with st.spinner("Removing identifiers again. This takes a few seconds."):
-        deadline = time.monotonic() + 30
+def wait_for_redaction(message: str, seconds: int) -> None:
+    """Wait for the runner to finish removing identifiers, then redraw, so the page shows
+    the result without a browser refresh (which would lose the chosen case). After
+    `seconds` the page redraws anyway and offers "Remove identifiers now"."""
+    with st.spinner(message):
+        deadline = time.monotonic() + seconds
         while store.state(cid).state == State.DEIDENTIFYING and time.monotonic() < deadline:
             time.sleep(1)
     st.rerun()
+
+
+def apply_change(**change) -> None:
+    """Record a redaction change, then wait for the runner to redact again."""
+    change_redactions(store, cid, ctx.actor, **change)
+    wait_for_redaction("Removing identifiers again. This takes a few seconds.", 30)
 
 
 # Once signed, files are fixed until a QC query reopens the case.
@@ -103,7 +109,7 @@ if can_upload:
                 labels={f.name: label for f in files} if label else None,
             )
             st.toast(f"Added {', '.join(names)} to the case")
-            st.rerun()
+            wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
 
 if can_upload:
     theme.quiet(
