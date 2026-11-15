@@ -54,18 +54,23 @@ else:
             [
                 {
                     "Check": c["label"],
-                    "Result": "Passed" if c["passed"] else "Failed",
+                    "Result": {"passed": "Passed", "failed": "Failed"}.get(
+                        c.get("status", ""), "Passed" if c["passed"] else "Not sure"
+                    ),
                     "Details": c.get("detail", ""),
                 }
                 for c in latest["checks"]
             ]
         )
         failed = int((checks["Result"] == "Failed").sum())
+        unsure = int((checks["Result"] == "Not sure").sum())
+        summary = [theme.status(f"{failed} failed", "bad")] if failed else []
+        summary += [theme.status(f"{unsure} not sure", "wait")] if unsure else []
         st.html(
             "<p>"
             + (
-                theme.status(f"{failed} of {len(checks)} checks failed", "bad")
-                if failed
+                f"{len(checks)} checks: " + ", ".join(summary)
+                if summary
                 else theme.status(f"All {len(checks)} checks passed", "good")
             )
             + "</p>"
@@ -73,7 +78,8 @@ else:
         st.dataframe(
             checks.style.map(
                 lambda v: (
-                    f"color: {theme.STATUS_INK['good' if v == 'Passed' else 'bad']}; "
+                    "color: "
+                    f"{theme.STATUS_INK[{'Passed': 'good', 'Failed': 'bad'}.get(v, 'wait')]}; "
                     "font-weight: 600"
                 ),
                 subset=["Result"],
@@ -110,10 +116,19 @@ else:
             hide_index=True,
             width="stretch",
         )
+    # The checks and agents propose; the Safety Specialist decides every case (P-37).
+    # Rounds from before P-37 carry a decision instead of a proposal.
+    proposal = latest.get("proposal")
+    if proposal:
+        word, ink = {
+            "pass": ("pass the quality check", "good"),
+            "query": ("send a query to the site", "bad"),
+            "unclear": ("none, the checks and the AI could not decide", "wait"),
+        }[proposal]
+        st.html(f"<p>Proposed by the checks and the AI: {theme.status(word, ink)}</p>")
     if latest.get("reasons"):
         items = "".join(f"<li>{html.escape(r)}</li>" for r in latest["reasons"])
-        lead = "Why a person is needed" if state == State.QC_REVIEW else "A person was needed"
-        st.html(f"<p>{lead}:</p><ul>{items}</ul>")
+        st.html(f"<p>Findings:</p><ul>{items}</ul>")
     ref = latest_manifest_ref(store, cid)
     documents = store.get_json(cid, ref["path"])["documents"] if ref else []
     if documents:
@@ -145,19 +160,32 @@ if state == State.QC_REVIEW:
     if not is_ss:
         st.write("Waiting for the Safety Specialist to decide.")
     else:
-        with st.form("qc_decision"):
+        # Pre-filled from the proposal; a check that failed in code allows only a query.
+        blocked = latest.get("failed_by_code") or []
+        options = ["query"] if blocked else ["pass", "query"]
+        if blocked:
+            st.caption("A check failed, so this round can only end in a query to the site.")
+        drafted = latest.get("proposal") == "query"
+        with st.form(f"qc_decision_{latest['round']}"):
             decision = st.radio(
                 "Your decision",
-                ["pass", "query"],
+                options,
+                index=options.index("query") if drafted or blocked else 0,
                 format_func={
                     "pass": "The documents are complete and fit for adjudication",
                     "query": "Send a query to the site",
                 }.get,
             )
             codes = st.multiselect(
-                "Query reasons (for a query)", list(QUERY_CODES), format_func=QUERY_CODES.get
+                "Query reasons (for a query)",
+                list(QUERY_CODES),
+                default=latest.get("query_codes") or [],
+                format_func=QUERY_CODES.get,
             )
-            text = st.text_area("Message to the site (for a query)")
+            text = st.text_area(
+                "Message to the site (for a query)",
+                " ".join(f"{r}." for r in latest.get("reasons", [])) if drafted else "",
+            )
             reason = st.text_input("Note for the audit trail (optional for a pass)")
             password = st.text_input(
                 f"Password for {ctx.user['name']} (demo password: demo)", type="password"
@@ -217,10 +245,17 @@ elif state == State.NARRATIVE_REVIEW and drafts:
     reasons = next((x["data"]["reasons"] for x in reversed(events)
                     if x["type"] == "narrative.review_needed"), [])  # fmt: skip
     if source == "template":
-        st.write("Drafted from the study template. Complete it from the dossier.")
+        why = f" ({'; '.join(reasons)})" if reasons else ""
+        st.write(f"Drafted from the study template{why}. Complete it from the dossier.")
     else:
         label = "Simulated AI" if drafts[-1]["data"].get("simulated") else "AI"
-        st.write(f"Drafted by {label}. It needs a person because: {'; '.join(reasons)}.")
+        if reasons:
+            st.write(f"Drafted by {label}. Code found problems: {'; '.join(reasons)}.")
+        else:
+            st.write(
+                f"Drafted by {label}. Every quote was found on the dossier page it cites. "
+                "Check the facts against the dossier, edit if needed, and sign."
+            )
     st.caption("Every statement must come from the dossier. No opinion on cause, no "
                "adjudication wording, nothing that reveals allocation.")  # fmt: skip
     if not is_ss:

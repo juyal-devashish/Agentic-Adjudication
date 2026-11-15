@@ -2,7 +2,7 @@
 
 What happens to an adverse event (AE), step by step, from the EDC to a package ready for adjudication. For each step: what triggers it, which component does it, who or what acts, and where AI and the Anthropic API come in.
 
-The design rule behind it ([plan §2](plan-mvp.md#2-autonomy-model)): **agents do the work, code checks every agent answer before it can move a case, and people sign and handle exceptions.** Everything below runs with AI off as well; the steps marked *AI* then go to a person.
+The design rule behind it ([plan §2](plan-mvp.md#2-autonomy-model)): **agents do the work, code checks every agent answer before it is used, and people do every step that needs medical judgement (P-37), sign, and handle exceptions.** Everything below runs with AI off as well; the steps marked *AI* then go to a person.
 
 Synthetic data only. Nothing here is validated or Part 11 / Annex 11 compliant; it shows the mechanics.
 
@@ -24,10 +24,10 @@ Synthetic data only. Nothing here is validated or Part 11 / Annex 11 compliant; 
 | 12 | Handoff to Flow 2 | Site signed | `adjud/handoff.py` | Code: `flow2_manifest.json` with redacted files and hashes, never originals | None |
 | 13 | Quality checks | Manifest written | `adjud/qc.py` | Code: readable, no identifiers left, document types, required documents, same patient, subject ID and onset date | None |
 | 14 | What code cannot tell | A check is unknown | `adjud/flow2.py` | *Agent*: document type of an untitled letter; whether the documents describe this event | *AI-2 and event match*, through `adjud/ai/gateway.py`; each answer passes `adjud/ai/gates.py` (quotes found on the page, confidence, allowed values) or goes to a person |
-| 15 | QC decision | Checks done | `adjud/flow2.py` | Code: all passed → passes; a clear failure → **query to the site**, back to step 7; otherwise the **Safety Specialist** decides and signs | Uses only gated agent answers |
+| 15 | QC decision | Checks done | `adjud/flow2.py` | Code proposes: all passed → pass; a failure → query, with its reasons; otherwise no proposal. The **Safety Specialist** decides and signs every case: pass, or a **query to the site** (back to step 7). A check that failed in code can only end in a query | Uses only gated agent answers, as a proposal |
 | 16 | Dossier | QC passed | `adjud/dossier.py` | Code: cover, EDC summary, documents in checklist order, subject ID on every page, hashed | None |
-| 17 | Narrative | Dossier built | `adjud/flow2.py` | *Agent* writes facts-only statements, each quoting a dossier page; code approves it if every quote is found and no forbidden wording is used; otherwise the **Safety Specialist** edits and signs | *AI-4*, gated; with AI off a template is filled and a person completes it |
-| 18 | Handoff to Flow 3 | Narrative approved | `adjud/flow2.py` | Code: `flow3_manifest.json` (dossier, narrative, QC results, hashes); Safety Specialist notified | None |
+| 17 | Narrative | Dossier built | `adjud/flow2.py` | *Agent* writes facts-only statements, each quoting a dossier page; code checks every quote and the wording. The **Safety Specialist** checks the draft against the dossier, edits it and signs, on every case | *AI-4*, gated; with AI off a template is filled and a person completes it |
+| 18 | Handoff to Flow 3 | Narrative signed | `adjud/flow2.py` | Code: `flow3_manifest.json` (dossier, narrative, QC results, hashes); Safety Specialist notified | None |
 
 Every step appends a hash-chained event to the case's `events.jsonl`; `tools/verify_log` detects any edited event or changed file.
 
@@ -35,7 +35,7 @@ Every step appends a hash-chained event to the case's `events.jsonl`; `tools/ver
 
 - **Site:** uploads, reviews the redacted pages and signs the submission. The signature stays human.
 - **Data manager:** imports or pulls the AE records.
-- **Safety Specialist:** only on exceptions: a QC round code and agents could not decide, an agent answer that failed its check, a narrative that failed its check.
+- **Safety Specialist:** on every case, twice (P-37): signs the QC pass or sends the query, then checks, edits and signs the narrative. Both screens arrive pre-filled by code and the agents.
 
 ## AI and the API
 

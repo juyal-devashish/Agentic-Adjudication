@@ -9,8 +9,10 @@ sign; everything else is the runner). All runs share one usage ledger, so the st
 budget cap covers the whole evaluation. The report, written to
 data/metrics/ai_eval/<timestamp>.json and latest.json, gives per run and per case:
 
-  - the outcome (final state, QC decision, who approved the narrative) against the
-    expected one: kit cases from the replay demo, fixtures from make_flow2_fixtures
+  - the outcome (final state, QC proposal, who signed the narrative) against the
+    expected one: kit cases from the replay demo, fixtures from make_flow2_fixtures.
+    The Safety Specialist decides every case (P-37); here a stand-in signs each proposed
+    pass so the narrative agent runs too
   - every agent call: valid or not, the gate's verdict and reasons, cost, latency
   - repeatability: per agent input, whether every run gave the same answer (document
     type, event verdict) or passed the gate (narrative)
@@ -31,7 +33,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from tools.simulate_ai import KIT, REPLAYS, ROOT, _submit_and_check
+from tools.simulate_ai import KIT, REPLAYS, ROOT, _submit_and_check, sign_proposed_passes
 
 HUMAN = ("site", "dm.", "safety")
 # What the replay demo shows for the kit cases (README, tests/test_demo_script.py)
@@ -67,11 +69,13 @@ def _demo(tmp: Path, ledger: Path):
 def _settle(runner, ticks: int = 6) -> None:
     for _ in range(ticks):
         runner.run_case_steps()
+        sign_proposed_passes(runner)
 
 
 def _case_report(store, cid: str, label: str, expected: str) -> dict[str, Any]:
     events = store.events(cid)
-    decisions = [e["data"].get("decision") for e in events if e["type"] == "qc.checks_completed"]
+    decisions = [e["data"].get("proposal", e["data"].get("decision"))
+                 for e in events if e["type"] == "qc.checks_completed"]  # fmt: skip
     calls = []
     gates = {e["data"]["call"]["path"]: e["data"] for e in events
              if e["type"] == "ai.gate" and e["data"].get("call")}  # fmt: skip
@@ -135,7 +139,7 @@ def one_run(tmp: Path, ledger: Path) -> list[dict[str, Any]]:
         runner = _demo(tmp / scenario, ledger)
         cid = _submit_and_check(runner, key, sorted((fixtures / scenario).iterdir()))
         _settle(runner)
-        expected = exp.get("with_ai", exp)["decision"]
+        expected = exp.get("with_ai", exp)["proposal"]
         cases.append(_case_report(runner.pipeline.store, cid, f"fixture:{scenario}", expected))
     return cases
 

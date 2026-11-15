@@ -13,7 +13,7 @@
 
 > An AE file arrives → eligible records become cases, every "no" explained → the case gets its own upload folder and the site is e-mailed → the site drops one ZIP → identifiers are removed (rules plus an AI detector on scans) and verified by code → the site reviews, draws boxes over anything missed, and signs → **an AI agent runs QC**: required documents, readability, residual PHI, document type, documents match the subject and the event → the dossier is built → **an AI agent drafts the narrative**, every sentence cited and checked by code → the case is ready for adjudication (Flow 3) and the Safety Specialist is e-mailed. A person is asked only when an agent's result fails a code gate.
 
-The project's aim is to **minimise the people needed in the whole process.** Every new step is designed agent-first, with the human as the exception path.
+The project's aim is to **minimise the people needed in the whole process.** Every new step is designed agent-first. Since P-37, a step that needs a medical specialist's judgement stays with a person on every case; agents do the work before and between those steps and prepare each decision.
 
 **Until the API key arrives** everything runs in one of two modes: AI off (deterministic checks, humans handle what needs judgement) or replay (recorded agent outputs, clearly labelled *simulated*). Switching to live is a config change plus an environment variable, not new code.
 
@@ -24,8 +24,8 @@ This replaces the old rule "no AI in any handover". It is the design rule for ev
 | Who | Does | Never does |
 |---|---|---|
 | **Agents** (Claude, through `adjud/ai/gateway.py`) | Read documents, classify, check against the EDC, find extra PHI, draft the narrative, propose a decision with reasons and citations. Agents act by **calling local tools** (our deterministic functions), never by touching files | Remove a PHI finding; change a signed or locked file; send unredacted content anywhere except the AI-1 detector on synthetic data |
-| **Code gates** (deterministic) | Decide whether an agent's proposal may move the case: output valid against its schema, every citation verified in the text, confidence at or above the study's threshold, every deterministic check passed. Pass → the runner appends the transition with actor `agent:<function>` and the call ID. Fail → an exception task for a person | Accept an unverified citation or a schema-invalid output |
-| **People** | Site: upload, review, draw boxes, **sign the submission** (kept by the meeting). Safety Specialist: **exceptions only** (gate failures, overrides, on-hold). Data manager: AE import | Routine approvals that a gate can make |
+| **Code gates** (deterministic) | Decide whether an agent's answer may be used: output valid against its schema, every citation found in the text, confidence at or above the study's threshold, every deterministic check passed. Pass → the answer fills in the QC check or becomes the narrative draft, shown to the Safety Specialist as a proposal. Fail → the answer is shown with the gate's reasons. Since P-37 no gate moves a case past a medical judgement | Accept an unverified citation or a schema-invalid output |
+| **People** | Site: upload, review, draw boxes, **sign the submission** (kept by the meeting). Safety Specialist, **on every case** (P-37): sign the QC result or send the query, and edit and sign the narrative. Data manager: AE import | Work that needs no medical judgement and that code or an agent can do |
 
 Rules that do not change:
 
@@ -72,7 +72,7 @@ Change any of these by editing this table first.
 | # | Decision | Value | Source |
 |---|---|---|---|
 | P-23 | Scope | Flows 1 and 2. Flow 2 ends at `READY_FOR_ADJUDICATION` with a handoff manifest for Flow 3 | User |
-| P-24 | Autonomy | Agents act, code gates decide, people handle exceptions (§2) | User |
+| P-24 | Autonomy | Agents act, code gates decide, people handle exceptions (§2). *Narrowed by P-37: steps that need medical judgement are always done by a person* | User |
 | P-25 | AE import role | **Data manager** replaces study admin (import and manual entry). The study admin role is removed | Meeting, user |
 | P-26 | Model | Pinned in `study.yaml`. First `claude-haiku-5-5` (small, tested on a personal key); since 2026-11-12 `claude-opus-5-5`, the originally intended model, on the company key: every narrative passes its gate (Haiku 18 of 25), at about 20 times the cost (step 22 results) | Checklist |
 | P-27 | AI provider modes | `off` / `replay` / `live` in `study.yaml`. `live` also needs `ANTHROPIC_API_KEY`; without it the gateway falls back to `off` and says so | Plan |
@@ -81,10 +81,11 @@ Change any of these by editing this table first.
 | P-30 | Manual redaction | The site drags a box on the page preview (Streamlit's box selection on a Plotly chart). The box applies to that page of that file; text and pixels under it are removed and verification re-runs. Spreadsheets keep "black out this text" | User |
 | P-31 | Upload flow | On case creation the runner makes `uploads/<case-id>/`. The site drops **one ZIP**; a complete ZIP is the "upload finished" signal (code, not AI). The folder can sit in a OneDrive-synced directory (`ADJUD_UPLOAD_DIR`) to stand in for SharePoint. The UI upload stays as a second route | Meeting |
 | P-32 | Same-patient check | Deterministic first: identifiers learned from each document of a case (name, DOB, MRN) must agree across documents; event term and dates must appear near the EDC onset. The AI agent adds a judgement with citations for unclear cases. A mismatch is a QC finding, not a block on upload | Demo discussion |
-| P-33 | Flow 2 sign-offs | QC pass and narrative approval are **automated decisions** when every gate passes. The Safety Specialist signs only on exceptions or overrides. *Confirm with the team; spec.md QC-06 and NAR-04 had the SS sign every case* | P-24 |
+| P-33 | Flow 2 sign-offs | ~~QC pass and narrative approval are automated decisions when every gate passes~~ *Superseded by P-37* | P-24 |
 | P-34 | "Pull data from EDC" | A demo tab that copies the mock EDC export into the import queue. No integration | Meeting (optional) |
 | P-35 | No redaction tracker | No separate list of redacted or mapped values; the approval process and the audit log are enough; the site keeps its original | Meeting |
-| P-36 | QC pass without AI | When every deterministic check passes, QC passes automatically (`system:qc`); a check that fails for a clear reason sends a query to the site automatically; only what code cannot tell goes to the QC agent, then a person | Plan (P-24) |
+| P-36 | QC pass without AI | ~~When every check passes, QC passes automatically; a clear failure sends a query automatically~~ *Superseded by P-37*. Still true: only what code cannot tell goes to the QC agent | Plan (P-24) |
+| P-37 | Manual steps stay manual | Every step the deck marks as manual, and anything that needs a medical specialist's judgement, is done by a person on every case. AI covers the work between them. In Flow 2 every case stops twice for the Safety Specialist: **QC review** (the checks and the agents' answers are a proposal, shown pre-selected; the Safety Specialist signs the pass or sends the query, spec QC-05 to QC-07) and **narrative review** (the AI or template draft is pre-filled; the Safety Specialist edits and signs it, NAR-04). No query goes to the site without the Safety Specialist's signature. A signed pass is refused while a required check has failed, so a clear failure still always becomes a query, as before. Cases on disk with the earlier automated `qc.passed` or `narrative.approved` still replay | User (2026-11-15, after talking to his manager) |
 
 ## 5. How we work
 
@@ -271,6 +272,18 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [ ] Live rehearsal by the presenter
 
 **Result:** screenshots of every page, including the Quality check page and the eight-step rail, at desktop and phone width (`tools/screenshots.py`, now in replay mode). They showed one misleading message, "AI is off" in replay mode when no answer was recorded; fallbacks now give the gateway's own reason.
+
+### Step 24 — Safety Specialist signs every case (P-37) ✅
+
+- [x] Plan: P-37 recorded, §2 rewritten
+- [x] QC: the round's outcome (pass, query or unclear) is stored as a proposal; the case always goes to `QC_REVIEW`; no unsigned query; no signed pass while a required check has failed
+- [x] Narrative: the AI draft (gate result shown) or the template always goes to `NARRATIVE_REVIEW`
+- [x] Quality check page: decision and query reasons pre-selected from the proposal; wording says what the AI did, not that it decided
+- [x] Tests, fixtures' expected proposals, `tools.ai_eval`, docs (AGENTS.md, CLAUDE.md, process, demo guide, README) updated
+
+**Done when:** in replay mode no case reaches `READY_FOR_ADJUDICATION` without `qc.signed_pass` and `narrative.signed`, every `query.opened` carries a signature, and the full kit and test suite pass.
+
+**Result** (2026-11-15): every QC round now ends at QC review with a proposal; queries carry the Safety Specialist's signature; a check failed in code cannot be signed as passed; every narrative is signed by a person, and a signed AI draft keeps its simulated label. The replay demo reaches adjudication with three signatures (site, QC, narrative). The recorded agent answers still match, because the agents' inputs did not change. Full test suite and kit green; the 11 cases already on disk rebuild unchanged.
 
 ---
 

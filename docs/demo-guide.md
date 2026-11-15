@@ -23,16 +23,16 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - Tick a wrongly removed item and give a reason to undo it.
    - Drag a box over anything missed.
    - Sign with the password `demo`.
-5. **Flow 2.** Nobody acts after the signature:
-   - Code runs the quality checks.
-   - Agents answer what code can't tell, and code checks each answer.
-   - The dossier is built and the agent writes the narrative, with every quote verified by code.
-   - The case becomes ready for adjudication.
-   - Show *Quality check* and *Case record*: the audit trail, notifications, and the AI calls with their cost.
+5. **Flow 2.** After the site's signature, code and the agents prepare everything; the Safety Specialist makes the two medical calls (P-37):
+   - Code runs the quality checks, and agents answer what code can't tell, each answer checked by code.
+   - As *Anna Safety*, follow **Review the quality check**. The page proposes *pass*, with the checks and the documents as submitted. Sign the decision (password `demo`).
+   - The dossier is built and the agent drafts the narrative, every quote checked by code. Allow about 30 seconds with live AI.
+   - Follow **Complete the narrative**: check the draft against the dossier, edit if needed, and sign. The case becomes ready for adjudication.
+   - Show *Case record*: three signatures in the audit trail (site, QC, narrative), the notifications, and the AI calls with their cost.
 6. **Exceptions.**
-   - Reset, then upload a scenario from `data/demo_uploads/flow2/` into DEMO01-0001 and sign. `missing_document`, `wrong_patient` and `unreadable` send the site a query; the site answers by uploading again and signing.
-   - `different_event`: the agent spots that the documents describe an earlier episode and queries the site itself. No person is involved.
-   - **Low confidence goes to a person.** As *Site 102 Coordinator*, upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0005 and sign. The agent is not sure about the poor-quality scan, so the case goes to Anna Safety. On *Quality check* she passes it, and the agent writes the narrative.
+   - Reset, then upload a scenario from `data/demo_uploads/flow2/` into DEMO01-0001 and sign. `missing_document`, `wrong_patient` and `unreadable` arrive at Anna with a query proposed and pre-filled; a check that failed in code can't be passed, so she sends the query. The site answers by uploading again and signing.
+   - `different_event`: the agent spots that the documents describe an earlier episode and proposes a query, quoting the documents. Anna decides whether to send it.
+   - **Low confidence gets no proposal.** As *Site 102 Coordinator*, upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0005 and sign. The agent is not sure about the poor-quality scan, so Anna gets the case without a proposal. She passes it, and the agent drafts the narrative for her to sign.
    - If Anna writes a narrative herself, it can only be signed once the template's [bracketed] instruction is replaced.
 7. **Not built:** a live EDC connection, real logins, DICOM redaction, Flows 3 and 4, and anything for real patient data.
 

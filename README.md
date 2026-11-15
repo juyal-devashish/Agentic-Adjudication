@@ -31,9 +31,9 @@ Today this is mostly done by hand, in spreadsheets and e-mail, and it takes days
 
 **Agentic Adjudication automates that preparation.** It is built on one rule:
 
-> **Agents do the work. Deterministic code decides whether an agent's answer may move a case. People sign, and handle the exceptions.**
+> **Agents do the work between the people's steps. Deterministic code decides whether an agent's answer can be used. Anything that needs medical judgement is done and signed by a person.**
 
-An AI answer never moves a case on its own. It must match its schema, every quote it cites must be found on the page it names, its confidence must reach the study's threshold, and every rule check must pass. Otherwise a person gets a task. The site's submission and every adjudication decision stay human electronic signatures.
+An AI answer never moves a case on its own. It must match its schema, every quote it cites must be found on the page it names, its confidence must reach the study's threshold, and every rule check must pass; otherwise it is shown with the reasons it failed. A usable answer prepares the person's step: the Safety Specialist signs the quality check (or the query to the site) and the narrative on every case. The site's submission and every adjudication decision stay human electronic signatures.
 
 ## Product vision
 
@@ -71,7 +71,7 @@ flowchart LR
 | | Flow | Status |
 |---|---|---|
 | 1 | **Intake:** rule-based case creation, document collection, de-identification, site sign-off | ✅ Built, demonstrated, passes its acceptance kit |
-| 2 | **Quality check and narrative:** automatic QC with agents, site queries, dossier, cited narrative | ✅ Built, evaluated live on the Claude API |
+| 2 | **Quality check and narrative:** QC checks and agents, prepared for the Safety Specialist's signature, site queries, dossier, cited narrative | ✅ Built, evaluated live on the Claude API |
 | 3 | **Adjudication:** blinded reviews, disagreement and consensus | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.5–6.6 |
 | 4 | **Outcome:** derived outcome, EDC export, re-adjudication | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.7–6.8 |
 
@@ -95,11 +95,12 @@ sequenceDiagram
     R->>R: Quality checks
     R->>AG: Only what code cannot decide
     AG->>G: Answer with quotes and confidence
-    G-->>R: Pass: move the case (actor agent:qc)
-    G-->>SS: Fail: exception task
+    G-->>SS: Checks and answers as a proposal: pass, query, or unclear
+    SS->>R: Sign the QC pass, or sign a query to the site
     R->>AG: Write the narrative from the dossier
     AG->>G: Statements, each quoting a dossier page
-    G-->>R: Every quote found, no forbidden wording: approve
+    G-->>SS: Draft, with every quote checked
+    SS->>R: Check, edit and sign the narrative
     R->>R: Hashed package for adjudication
 ```
 
@@ -122,9 +123,9 @@ The step-by-step table, with the trigger, component and actor for each step, is 
 **Quality check and narrative (Flow 2)**
 - Six deterministic checks: readable, no identifiers left, document types, required documents by event type, same patient, and subject ID and onset date.
 - **Agents only on what code cannot decide:** the type of a letter with no title, and whether the documents describe this event.
-- **Automatic queries** to the site for clear failures, for example a missing ECG, another patient's document, an unreadable scan or a different event.
+- **Proposed queries** for clear failures, for example a missing ECG, another patient's document, an unreadable scan or a different event: pre-filled for the Safety Specialist, who signs every QC decision. A check that failed in code can only end in a query.
 - A **dossier** in PDF form: cover, EDC summary, then the documents in checklist order, with the subject ID on every page, bookmarks, a page map and a SHA-256.
-- A **narrative agent** writes facts-only statements, each quoting a dossier page. Code approves it only if every quote is found and no forbidden wording (causality, relatedness, allocation) is used.
+- A **narrative agent** drafts facts-only statements, each quoting a dossier page. Code checks that every quote is found and no forbidden wording (causality, relatedness, allocation) is used; the Safety Specialist checks, edits and signs the narrative on every case.
 - A versioned, hashed **Flow 3 handoff manifest**. It never lists anything from `documents/original/`.
 
 **Platform**
@@ -167,7 +168,7 @@ All results are on synthetic data.
 | Cost | **≈ $0.30 per full demo run**, $0.02–0.06 per case (on Haiku 5.5: $0.014 per run) |
 | Median latency | document type 4 s · event match 8 s · narrative 10 s |
 | Repeatability | Document type and event verdicts identical in 5 of 5 runs; 25 / 25 narratives pass their citation check |
-| Autonomy | 4 of 6 kit cases reach adjudication with only the site's signature. One is queried automatically for missing documents; one goes to a person because the agent's confidence on a poor-quality scan was 0.6–0.7 |
+| Proposals | 4 of 6 kit cases get a pass proposal and one a query for missing documents; one gets no proposal because the agent's confidence on a poor-quality scan was 0.6–0.7. (Measured before P-37, when a pass proposal moved the case on its own; the Safety Specialist now signs every case) |
 | Bug found by the evaluation | Citations from scanned pages were not being verified correctly. Fixed: 25 / 25 narratives pass |
 
 How these were measured: `tools/deid_check.py` and `tools/ai_eval.py`, with details in [docs/plan-mvp.md](docs/plan-mvp.md), step 22.
