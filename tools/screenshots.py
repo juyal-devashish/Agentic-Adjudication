@@ -67,14 +67,21 @@ def prepare(data: Path) -> dict[str, str]:
     )
     runner.run_case_steps()
     submit(pipe.store, done, "site101.coord", "demo", paths.config)
-    for _ in range(4):  # Flow 2: QC, dossier and narrative, handoff to Flow 3
+    from adjud.flow2 import Flow2
+
+    flow2 = Flow2(pipe.store, paths.config)
+    for _ in range(2):  # Flow 2: handoff, QC round
         runner.run_case_steps()
+    flow2.sign_qc_pass(done, "ss.anna", "demo")  # the Safety Specialist's two sign-offs (P-37)
+    runner.run_case_steps()  # dossier and narrative draft
+    draft = next(e for e in pipe.store.events(done) if e["type"] == "narrative.drafted")
+    text = pipe.store.get_file(done, draft["data"]["draft"]["path"]).decode()
+    flow2.sign_narrative(done, "ss.anna", "demo", text)
+    runner.run_case_steps()  # handoff to Flow 3
 
     # The Safety Specialist's decision screens and a site's open query: documents without
     # a subject ID, so no check or recorded agent answer can decide and a person must.
     import pymupdf
-
-    from adjud.flow2 import Flow2
 
     def to_qc_review(key: str, site_user: str) -> str:
         cid = pipe.case_for(key)
@@ -93,7 +100,6 @@ def prepare(data: Path) -> dict[str, str]:
             runner.run_case_steps()
         return cid
 
-    flow2 = Flow2(pipe.store, paths.config)
     qc_review = to_qc_review("DEMO01|DEMO01-101-0002|AE-002", "site101.coord")
     query = to_qc_review("DEMO01|DEMO01-102-0003|AE-003", "site102.coord")
     flow2.open_query(query, ["missing_document"], "Please upload the ECG report.",
