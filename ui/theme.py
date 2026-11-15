@@ -66,10 +66,11 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
   list-style: none; padding: 0 !important; margin: 1rem 0 .25rem 0 !important;
   counter-reset: step; }
 @media (max-width: 900px) { .adj-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .adj-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .adj-rail li { margin: 0 !important; }
 .adj-rail li { counter-increment: step; font-size: .875rem; line-height: 1.25;
   padding: .35rem .45rem; color: #5A6B78; border-top: 3px solid #C9D3D9;
-  hyphens: auto; overflow-wrap: anywhere; }
+  hyphens: auto; }
 .adj-rail li::before { content: counter(step) "  "; font-weight: 700; }
 .adj-rail li.done { color: #1C2833; border-top-color: #1C2833; }
 .adj-rail li.now { background: #000; color: #fff; border-top-color: #000; font-weight: 600; }
