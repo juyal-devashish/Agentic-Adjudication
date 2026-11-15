@@ -68,11 +68,19 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     started = next(e for e in store.events(cid) if e["type"] == "qc.started")
     assert started["data"]["manifest"]["path"] == "handoff/flow2_manifest.json"
     runner.run_case_steps()  # QC round 1: a cardiac event needs an ECG report
+    assert state(store, cid) == State.QC_REVIEW  # proposed, not sent (P-37)
+    proposal = store.get_json(cid, "qc/checks_v1.json")
+    assert proposal["proposal"] == "query" and proposal["query_codes"] == ["missing_document"]
+    assert "qc_review_needed" in templates(store)
+    with pytest.raises(Flow2Refused, match="send a query"):  # a clear failure is never passed
+        flow2.sign_qc_pass(cid, SS, "demo")
+    flow2.open_query(cid, proposal["query_codes"], " ".join(proposal["reasons"]),
+                     user_id=SS, password="demo")  # fmt: skip
     assert state(store, cid) == State.QUERY_OPEN
     query = query_of(store, cid)
     assert query["codes"] == ["missing_document"] and "ECG report" in query["text"]
     opened = next(e for e in store.events(cid) if e["type"] == "query.opened")
-    assert opened["actor"] == "system:qc"  # no person was needed to send it
+    assert opened["actor"] == SS and opened["signature"]["signer"] == "Anna Safety"
     assert "query_opened" in templates(store)
 
     # The site answers through Flow 1 again; a new manifest version is handed off.
@@ -117,15 +125,15 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     assert not any(r.changed for r in rebuild_all(store.paths, write=False))
 
 
-def test_automatic_query_only_during_the_checks(submitted):
+def test_a_query_needs_the_safety_specialist_at_qc_review(submitted):
     runner, store, cid = submitted
     runner.run_case_steps()
     assert state(store, cid) == State.QC_CHECKS
-    with pytest.raises(Flow2Refused):  # no results yet in this round
-        runner.flow2.open_query(cid, ["missing_document"], "x")
+    with pytest.raises(Flow2Refused, match="not waiting for a QC review"):  # still checking
+        runner.flow2.open_query(cid, ["missing_document"], "x", user_id=SS, password="demo")
     runner.run_case_steps()
-    with pytest.raises(Flow2Refused, match="only possible during the checks"):
-        runner.flow2.open_query(cid, ["missing_document"], "x")
+    assert state(store, cid) == State.QC_REVIEW
+    assert not any(e["type"] == "query.opened" for e in store.events(cid))
 
 
 def test_documents_cannot_change_after_signing_until_a_query(submitted):

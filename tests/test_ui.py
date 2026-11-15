@@ -212,7 +212,7 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     assert not at.exception, at.exception
     assert store.state(cid).state.value == "NARRATIVE"
     assert any("Passed and signed by Anna Safety" in s.value for s in at.success)
-    assert "A person was needed:" in html_text(at)
+    assert "Findings:" in html_text(at)
 
     runner.run_case_steps()  # template draft
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
@@ -255,7 +255,12 @@ def test_quality_check_page_shows_ai_proposals(demo, monkeypatch, tmp_path):
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
     table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
     assert table.iloc[0]["Source"] == "AI" and table.iloc[0]["Accepted"] == "Yes"
-    assert any("fracture" in i.value for i in at.info)  # the query the agent sent
+    # The agent's verdict is a proposal: the query is pre-filled, a person sends it (P-37).
+    assert "send a query to the site" in html_text(at)
+    assert next(r for r in at.radio if r.label == "Your decision").value == "query"
+    message = next(a for a in at.text_area if a.label.startswith("Message to the site"))
+    assert "fracture" in message.value
+    assert not at.info  # nothing has been sent to the site yet
 
 
 def test_a_site_sees_only_its_own_subjects_on_every_page(demo):

@@ -135,14 +135,15 @@ def next_step(
         State.SUBMITTED: "Signed by the site. The quality check starts automatically.",
         State.QC_CHECKS: "The quality check is running.",
         State.QC_REVIEW: (
-            "The automatic quality check could not decide. Review it on the Quality check page."
+            "The checks and the AI have prepared the quality check. Review it, then pass it "
+            "or send a query."
             if role == "safety_specialist"
             else "Waiting for the Safety Specialist to review the quality check."
         ),
         State.QUERY_OPEN: f"Waiting for site {site} to answer the query.",
         State.NARRATIVE: "The narrative is being drafted.",
         State.NARRATIVE_REVIEW: (
-            "Complete and sign the narrative on the Quality check page."
+            "The narrative draft is ready. Check it against the dossier, then sign it."
             if role == "safety_specialist"
             else "Waiting for the Safety Specialist to sign the narrative."
         ),

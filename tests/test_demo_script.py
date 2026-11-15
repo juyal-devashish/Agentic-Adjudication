@@ -191,10 +191,12 @@ def test_11_tamper_detected_and_state_rebuilt(demo):
 
 
 def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
-    """The Flows 1+2 demo (README): a site drops one ZIP and, with the recorded agent
-    answers, the case reaches adjudication with only the site's people in its audit
-    trail. A case whose letter has no title is typed by the agent, but the recorded live
-    answer is unsure (confidence 0.6), so the gate hands it to the Safety Specialist."""
+    """The Flows 1+2 demo (README): a site drops one ZIP; code and the recorded agent
+    answers do the work between the people's steps, and the case reaches adjudication
+    with exactly three signatures in its audit trail: the site's submission, the Safety
+    Specialist's QC pass and the narrative the AI drafted and the Safety Specialist signed
+    (P-37). A case whose letter has no title is typed by the agent, but the recorded live
+    answer is unsure (confidence 0.6), so the Safety Specialist gets no proposal."""
     import io
     import zipfile
 
@@ -231,10 +233,24 @@ def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
     for cid, site in cases.items():
         assert store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
         submit(store, cid, site, "demo", paths.config)  # the one human signature
-    for _ in range(4):  # handoff, QC (+ agents), dossier + narrative, Flow 3 handoff
+    for _ in range(2):  # handoff, QC (+ agents)
         runner.run_case_steps()
     (ae001, site), (ae005, _) = cases.items()
+    assert store.state(ae001).state == State.QC_REVIEW  # every case waits for a person
+    assert store.get_json(ae001, "qc/checks_v1.json")["proposal"] == "pass"
+    flow2 = runner.flow2
+    flow2.sign_qc_pass(ae001, "ss.anna", "demo")
+    runner.run_case_steps()  # dossier + AI narrative draft
+    assert store.state(ae001).state == State.NARRATIVE_REVIEW
+    draft = next(e for e in store.events(ae001) if e["type"] == "narrative.drafted")
+    assert draft["data"]["source"] == "ai"
+    text = store.get_file(ae001, draft["data"]["draft"]["path"]).decode()
+    flow2.sign_narrative(ae001, "ss.anna", "demo", text)
+    runner.run_case_steps()  # Flow 3 handoff
     assert store.state(ae001).state == State.READY_FOR_ADJUDICATION
+    signed = [e["type"] for e in store.events(ae001) if e.get("signature")]
+    assert signed == ["submission.signed", "qc.signed_pass", "narrative.signed"]
     people = {e["actor"] for e in store.events(ae001)} - {"system:upload-folder"}
-    assert {a for a in people if not a.startswith(("system:", "agent:"))} == {site}
-    assert store.state(ae005).state == State.QC_REVIEW  # an exception for a person
+    assert {a for a in people if not a.startswith("system:")} == {site, "ss.anna"}
+    assert store.state(ae005).state == State.QC_REVIEW
+    assert store.get_json(ae005, "qc/checks_v1.json")["proposal"] == "unclear"

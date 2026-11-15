@@ -1,5 +1,6 @@
 """Deterministic QC checks (plan step 14) on the Flow 2 fixtures, end to end through the
-runner: each scenario gets the decision written in its expected.json."""
+runner: each scenario gets the proposal written in its expected.json, and every case
+then waits for the Safety Specialist (P-37)."""
 
 from __future__ import annotations
 
@@ -50,26 +51,46 @@ def run_scenario(tmp_path: Path, fixtures: Path, scenario: str):
     return store, cid
 
 
+def sign_qc_pass(store, cid: str) -> None:
+    """The Safety Specialist agrees with a pass proposal and signs it."""
+    from adjud.flow2 import Flow2
+
+    Flow2(store, CONFIG).sign_qc_pass(cid, "ss.anna", "demo")
+
+
+def no_decision_without_a_person(store, cid: str) -> None:
+    """P-37: no QC result, query or narrative approval without a signature."""
+    for e in store.events(cid):
+        if e["type"] in ("qc.signed_pass", "query.opened", "narrative.signed"):
+            assert e.get("signature"), e["type"]
+        assert e["type"] not in ("qc.passed", "narrative.approved"), e["type"]
+
+
 @pytest.mark.parametrize("scenario", SCENARIOS)
-def test_each_fixture_gets_its_expected_decision(tmp_path, fixtures, scenario):
+def test_each_fixture_gets_its_expected_proposal(tmp_path, fixtures, scenario):
     store, cid = run_scenario(tmp_path, fixtures, scenario)
     expected = make_flow2_fixtures.EXPECTED[scenario]
     result = store.get_json(cid, "qc/checks_v1.json")
-    assert result["decision"] == expected["decision"], result["checks"]
-    state = store.state(cid).state
-    if expected["decision"] == "pass":
-        assert state in (State.NARRATIVE, State.NARRATIVE_REVIEW)  # the narrative follows
-        assert (
-            next(e for e in store.events(cid) if e["type"] == "qc.passed")["actor"] == "system:qc"
-        )
-    elif expected["decision"] == "query":
-        assert state == State.QUERY_OPEN
-        query = next(e for e in store.events(cid) if e["type"] == "query.opened")
-        assert query["data"]["codes"] == expected["codes"]
-    else:
-        assert state == State.QC_REVIEW
+    assert result["proposal"] == expected["proposal"], result["checks"]
+    assert result["query_codes"] == expected["codes"]
+    assert store.state(cid).state == State.QC_REVIEW  # always the Safety Specialist's call
+    no_decision_without_a_person(store, cid)
     events = (store.case_dir(cid) / "events.jsonl").read_text() + json.dumps(result)
     assert "Roberts" not in events and "24/07/1955" not in events  # verdicts, never values
+
+
+def test_a_check_failed_by_code_cannot_be_signed_as_passed(tmp_path, fixtures):
+    """A clear failure still always ends in a query, now one the Safety Specialist signs."""
+    from adjud.flow2 import Flow2, Flow2Refused
+
+    store, cid = run_scenario(tmp_path, fixtures, "missing_document")
+    flow2 = Flow2(store, CONFIG)
+    with pytest.raises(Flow2Refused, match="send a query"):
+        flow2.sign_qc_pass(cid, "ss.anna", "demo")
+    flow2.open_query(cid, ["missing_document"], "Please upload the ECG report.",
+                     user_id="ss.anna", password="demo")  # fmt: skip
+    assert store.state(cid).state == State.QUERY_OPEN
+    no_decision_without_a_person(store, cid)
 
 
 def test_types_come_from_the_first_title_keyword():
@@ -119,15 +140,17 @@ def test_identity_compares_dates_and_names_leniently():
 # --- QC agent in replay mode (plan step 15) ---------------------------------------------------
 
 
-def test_agent_spots_a_different_event_and_queries_the_site(tmp_path, fixtures, monkeypatch):
+def test_agent_spots_a_different_event_and_proposes_a_query(tmp_path, fixtures, monkeypatch):
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")
     store, cid = run_scenario(tmp_path, fixtures, "different_event")
     expected = make_flow2_fixtures.EXPECTED["different_event"]["with_ai"]
     result = store.get_json(cid, "qc/checks_v1.json")
-    assert result["decision"] == expected["decision"] == "query"
-    query = next(e for e in store.events(cid) if e["type"] == "query.opened")
-    assert query["actor"] == "agent:qc" and query["data"]["codes"] == expected["codes"]
-    assert "fracture" in query["data"]["text"]  # the recorded live answer's own words
+    assert result["proposal"] == expected["proposal"] == "query"
+    assert result["query_codes"] == expected["codes"]
+    assert any("fracture" in r for r in result["reasons"])  # the recorded answer's own words
+    assert store.state(cid).state == State.QC_REVIEW
+    assert not any(e["type"] == "query.opened" for e in store.events(cid))  # a person sends it
+    assert result["failed_by_code"] == []  # the AI's verdict: the specialist may overrule it
     (entry,) = result["ai"]
     assert entry["label"] == "AI" and entry["gate"]["passed"]
     assert any(e["type"] == "ai.gate" and e["data"]["passed"] for e in store.events(cid))
@@ -151,7 +174,7 @@ def test_a_quote_the_page_does_not_contain_sends_the_case_to_a_person(
     )
     store, cid = run_scenario(tmp_path, fixtures, "different_event")
     result = store.get_json(cid, "qc/checks_v1.json")
-    assert result["decision"] == "review"
+    assert result["proposal"] == "unclear"
     assert any("quote not found on discharge_summary.pdf page 1" in r for r in result["reasons"])
     assert store.state(cid).state == State.QC_REVIEW
 
@@ -171,8 +194,8 @@ def _gateway(cls, store, replays):
 def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
     """Kit AE-005 (fatal, a poor-quality GP summary letter): the recorded live agent types
     it as a discharge summary but is unsure (0.6), so the gate sends it to the Safety
-    Specialist. AE-006 (a clinic letter and an angiography report, no discharge summary or
-    ECG) gets a query for both."""
+    Specialist with no proposal. AE-006 (a clinic letter and an angiography report, no
+    discharge summary or ECG) gets a query proposed for both."""
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")
     data = tmp_path / "data"
     data.mkdir()
@@ -201,9 +224,11 @@ def test_agent_types_the_kit_letters_code_could_not(tmp_path, monkeypatch):
     (entry,) = result["ai"]
     assert entry["label"] == "AI" and not entry["gate"]["passed"]
     assert any("below 0.80" in r for r in entry["gate"]["reasons"])
-    query = next(e for e in store.events(cases["AE-006"]) if e["type"] == "query.opened")
-    assert query["actor"] == "agent:qc" and query["data"]["codes"] == ["missing_document"]
-    assert "Discharge or death summary, ECG report" in query["data"]["text"]
+    assert result["proposal"] == "unclear"
+    ae006 = store.get_json(cases["AE-006"], "qc/checks_v1.json")
+    assert ae006["proposal"] == "query" and ae006["query_codes"] == ["missing_document"]
+    assert any("Discharge or death summary, ECG report" in r for r in ae006["reasons"])
+    assert store.state(cases["AE-006"]).state == State.QC_REVIEW
 
 
 # --- narrative agent in replay mode (plan step 17) --------------------------------------------
@@ -217,21 +242,29 @@ def _complete_narrative(replays: Path) -> Path:
     )  # fmt: skip
 
 
-def test_narrative_agent_writes_a_cited_narrative_nobody_has_to_sign(
+def test_narrative_agent_drafts_a_cited_narrative_the_specialist_signs(
     tmp_path, fixtures, monkeypatch
 ):
-    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
-    store, cid = run_scenario(tmp_path, fixtures, "complete")
+    from adjud.flow2 import Flow2
     from adjud.runner import Runner
 
-    Runner(store.paths).run_case_steps()  # dossier + narrative
-    assert store.state(cid).state == State.READY_FOR_ADJUDICATION
-    approved = next(e for e in store.events(cid) if e["type"] == "narrative.approved")
-    assert approved["actor"] == "agent:narrative" and approved["data"]["simulated"] is False
-    text = store.get_file(cid, approved["data"]["narrative"]["path"]).decode()
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    store, cid = run_scenario(tmp_path, fixtures, "complete")
+    sign_qc_pass(store, cid)
+    Runner(store.paths).run_case_steps()  # dossier + narrative draft
+    assert store.state(cid).state == State.NARRATIVE_REVIEW  # a person signs every narrative
+    drafted = next(e for e in store.events(cid) if e["type"] == "narrative.drafted")
+    assert drafted["data"]["source"] == "ai" and drafted["data"]["simulated"] is False
+    review = next(e for e in store.events(cid) if e["type"] == "narrative.review_needed")
+    assert review["data"]["gate_passed"] and review["data"]["reasons"] == []
+    text = store.get_file(cid, drafted["data"]["draft"]["path"]).decode()
     assert "myocardial infarction" in text.lower() and "[dossier p. 2]" in text
-    people = {e["actor"] for e in store.events(cid)} - {"site101.coord"}
-    assert all(a.startswith(("system:", "agent:")) for a in people)
+    Flow2(store, CONFIG).sign_narrative(cid, "ss.anna", "demo", text)
+    Runner(store.paths).run_case_steps()  # Flow 3 handoff
+    assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+    signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")
+    assert signed["data"]["source"] == "ai" and not signed["data"]["edited"]
+    no_decision_without_a_person(store, cid)
 
 
 def test_forbidden_wording_sends_the_ai_draft_to_the_safety_specialist(
@@ -254,6 +287,7 @@ def test_forbidden_wording_sends_the_ai_draft_to_the_safety_specialist(
         classmethod(lambda cls, store, config_dir, study="DEMO01": _gateway(cls, store, replays)),
     )
     store, cid = run_scenario(tmp_path, fixtures, "complete")
+    sign_qc_pass(store, cid)
     Runner(store.paths).run_case_steps()
     assert store.state(cid).state == State.NARRATIVE_REVIEW
     reasons = next(e for e in store.events(cid) if e["type"] == "narrative.review_needed")

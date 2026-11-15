@@ -4,7 +4,7 @@
 
 Each scenario is a folder of PDFs for kit case AE-001 (subject DEMO01-101-0001,
 myocardial infarction, onset 2026-03-14; the patient is the kit's seeded identity) plus
-`expected.json` with the QC decision it should get:
+`expected.json` with the QC proposal it should get:
 
     complete          discharge summary + ECG report              → pass
     missing_document  discharge summary only (a cardiac event     → query missing_document
@@ -32,16 +32,17 @@ from faker import Faker
 ROOT = Path(__file__).resolve().parents[1]
 KIT = ROOT / "data" / "flow1-testkit"
 SUBJECT = "DEMO01-101-0001"
+# What the QC round proposes to the Safety Specialist, who decides every case (P-37).
 EXPECTED = {
-    "complete": {"decision": "pass", "codes": []},
-    "missing_document": {"decision": "query", "codes": ["missing_document"]},
-    "wrong_patient": {"decision": "query", "codes": ["wrong_patient"]},
+    "complete": {"proposal": "pass", "codes": []},
+    "missing_document": {"proposal": "query", "codes": ["missing_document"]},
+    "wrong_patient": {"proposal": "query", "codes": ["wrong_patient"]},
     "different_event": {
-        "decision": "review",
+        "proposal": "unclear",
         "codes": [],
-        "with_ai": {"decision": "query", "codes": ["wrong_event"]},  # the agent's verdict
+        "with_ai": {"proposal": "query", "codes": ["wrong_event"]},  # the agent's verdict
     },
-    "unreadable": {"decision": "query", "codes": ["unreadable"]},
+    "unreadable": {"proposal": "query", "codes": ["unreadable"]},
 }
 
 

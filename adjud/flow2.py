@@ -36,8 +36,6 @@ from adjud.store import FileCaseStore, json_bytes
 from adjud.workflow import State
 
 SYSTEM_QC = "system:qc"
-AGENT_QC = "agent:qc"  # a QC decision that used an agent answer which passed its gate
-AGENT_NARRATIVE = "agent:narrative"  # a narrative approved because its gate passed
 SYSTEM_NARRATIVE = "system:narrative"
 QC_PASS_MEANING = "Quality check passed — the documents are complete and fit for adjudication"  # noqa: S105
 QUERY_MEANING = "Quality check failed — a query is sent to the site"
@@ -123,29 +121,35 @@ class Flow2:
         self._event(case_id, "qc.started", SYSTEM_QC, {"manifest": ref})
 
     def run_qc(self, case_id: str) -> dict[str, Any]:
-        """One QC round. Deterministic checks first (step 14):
-        - a check failed for a clear reason → a query goes to the site automatically
-        - every check passed                 → QC passes, no person involved (P-36)
-        - code cannot tell                   → the QC agent (step 15), else a person
+        """One QC round, prepared for the Safety Specialist (P-37). Deterministic checks
+        first (step 14); what code cannot tell goes to the QC agents (step 15). The result
+        is a *proposal*, never a decision:
+        - a check failed            → propose a query, with its reason codes
+        - every check passed        → propose a pass
+        - still unclear             → no proposal; the Safety Specialist decides
+        The case always goes to QC review, where the Safety Specialist signs the pass or
+        sends the query: whether documents are fit for adjudication is a medical judgement.
         """
         n = _rounds(self.store, case_id, "qc.checks_completed") + 1
         manifest_ref = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
         manifest = self.store.get_json(case_id, manifest_ref["path"])
         outcome = run_checks(self.store, case_id, manifest, self.checklist)
+        # Failures found by code alone: a signed pass is refused while any is present.
+        failed_by_code = [c.id for c in outcome.failed]
         ai: list[dict[str, Any]] = []
-        actor = SYSTEM_QC
         if outcome.unknown and not outcome.failed:  # step 15: agents fill in the unknowns
             ai_types, event = self._qc_agents(case_id, manifest, outcome, ai)
             if ai_types or event:
                 outcome = run_checks(self.store, case_id, manifest, self.checklist,
                                      ai_types=ai_types, event=event)  # fmt: skip
-                actor = AGENT_QC
+        codes: list[str] = []
         if outcome.failed:
-            decision, reasons = "query", [c.detail for c in outcome.failed]
+            proposal, reasons = "query", [c.detail for c in outcome.failed]
+            codes = list(dict.fromkeys(c.query_code for c in outcome.failed if c.query_code))
         elif not outcome.unknown:
-            decision, reasons = "pass", []
+            proposal, reasons = "pass", []
         else:
-            decision = "review"
+            proposal = "unclear"
             reasons = [c.detail or c.label for c in outcome.unknown]
             if not any(a["status"] != "unavailable" for a in ai):
                 why = next((a["note"] for a in ai), "") or "AI is off"
@@ -157,7 +161,10 @@ class Flow2:
             "manifest": manifest_ref,
             "checks": outcome.as_dicts(),
             "types": outcome.types,
-            "decision": decision,
+            "decision": "review",  # always the Safety Specialist's (P-37)
+            "proposal": proposal,
+            "query_codes": codes,
+            "failed_by_code": failed_by_code,
             "reasons": reasons,
             "ai": ai,
         }
@@ -165,17 +172,10 @@ class Flow2:
         sha = self.store.put_file(case_id, rel, json_bytes(result))
         self._event(case_id, "qc.checks_completed", SYSTEM_QC,
                     {"round": n, "results": {"path": rel, "sha256": sha},
-                     "decision": decision})  # fmt: skip
-        if decision == "query":
-            codes = list(dict.fromkeys(c.query_code for c in outcome.failed if c.query_code))
-            self.open_query(case_id, codes, " ".join(f"{r}." for r in reasons), actor=actor)
-        elif decision == "pass":
-            by = "checks and AI" if actor == AGENT_QC else "checks"
-            self._event(case_id, "qc.passed", actor,
-                        {"results": {"path": rel, "sha256": sha}, "by": by})  # fmt: skip
-        else:
-            self._event(case_id, "qc.review_needed", SYSTEM_QC, {"reasons": reasons})
-            self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
+                     "decision": "review", "proposal": proposal})  # fmt: skip
+        self._event(case_id, "qc.review_needed", SYSTEM_QC,
+                    {"reasons": reasons, "proposal": proposal})  # fmt: skip
+        self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
         return result
 
     # -- QC agents (step 15) -----------------------------------------------------------------
@@ -268,10 +268,10 @@ class Flow2:
 
     def run_narrative(self, case_id: str) -> str:
         """Build the dossier, then draft the narrative (step 17). The narrative agent writes
-        facts-only statements, each quoting a dossier page; if its gate passes the
-        narrative is approved and frozen with no person involved. Otherwise, or with AI
-        off, the draft (the agent's, labelled, or the study template) goes to the Safety
-        Specialist."""
+        facts-only statements, each quoting a dossier page, and code checks every quote.
+        The draft (the agent's, labelled, or the study template when AI is off or its
+        answer is unusable) always goes to the Safety Specialist, who edits and signs it
+        (P-37). A passing gate only means every quote was found on its page."""
         dossier = self.ensure_dossier(case_id)
         n = _rounds(self.store, case_id, "narrative.drafted") + 1
         r, g, statements = self._narrative_agent(case_id, dossier)
@@ -286,23 +286,14 @@ class Flow2:
                     {"draft": {"path": rel, "sha256": sha}, "source": source,
                      "simulated": r.simulated, "call": r.call})  # fmt: skip
         if g is not None and g.passed:
-            k = (
-                _rounds(self.store, case_id, "narrative.signed")
-                + _rounds(self.store, case_id, "narrative.approved")
-                + 1
-            )
-            final = f"narrative/narrative_v{k}.md"
-            fsha = self.store.put_file(case_id, final, text.encode() + b"\n")
-            self._event(case_id, "narrative.approved", AGENT_NARRATIVE,
-                        {"narrative": {"path": final, "sha256": fsha}, "source": "ai",
-                         "simulated": r.simulated, "call": r.call})  # fmt: skip
-            return text
-        if r.status == "unavailable":
+            reasons: list[str] = []  # nothing wrong with the draft; a person still signs it
+        elif r.status == "unavailable":
             reasons = [f"No AI draft ({r.note or 'AI is off'}): the Safety Specialist completes "
                        "the narrative"]  # fmt: skip
         else:
             reasons = [f"AI draft not accepted: {x}" for x in (g.reasons if g else [r.note])]
-        self._event(case_id, "narrative.review_needed", SYSTEM_NARRATIVE, {"reasons": reasons})
+        self._event(case_id, "narrative.review_needed", SYSTEM_NARRATIVE,
+                    {"reasons": reasons, "gate_passed": bool(g and g.passed)})  # fmt: skip
         self._notify(case_id, "role:safety_specialist", "narrative_review_needed",
                      SYSTEM_NARRATIVE)  # fmt: skip
         return text
@@ -426,8 +417,14 @@ class Flow2:
                      reason: str | None = None) -> None:  # fmt: skip
         if self.store.state(case_id).state != State.QC_REVIEW:
             raise Flow2Refused("the case is not waiting for a QC review")
-        user = _safety_specialist(self.config_dir, user_id)
         checks = self._checks_ref(case_id)
+        failed = self.store.get_json(case_id, checks["path"]).get("failed_by_code") or []
+        if failed:
+            raise Flow2Refused(
+                "a check failed (" + ", ".join(failed).replace("_", " ") + "): send a query "
+                "to the site instead"
+            )
+        user = _safety_specialist(self.config_dir, user_id)
         manifest = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
         records = [{"name": "qc results", **checks}, {"name": "flow2 manifest", **manifest}]
         signature = sign(user, password, QC_PASS_MEANING, records)
@@ -435,28 +432,20 @@ class Flow2:
                     signature=signature, reason=(reason or "").strip() or None)  # fmt: skip
 
     def open_query(self, case_id: str, codes: list[str], text: str, *,
-                   user_id: str | None = None, password: str | None = None,
-                   actor: str = SYSTEM_QC) -> None:  # fmt: skip
-        """A query to the site: signed by the Safety Specialist from QC_REVIEW, or opened by
-        the QC step itself when a required check fails for a clear reason."""
+                   user_id: str, password: str) -> None:  # fmt: skip
+        """A query to the site, always signed by the Safety Specialist from QC review
+        (P-37): nothing goes back to the site on a machine's judgement alone."""
         codes = [c for c in codes if c in QUERY_CODES]
         if not codes:
             raise Flow2Refused("choose at least one reason for the query")
-        state = self.store.state(case_id).state
+        if self.store.state(case_id).state != State.QC_REVIEW:
+            raise Flow2Refused("the case is not waiting for a QC review")
         data = {"codes": codes, "text": text.strip(), "results": self._checks_ref(case_id)}
-        if user_id is None:
-            if state != State.QC_CHECKS:
-                raise Flow2Refused("an automatic query is only possible during the checks")
-            self._event(case_id, "query.opened", actor, data)
-        else:
-            if state != State.QC_REVIEW:
-                raise Flow2Refused("the case is not waiting for a QC review")
-            user = _safety_specialist(self.config_dir, user_id)
-            signature = sign(user, password or "", QUERY_MEANING,
-                             [{"name": "qc results", **data["results"]}])  # fmt: skip
-            self._event(case_id, "query.opened", user_id, data, signature=signature)
-            actor = user_id
-        self._notify(case_id, _site(self.store, case_id), "query_opened", actor)
+        user = _safety_specialist(self.config_dir, user_id)
+        signature = sign(user, password or "", QUERY_MEANING,
+                         [{"name": "qc results", **data["results"]}])  # fmt: skip
+        self._event(case_id, "query.opened", user_id, data, signature=signature)
+        self._notify(case_id, _site(self.store, case_id), "query_opened", user_id)
 
     def sign_narrative(self, case_id: str, user_id: str, password: str, text: str) -> None:
         if self.store.state(case_id).state != State.NARRATIVE_REVIEW:
@@ -481,7 +470,8 @@ class Flow2:
         )
         self._event(case_id, "narrative.signed", user_id,
                     {"narrative": {"path": rel, "sha256": sha}, "source": draft["source"],
-                     "edited": edited}, signature=signature)  # fmt: skip
+                     "simulated": bool(draft.get("simulated")), "edited": edited},
+                    signature=signature)  # fmt: skip
 
 
 def query_of(store: FileCaseStore, case_id: str) -> dict[str, Any] | None:
