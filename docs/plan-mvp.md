@@ -265,16 +265,6 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - Limitation seen in the first live narrative: the gate checks that each quote is on its page, not that the quote supports every fact in the statement (a statement may add a second value from the same page). Open: tighten (one quote per fact, or numbers in the statement must appear in its quote).
 
-### Step 24 — Safety Specialist signs every case (P-37)
-
-- [ ] Plan: P-37 recorded, §2 rewritten
-- [ ] QC: the round's outcome (pass, query or unclear) is stored as a proposal; the case always goes to `QC_REVIEW`; no unsigned query; no signed pass while a required check has failed
-- [ ] Narrative: the AI draft (gate result shown) or the template always goes to `NARRATIVE_REVIEW`
-- [ ] Quality check page: decision and query reasons pre-selected from the proposal; wording says what the AI did, not that it decided
-- [ ] Tests, fixtures' expected proposals, `tools.ai_eval`, docs (AGENTS.md, CLAUDE.md, process, demo guide, README) updated
-
-**Done when:** in replay mode no case reaches `READY_FOR_ADJUDICATION` without `qc.signed_pass` and `narrative.signed`, every `query.opened` carries a signature, and the full kit and test suite pass.
-
 ### Step 23 — Process document and demo ✅ (live rehearsal outstanding)
 
 - [x] `docs/process.md`: each step with trigger, component, who or what does it, and where AI and the API are used
@@ -282,6 +272,18 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [ ] Live rehearsal by the presenter
 
 **Result:** screenshots of every page, including the Quality check page and the eight-step rail, at desktop and phone width (`tools/screenshots.py`, now in replay mode). They showed one misleading message, "AI is off" in replay mode when no answer was recorded; fallbacks now give the gateway's own reason.
+
+### Step 24 — Safety Specialist signs every case (P-37) ✅
+
+- [x] Plan: P-37 recorded, §2 rewritten
+- [x] QC: the round's outcome (pass, query or unclear) is stored as a proposal; the case always goes to `QC_REVIEW`; no unsigned query; no signed pass while a required check has failed
+- [x] Narrative: the AI draft (gate result shown) or the template always goes to `NARRATIVE_REVIEW`
+- [x] Quality check page: decision and query reasons pre-selected from the proposal; wording says what the AI did, not that it decided
+- [x] Tests, fixtures' expected proposals, `tools.ai_eval`, docs (AGENTS.md, CLAUDE.md, process, demo guide, README) updated
+
+**Done when:** in replay mode no case reaches `READY_FOR_ADJUDICATION` without `qc.signed_pass` and `narrative.signed`, every `query.opened` carries a signature, and the full kit and test suite pass.
+
+**Result** (2026-11-15): every QC round now ends at QC review with a proposal; queries carry the Safety Specialist's signature; a check failed in code cannot be signed as passed; every narrative is signed by a person, and a signed AI draft keeps its simulated label. The replay demo reaches adjudication with three signatures (site, QC, narrative). The recorded agent answers still match, because the agents' inputs did not change. Full test suite and kit green; the 11 cases already on disk rebuild unchanged.
 
 ---
 

@@ -32,7 +32,7 @@ The project builds **Flows 1 and 2**. Flow 1 is done; Flow 2 and the AI layer ar
 
 **Boundary between flows.** Flow 1 ends by writing `handoff/flow2_manifest.json`: redacted files, source snapshots and their hashes, and never anything from `documents/original/`. Flow 2 reads only that manifest. Keep that contract stable. Flow 2 ends the same way with `handoff/flow3_manifest.json`.
 
-**AI layer (plan §2, step 12).** Agents run only through `adjud/ai/gateway.py` (modes `off` / `replay` / `live`) and act by calling local tools in `adjud/ai/tools.py`. `adjud/ai/gates.py` decides whether an agent result may move the case; if not, a person gets an exception task. Every call is logged per case and in a cost ledger.
+**AI layer (plan §2, step 12).** Agents run only through `adjud/ai/gateway.py` (modes `off` / `replay` / `live`) and act by calling local tools in `adjud/ai/tools.py`. `adjud/ai/gates.py` decides whether an agent result can be used. Used results prepare the Safety Specialist's QC review and narrative review, which a person signs on every case (plan P-37); no gate moves a case past a medical judgement. Every call is logged per case and in a cost ledger.
 
 **Measurement is a deliverable.** The kit's `tools/make_synthetic.py` writes seeded fake PHI plus a ground-truth file. `tools/deid_check.py` scores recall, over-redaction, metadata residuals and time per page into `data/metrics/`. Text-layer PDFs must reach 100% removal. Results for scans, spreadsheets and DICOM are reported, not gated, so they can't be tuned toward a target.
 
