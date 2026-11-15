@@ -15,8 +15,8 @@ Applies [frontend-design-skill.md](frontend-design-skill.md) to the Streamlit UI
 
 | Name | Hex | Use |
 |---|---|---|
-| Form | `#EDF1F3` | Page background: the cool blue-grey of carbonless hospital form paper |
-| Sheet | `#FAFBFB` | Inputs, tables, widget surfaces |
+| Form | `#EDF1F3` | The desk around the page, the case header, inputs: the cool blue-grey of carbonless hospital form paper |
+| Sheet | `#FAFBFB` | The page itself (one bordered sheet on the desk), tables |
 | Folder | `#DDE5E9` | Sidebar, the "case folder" the user is working in |
 | Ink | `#1C2833` | Text: blue-black ballpoint |
 | Stamp violet | `#4A3AA0` | Primary actions, links, focus: indelible stamp ink |
@@ -84,6 +84,19 @@ Screenshots (`uv run python -m tools.screenshots --out <dir>`) were taken after 
 - The rail was indented by Streamlit's list styles, the sidebar case name was cut off, and the "200MB" picker hint contradicted the 50 MB limit. All three are fixed.
 - **Pass 2** removed the leftover system vocabulary: `Dob`/`Mrn`, `UNSUPPORTED_TYPE` in the reasons, raw AE JSON, user IDs in the audit trail, times without a timezone.
 - **Pass 3:** on a phone the forced-open sidebar covered the page, so it is now "auto". An empty "Type" column is hidden, and the "Found by" column is dropped as a system detail. That was the one accessory removed.
+
+- **Pass 4** (case review): everything sat on one flat grey plane, so sections, tables and the page ran together, and the next step said where to go without taking you there. Changes:
+  - The page is one sheet on the desk. Sections are separated by a hairline above each heading, not by cards.
+  - The case header is the case's cover sheet, on form paper. It holds the case number, the event term and the key facts (status and since when, onset, subject, site, AE, flags), then the rail and the next step.
+  - The rail has eight equal steps: one row on desktop, two on a phone.
+  - When the viewer has an action, the next step carries one link to the page where it is taken (`wording.next_page`). There is no link to the page already open, and none for someone with nothing to do.
+  - With no case chosen, every case page lists the cases the viewer may see. Selecting a row opens the case.
+  - The Case record has an in-page contents line and an "Only actions by people" filter on the audit trail. The seal check still counts every entry.
+  - The study-wide identifier measurements are collapsed on a case page.
+  - QC results are inked, with a one-line count of failed checks.
+  - The frozen narrative is shown at full contrast instead of in a greyed-out text box.
+  - During site review, the upload sits in an expander.
+  - The signing reasons come before the disabled button.
 
 ## Notes for future passes
 

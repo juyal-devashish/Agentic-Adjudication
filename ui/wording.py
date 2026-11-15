@@ -150,6 +150,31 @@ def next_step(
     }[state]
 
 
+DOCUMENTS_PAGE, QC_PAGE = "views/site_documents.py", "views/quality_check.py"
+
+
+def next_page(role: str, state: State) -> tuple[str, str, str] | None:
+    """Where the person looking at this case acts next: (page, link text, icon), or None
+    when there is nothing for them to do. Matches next_step(): only states in which this
+    role has an action of its own get a link."""
+    if role == "site":
+        return {
+            State.AWAITING_DOCUMENTS: (DOCUMENTS_PAGE, "Upload documents", ":material/upload:"),
+            State.AWAITING_SITE_CONFIRMATION: (
+                DOCUMENTS_PAGE,
+                "Review and sign the documents",
+                ":material/description:",
+            ),
+            State.QUERY_OPEN: (DOCUMENTS_PAGE, "Answer the query", ":material/upload:"),
+        }.get(state)
+    if role == "safety_specialist":
+        return {
+            State.QC_REVIEW: (QC_PAGE, "Review the quality check", ":material/rule:"),
+            State.NARRATIVE_REVIEW: (QC_PAGE, "Complete the narrative", ":material/rule:"),
+        }.get(state)
+    return None
+
+
 def import_summary(rep: dict) -> str:
     if rep["status"] != "ACCEPTED":
         head = f"{rep['file']} was not imported. Nothing from this file was saved."

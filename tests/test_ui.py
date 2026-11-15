@@ -367,3 +367,18 @@ def test_cases_to_check_names_the_case_a_duplicate_may_repeat(demo):
     assert not at.exception, at.exception
     flagged = at.dataframe[-1].value
     assert list(flagged["Why"]) == ["Possible duplicate of DEMO01-0011"]
+
+
+def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
+    """The case header links to where the viewer's next action is, never to the page
+    already open, and not at all for someone with nothing to do."""
+    from adjud.runner import Runner
+
+    Runner(demo).run_once()  # cases wait for documents
+    at = run("views/results.py", role="site", case_id="DEMO01-0001")
+    links = [(p.proto.page, p.proto.label) for p in at.get("page_link")]
+    assert any(label == "Upload documents" for _, label in links), links
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    assert not at.get("page_link")  # already on Documents
+    at = run("views/results.py", role="safety_specialist", case_id="DEMO01-0001")
+    assert not at.get("page_link")  # nothing for the Safety Specialist to do yet

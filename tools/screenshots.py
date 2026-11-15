@@ -69,7 +69,40 @@ def prepare(data: Path) -> dict[str, str]:
     submit(pipe.store, done, "site101.coord", "demo", paths.config)
     for _ in range(4):  # Flow 2: QC, dossier and narrative, handoff to Flow 3
         runner.run_case_steps()
-    return {"review": review, "done": done}
+
+    # The Safety Specialist's decision screens and a site's open query: documents without
+    # a subject ID, so no check or recorded agent answer can decide and a person must.
+    import pymupdf
+
+    from adjud.flow2 import Flow2
+
+    def to_qc_review(key: str, site_user: str) -> str:
+        cid = pipe.case_for(key)
+        files = []
+        for name, text in (
+            ("summary.pdf", "DISCHARGE SUMMARY. Chest pain."),
+            ("ecg.pdf", "ECG REPORT. Sinus rhythm."),
+        ):
+            with pymupdf.open() as doc:
+                doc.new_page().insert_text((72, 72), text)
+                files.append((name, doc.tobytes()))
+        upload(pipe.store, cid, files, site_user)
+        runner.run_case_steps()
+        submit(pipe.store, cid, site_user, "demo", paths.config)
+        for _ in range(3):  # handoff, QC start, QC round
+            runner.run_case_steps()
+        return cid
+
+    flow2 = Flow2(pipe.store, paths.config)
+    qc_review = to_qc_review("DEMO01|DEMO01-101-0002|AE-002", "site101.coord")
+    query = to_qc_review("DEMO01|DEMO01-102-0003|AE-003", "site102.coord")
+    flow2.open_query(query, ["missing_document"], "Please upload the ECG report.",
+                     user_id="ss.anna", password="demo")  # noqa: S106  # fmt: skip
+    narrative = to_qc_review("DEMO01|DEMO01-101-0005|AE-006", "site101.coord")
+    flow2.sign_qc_pass(narrative, "ss.anna", "demo", "")
+    runner.run_case_steps()  # template draft: no recorded answer for these documents
+    return {"review": review, "done": done, "qc_review": qc_review, "query": query,
+            "narrative": narrative}  # fmt: skip
 
 
 def main() -> None:
@@ -115,6 +148,12 @@ def main() -> None:
             ("4_record", f"record?role=safety_specialist&case={cases['done']}"),
             ("6_quality_check", f"qc?role=safety_specialist&case={cases['done']}"),
             ("5_record_list", "record?role=safety_specialist"),
+            ("7_qc_review", f"qc?role=safety_specialist&case={cases['qc_review']}"),
+            ("8_record_needs_qc", f"record?role=safety_specialist&case={cases['qc_review']}"),
+            ("9_narrative_review", f"qc?role=safety_specialist&case={cases['narrative']}"),
+            ("10_site_query", f"documents?role=site&case={cases['query']}"),
+            ("11_documents_reader", f"documents?role=safety_specialist&case={cases['review']}"),
+            ("12_documents_no_case", "documents?role=site&user=site101.coord"),
         ]
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
