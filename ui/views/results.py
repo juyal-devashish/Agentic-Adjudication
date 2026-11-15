@@ -12,7 +12,7 @@ import sys
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, context, paths, pipeline, users
+from common import case_header, case_list, context, paths, pipeline, users
 
 from adjud.ai.gateway import Gateway
 from adjud.handoff import read_manifest
@@ -58,8 +58,10 @@ EVENT_WORDS = {
 }
 
 
-def measurements() -> None:
-    st.header("How well identifiers are removed")
+def measurements(heading: bool = True) -> None:
+    """Study-wide: the same figures on every case, so a case page shows them collapsed."""
+    if heading:
+        st.header("How well identifiers are removed")
     st.write(
         "Measured on the synthetic test kit: 17 documents with planted identifiers, scored "
         "by the kit's own harness. Scanned pages are read back by OCR, so their figures "
@@ -138,39 +140,25 @@ def measurements() -> None:
 
 if ctx.case_id is None:
     st.title("Case record")
-    states = [cs for cs in store.list_case_states() if ctx.sees(cs.subject)]
-    if ctx.role == "site":
-        theme.quiet(f"Only cases of site {ctx.user['site']} are shown.")
-    if states:
-        st.write("Choose a case in the sidebar to see its full record.")
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Case": cs.case_id,
-                        "Subject": cs.subject,
-                        "AE": cs.ae_id,
-                        "Status": theme.state_words(cs.state),
-                        "Since": theme.date_words(cs.state_since),
-                        "Flags": theme.flag_words(cs.flags),
-                    }
-                    for cs in states
-                ]
-            ),
-            hide_index=True,
-            width="stretch",
-        )
-    else:
-        st.write("No cases yet. Import an AE file first.")
+    case_list(ctx, "Select a case to open its full record, or choose one in the sidebar.")
     measurements()
     st.stop()
 
 cid = ctx.case_id
-case_header(ctx)
+case_header(ctx, "views/results.py")
+theme.toc(
+    [
+        ("package", "Package for adjudication"),
+        ("audit-trail", "Audit trail"),
+        ("source-data", "Source data"),
+        ("notifications", "Notifications"),
+        ("ai-activity", "AI activity"),
+    ]
+)
 
 # --- package for adjudication ------------------------------------------------------------------
 manifest = read_manifest(store, cid)
-st.header("Package for adjudication")
+st.header("Package for adjudication", anchor="package")
 if manifest is None:
     st.write("Not ready yet. It is put together as soon as the site signs.")
 else:
@@ -204,7 +192,7 @@ if flow3:
         st.json(package)
 
 # --- audit trail -------------------------------------------------------------------------------
-st.header("Audit trail")
+st.header("Audit trail", anchor="audit-trail")
 report = verify_case_log(store.case_dir(cid))
 if report.ok:
     st.html(
@@ -218,6 +206,13 @@ else:
     )
 events = store.events(cid)
 names = {u["id"]: u["name"] for u in users()}
+# Most entries are automatic steps; a reviewer often wants only what people did
+# (uploads, corrections, signatures). The seal check above always covers every entry.
+if st.checkbox("Only actions by people", key=f"people_only_{cid}"):
+    shown = [e for e in events if not e["actor"].startswith(("system:", "agent:"))]
+    theme.quiet(f"Showing {len(shown)} of {len(events)} entries.")
+else:
+    shown = events
 st.dataframe(
     pd.DataFrame(
         [
@@ -228,7 +223,7 @@ st.dataframe(
                 "Reason": e.get("reason") or "",
                 "Seal": e["hash"][7:15],
             }
-            for e in events
+            for e in shown
         ]
     ),
     hide_index=True,
@@ -236,7 +231,7 @@ st.dataframe(
 )
 
 # --- source data -------------------------------------------------------------------------------
-st.header("Source data from the EDC")
+st.header("Source data from the EDC", anchor="source-data")
 tabs = st.tabs(["Adverse event", "Eligibility", "Related data", "Earlier similar events"])
 with tabs[0]:
     snap = pipe.latest_snapshot(cid)
@@ -305,7 +300,7 @@ with tabs[3]:
         st.write("No earlier similar events for this subject in the 365 days before onset.")
 
 # --- notifications -----------------------------------------------------------------------------
-st.header("Notifications")
+st.header("Notifications", anchor="notifications")
 notes = [json.loads(f.read_text()) for f in sorted(paths().outbox.glob("*.json"))]
 mine = [n for n in notes if n.get("case_id") == cid]
 emailed: dict[str, str] = {}  # notification id -> last delivery status
@@ -340,7 +335,7 @@ else:
     st.write("No notifications for this case.")
 
 # --- AI activity (plan step 12) -----------------------------------------------------------------
-st.header("AI activity")
+st.header("AI activity", anchor="ai-activity")
 gw = Gateway.for_study(store, paths().config)
 calls = [e for e in store.events(cid) if e["type"] == "ai.called"]
 mode_words = {"off": "off", "replay": "replaying recorded answers", "live": "live"}
@@ -370,4 +365,5 @@ else:
 spent = gw.spent_usd()
 st.caption(f"All cases: ${spent:.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget.")
 
-measurements()
+with st.expander("How well identifiers are removed (test kit, the same for every case)"):
+    measurements(heading=False)

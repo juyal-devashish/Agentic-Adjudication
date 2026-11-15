@@ -89,10 +89,14 @@ def study_config() -> dict[str, Any]:
     return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
 
 
-def case_header(ctx: Context) -> None:
-    """Case heading, lifecycle rail and the next step for whoever is looking."""
+def case_header(ctx: Context, here: str) -> None:
+    """Case heading with its key facts, the lifecycle rail and the next step for whoever is
+    looking, with a link to the page where they take it. `here` is the current page file,
+    so the link never points to the page already open."""
+    import html
+
     import theme
-    from wording import next_step
+    from wording import next_page, next_step
 
     from adjud.documents import documents_of
     from adjud.review import submission_status
@@ -100,20 +104,80 @@ def case_header(ctx: Context) -> None:
     pipe = pipeline()
     cs = pipe.store.state(ctx.case_id)
     snap = pipe.latest_snapshot(ctx.case_id)
-    theme.case_heading(
-        ctx.case_id,
-        snap["ae_term"],
-        f"Onset {theme.date_words(snap['onset_date'])}. Subject {snap['subject_id']} at site "
-        f"{snap['site_id']}." + (f" {theme.flag_words(cs.flags)}." if cs.flags else ""),
-    )
-    theme.lifecycle(cs.state)
-    theme.next_step(
-        next_step(
-            ctx.role,
-            cs.state,
-            site=snap["site_id"],
-            requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
-            ready=submission_status(pipe.store, ctx.case_id).ready,
-            has_files=bool(documents_of(pipe.store, ctx.case_id).files),
+    since = f'<span class="adj-quiet">since {theme.date_words(cs.state_since)}</span>'
+    facts = [
+        ("Status", f"{theme.state_status(cs.state)} {since}"),
+        ("Onset", html.escape(theme.date_words(snap["onset_date"]))),
+        ("Subject", html.escape(snap["subject_id"])),
+        ("Site", html.escape(str(snap["site_id"]))),
+        ("AE", html.escape(snap["ae_id"])),
+    ]
+    if cs.flags:
+        facts.append(("Flags", theme.status(theme.flag_words(cs.flags), "bad")))
+    with st.container(key="case_head"):
+        theme.case_heading(ctx.case_id, snap["ae_term"], facts)
+        theme.lifecycle(cs.state)
+        theme.next_step(
+            next_step(
+                ctx.role,
+                cs.state,
+                site=snap["site_id"],
+                requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
+                ready=submission_status(pipe.store, ctx.case_id).ready,
+                has_files=bool(documents_of(pipe.store, ctx.case_id).files),
+            )
         )
+        target = next_page(ctx.role, cs.state)
+        if target and target[0] != here:
+            st.page_link(target[0], label=target[1], icon=target[2])
+
+
+def case_list(ctx: Context, intro: str) -> None:
+    """Every case this person may see. Selecting a row opens the case, the same as choosing
+    it in the sidebar."""
+    import pandas as pd
+    import theme
+
+    states = [cs for cs in pipeline().store.list_case_states() if ctx.sees(cs.subject)]
+    if ctx.role == "site":
+        theme.quiet(f"Only cases of site {ctx.user['site']} are shown.")
+    if not states:
+        st.write(
+            "No cases yet. They appear here once the data manager imports AE records."
+            if ctx.role != "data_manager"
+            else "No cases yet. Import an AE file on the AE import page first."
+        )
+        return
+    st.write(intro)
+    ids = [cs.case_id for cs in states]
+    # A new key after each pick, so a remembered selection never reopens a case the
+    # person has since left in the sidebar.
+    n = st.session_state.get("case_list_round", 0)
+    key = f"case_list_{n}"
+
+    def open_case() -> None:
+        rows = st.session_state[key]["selection"]["rows"]
+        if rows:
+            st.session_state["case_id"] = ids[rows[0]]
+            st.session_state["case_list_round"] = n + 1
+
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Case": cs.case_id,
+                    "Subject": cs.subject,
+                    "AE": cs.ae_id,
+                    "Status": theme.state_words(cs.state),
+                    "Since": theme.date_words(cs.state_since),
+                    "Flags": theme.flag_words(cs.flags),
+                }
+                for cs in states
+            ]
+        ),
+        hide_index=True,
+        width="stretch",
+        on_select=open_case,
+        selection_mode="single-row",
+        key=key,
     )

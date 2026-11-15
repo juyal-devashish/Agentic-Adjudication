@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 import theme
 from boxdraw import page_box
-from common import case_header, context, doc_label, pipeline, processor, study_config
+from common import case_header, case_list, context, doc_label, pipeline, processor, study_config
 from preview import pdf_page, show_sheets
 
 from adjud.documents import documents_of, upload
@@ -32,11 +32,11 @@ store = pipe.store
 
 if ctx.case_id is None:
     st.title("Documents")
-    st.write("Choose a case in the sidebar to upload and review its documents.")
+    case_list(ctx, "Select a case to upload and review its documents.")
     st.stop()
 
 cid = ctx.case_id
-case_header(ctx)
+case_header(ctx, "views/site_documents.py")
 cs = store.state(cid)
 requested = study_config().get("requested_documents", [])
 is_site = ctx.role == "site"
@@ -85,47 +85,54 @@ can_upload = is_site and cs.state in (
     State.DEIDENTIFYING,
     State.QUERY_OPEN,
 )
+# Uploading is the task while documents are missing or a query is open. During site review
+# the upload stays one click away, so the files and their review come first.
+upload_area = (
+    st.expander("Add more documents")
+    if cs.state == State.AWAITING_SITE_CONFIRMATION
+    else st.container()
+)
 if can_upload:
-    # A new uploader key after each upload empties it (st.file_uploader has no reset).
-    round_key = f"upload_round_{cid}"
-    n = st.session_state.get(round_key, 0)
-    files = st.file_uploader(
-        "Add documents: PDF, scans (PNG, JPG, TIFF) or spreadsheets (XLSX), up to 50 MB each",
-        accept_multiple_files=True,
-        key=f"uploader_{cid}_{n}",
-    )
-    labels: dict[str, str] = {}
-    if files:
-        st.caption(
-            "What is each file? Leave it as Not specified and the type is recognised "
-            "from the document."
+    with upload_area:
+        # A new uploader key after each upload empties it (st.file_uploader has no reset).
+        round_key = f"upload_round_{cid}"
+        n = st.session_state.get(round_key, 0)
+        files = st.file_uploader(
+            "Add documents: PDF, scans (PNG, JPG, TIFF) or spreadsheets (XLSX), up to 50 MB each",
+            accept_multiple_files=True,
+            key=f"uploader_{cid}_{n}",
         )
-        for i, f in enumerate(files):
-            label = st.selectbox(
-                f.name,
-                [None, *requested],
-                format_func=lambda r: "Not specified" if r is None else doc_label(r),
-                key=f"label_{cid}_{n}_{i}",
+        labels: dict[str, str] = {}
+        if files:
+            st.caption(
+                "What is each file? Leave it as Not specified and the type is recognised "
+                "from the document."
             )
-            if label:
-                labels[f.name] = label
-    if st.button("Add to case", disabled=not files):
-        names = upload(
-            store,
-            cid,
-            [(f.name, f.getvalue()) for f in files],
-            ctx.actor,
-            labels=labels or None,
-        )
-        st.session_state[round_key] = n + 1
-        st.toast(f"Added {', '.join(names)} to the case")
-        wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
+            for i, f in enumerate(files):
+                label = st.selectbox(
+                    f.name,
+                    [None, *requested],
+                    format_func=lambda r: "Not specified" if r is None else doc_label(r),
+                    key=f"label_{cid}_{n}_{i}",
+                )
+                if label:
+                    labels[f.name] = label
+        if st.button("Add to case", disabled=not files):
+            names = upload(
+                store,
+                cid,
+                [(f.name, f.getvalue()) for f in files],
+                ctx.actor,
+                labels=labels or None,
+            )
+            st.session_state[round_key] = n + 1
+            st.toast(f"Added {', '.join(names)} to the case")
+            wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
 
-if can_upload:
-    theme.quiet(
-        f"Or put one ZIP file with all the documents in this case's upload folder, "
-        f"{cid}. It is picked up within a minute."
-    )
+        theme.quiet(
+            f"Or put one ZIP file with all the documents in this case's upload folder, "
+            f"{cid}. It is picked up within a minute."
+        )
 
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("The runner picks uploads up within a few seconds. To see the result now:")
@@ -309,9 +316,9 @@ if now in SIGNED_STATES:
 elif now != State.AWAITING_SITE_CONFIRMATION:
     st.write("You can sign once the documents have been processed and reviewed.")
 elif not status.ready:
-    st.button("Sign and submit", disabled=True)
     st.write("You can sign once every file is verified:")
     st.html("<ul>" + "".join(f"<li>{html.escape(r)}</li>" for r in status.reasons) + "</ul>")
+    st.button("Sign and submit", disabled=True, help="Fix the files listed above first.")
 elif not is_site:
     st.write("Every file is verified. The site can now sign.")
 else:

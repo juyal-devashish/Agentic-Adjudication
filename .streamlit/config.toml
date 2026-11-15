@@ -13,8 +13,8 @@ gatherUsageStats = false
 [theme]
 base = "light"
 primaryColor = "#4A3AA0"              # stamp violet
-backgroundColor = "#EDF1F3"           # form paper
-secondaryBackgroundColor = "#FAFBFB"  # sheet
+backgroundColor = "#FAFBFB"           # sheet: the case page, tables (ui/theme.py paints the desk)
+secondaryBackgroundColor = "#EDF1F3"  # form paper: inputs, code
 textColor = "#1C2833"                 # ballpoint ink
 linkColor = "#4A3AA0"
 linkUnderline = true

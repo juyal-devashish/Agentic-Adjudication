@@ -12,7 +12,7 @@ import html
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, context, paths, pipeline
+from common import case_header, case_list, context, paths, pipeline
 from preview import show_file
 
 from adjud.dossier import latest_dossier
@@ -27,11 +27,11 @@ flow2 = Flow2(store, paths().config)
 
 if ctx.case_id is None:
     st.title("Quality check")
-    st.write("Choose a case in the sidebar to see its quality check and narrative.")
+    case_list(ctx, "Select a case to see its quality check and narrative.")
     st.stop()
 
 cid = ctx.case_id
-case_header(ctx)
+case_header(ctx, "views/quality_check.py")
 state = store.state(cid).state
 events = store.events(cid)
 is_ss = ctx.role == "safety_specialist"
@@ -50,16 +50,33 @@ else:
     latest = store.get_json(cid, rounds[-1]["data"]["results"]["path"])
     st.write(f"Round {latest['round']}, {when(rounds[-1])}.")
     if latest["checks"]:
+        checks = pd.DataFrame(
+            [
+                {
+                    "Check": c["label"],
+                    "Result": "Passed" if c["passed"] else "Failed",
+                    "Details": c.get("detail", ""),
+                }
+                for c in latest["checks"]
+            ]
+        )
+        failed = int((checks["Result"] == "Failed").sum())
+        st.html(
+            "<p>"
+            + (
+                theme.status(f"{failed} of {len(checks)} checks failed", "bad")
+                if failed
+                else theme.status(f"All {len(checks)} checks passed", "good")
+            )
+            + "</p>"
+        )
         st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Check": c["label"],
-                        "Result": "Passed" if c["passed"] else "Failed",
-                        "Details": c.get("detail", ""),
-                    }
-                    for c in latest["checks"]
-                ]
+            checks.style.map(
+                lambda v: (
+                    f"color: {theme.STATUS_INK['good' if v == 'Passed' else 'bad']}; "
+                    "font-weight: 600"
+                ),
+                subset=["Result"],
             ),
             hide_index=True,
             width="stretch",
@@ -193,7 +210,7 @@ if signed:
               "the dossier page it cites")  # fmt: skip
     st.write(f"Approved by {by}, {when(e)}. This version is frozen for the adjudicators.")
     text = store.get_file(cid, e["data"]["narrative"]["path"]).decode()
-    st.text_area("Narrative", text, height=260, disabled=True)
+    theme.frozen_text(text, "Narrative")
 elif state == State.NARRATIVE_REVIEW and drafts:
     draft = store.get_file(cid, drafts[-1]["data"]["draft"]["path"]).decode()
     source = drafts[-1]["data"]["source"]
@@ -207,7 +224,7 @@ elif state == State.NARRATIVE_REVIEW and drafts:
     st.caption("Every statement must come from the dossier. No opinion on cause, no "
                "adjudication wording, nothing that reveals allocation.")  # fmt: skip
     if not is_ss:
-        st.text_area("Draft", draft, height=260, disabled=True)
+        theme.frozen_text(draft, "Draft narrative")
     else:
         with st.form("narrative"):
             text = st.text_area("Narrative", draft, height=320)
