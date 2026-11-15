@@ -85,15 +85,13 @@ can_upload = is_site and cs.state in (
     State.DEIDENTIFYING,
     State.QUERY_OPEN,
 )
-# Uploading is the task while documents are missing or a query is open. During site review
-# the upload stays one click away, so the files and their review come first.
-upload_area = (
-    st.expander("Add more documents")
-    if cs.state == State.AWAITING_SITE_CONFIRMATION
-    else st.container()
-)
+
 if can_upload:
-    with upload_area:
+    # Uploading is the task while documents are missing, a file needs replacing or a query
+    # is open. Once every file is verified, during site review the upload stays one click
+    # away, so the files and their review come first.
+    tucked = cs.state == State.AWAITING_SITE_CONFIRMATION and submission_status(store, cid).ready
+    with st.expander("Add more documents") if tucked else st.container():
         # A new uploader key after each upload empties it (st.file_uploader has no reset).
         round_key = f"upload_round_{cid}"
         n = st.session_state.get(round_key, 0)
