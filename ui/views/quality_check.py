@@ -54,18 +54,23 @@ else:
             [
                 {
                     "Check": c["label"],
-                    "Result": "Passed" if c["passed"] else "Failed",
+                    "Result": {"passed": "Passed", "failed": "Failed"}.get(
+                        c.get("status", ""), "Passed" if c["passed"] else "Not sure"
+                    ),
                     "Details": c.get("detail", ""),
                 }
                 for c in latest["checks"]
             ]
         )
         failed = int((checks["Result"] == "Failed").sum())
+        unsure = int((checks["Result"] == "Not sure").sum())
+        summary = [theme.status(f"{failed} failed", "bad")] if failed else []
+        summary += [theme.status(f"{unsure} not sure", "wait")] if unsure else []
         st.html(
             "<p>"
             + (
-                theme.status(f"{failed} of {len(checks)} checks failed", "bad")
-                if failed
+                f"{len(checks)} checks: " + ", ".join(summary)
+                if summary
                 else theme.status(f"All {len(checks)} checks passed", "good")
             )
             + "</p>"
@@ -73,7 +78,8 @@ else:
         st.dataframe(
             checks.style.map(
                 lambda v: (
-                    f"color: {theme.STATUS_INK['good' if v == 'Passed' else 'bad']}; "
+                    "color: "
+                    f"{theme.STATUS_INK[{'Passed': 'good', 'Failed': 'bad'}.get(v, 'wait')]}; "
                     "font-weight: 600"
                 ),
                 subset=["Result"],
