@@ -135,6 +135,22 @@ def _submit_and_check(runner, case_key: str, files: list[Path]) -> str:
     return cid
 
 
+def sign_proposed_passes(runner) -> None:
+    """Stand in for the Safety Specialist (P-37): sign the QC pass wherever the round
+    proposed one, so those cases go on to their narrative. Cases with a proposed query or
+    no proposal stay at QC review, as they would for a real person."""
+    from adjud.workflow import State
+
+    store = runner.pipeline.store
+    for cs in store.list_case_states(State.QC_REVIEW):
+        rounds = [e for e in store.events(cs.case_id) if e["type"] == "qc.checks_completed"]
+        if (
+            store.get_json(cs.case_id, rounds[-1]["data"]["results"]["path"]).get("proposal")
+            == "pass"
+        ):
+            runner.flow2.sign_qc_pass(cs.case_id, "ss.anna", "demo")
+
+
 def _run_flow2(runner) -> list[tuple[str, str, dict[str, Any]]]:
     """Run the remaining Flow 2 steps. QC answers are written first, so cases they move on
     reach their narrative too; every narrative input seen is answered from its own case's
@@ -145,6 +161,7 @@ def _run_flow2(runner) -> list[tuple[str, str, dict[str, Any]]]:
     qc = [m for m in gw.missing if m[0] != "narrative"]
     _write(qc)
     for _ in range(3):  # cases whose QC answer was just written, then their narrative
+        sign_proposed_passes(runner)
         runner.run_case_steps()
     seen, narratives = set(), []
     for function, h, payload in gw.missing:
