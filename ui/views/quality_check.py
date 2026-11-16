@@ -166,27 +166,33 @@ if state == State.QC_REVIEW:
         if blocked:
             st.caption("A check failed, so this round can only end in a query to the site.")
         drafted = latest.get("proposal") == "query"
-        with st.form(f"qc_decision_{latest['round']}"):
-            decision = st.radio(
-                "Your decision",
-                options,
-                index=options.index("query") if drafted or blocked else 0,
-                format_func={
-                    "pass": "The documents are complete and fit for adjudication",
-                    "query": "Send a query to the site",
-                }.get,
-            )
-            codes = st.multiselect(
-                "Query reasons (for a query)",
-                list(QUERY_CODES),
-                default=latest.get("query_codes") or [],
-                format_func=QUERY_CODES.get,
-            )
-            text = st.text_area(
-                "Message to the site (for a query)",
-                " ".join(f"{r}." for r in latest.get("reasons", [])) if drafted else "",
-            )
-            reason = st.text_input("Note for the audit trail (optional for a pass)")
+        # The decision sits outside the form so the query fields appear only once "Send a
+        # query" is chosen (widgets inside a form do not redraw the page until submitted).
+        decision = st.radio(
+            "Your decision",
+            options,
+            index=options.index("query") if drafted or blocked else 0,
+            format_func={
+                "pass": "The documents are complete and fit for adjudication",
+                "query": "Send a query to the site",
+            }.get,
+            key=f"qc_decision_{cid}_{latest['round']}",
+        )
+        with st.form(f"qc_sign_{cid}_{latest['round']}"):
+            codes, text, reason = [], "", ""
+            if decision == "query":
+                codes = st.multiselect(
+                    "Query reasons",
+                    list(QUERY_CODES),
+                    default=latest.get("query_codes") or [],
+                    format_func=QUERY_CODES.get,
+                )
+                text = st.text_area(
+                    "Message to the site",
+                    " ".join(f"{r}." for r in latest.get("reasons", [])) if drafted else "",
+                )
+            else:
+                reason = st.text_input("Note for the audit trail (optional)")
             password = st.text_input(
                 f"Password for {ctx.user['name']} (demo password: demo)", type="password"
             )
