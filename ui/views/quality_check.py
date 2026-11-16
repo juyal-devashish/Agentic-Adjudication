@@ -226,7 +226,8 @@ if dossier:
         file_name=f"{cid}_dossier_v{dossier['version']}.pdf",
         mime="application/pdf",
     )
-    theme.quiet(f"SHA-256 {dossier['dossier']['sha256'].removeprefix('sha256:')[:16]}…")
+    with st.expander("Technical details"):
+        st.write(f"SHA-256 {dossier['dossier']['sha256'].removeprefix('sha256:')}")
 
 # --- narrative --------------------------------------------------------------------------------
 st.header("Narrative")

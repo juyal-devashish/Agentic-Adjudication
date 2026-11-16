@@ -152,7 +152,7 @@ def test_m4_submission_signature_and_handoff_manifest(ctx):
         assert d["path"].startswith("documents/redacted/")
         assert sha256_bytes(store.get_file(cid, d["path"])) == d["sha256"]
     assert "original" not in json.dumps(manifest)
-    assert manifest["submission"]["signer"] == "Site 101 Coordinator"
+    assert manifest["submission"]["signer"] == "Priya Nair"
     assert all(r.ok for r in verify_all(store.paths))
     templates = [json.loads(p.read_text())["template"] for p in store.paths.outbox.glob("*.json")]
     assert {"submission_received", "documents_received"} <= set(templates)

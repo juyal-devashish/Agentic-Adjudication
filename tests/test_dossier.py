@@ -122,7 +122,7 @@ def test_flow3_handoff_lists_dossier_narrative_and_qc_with_matching_hashes(tmp_p
         ref = manifest[key]
         assert sha256_bytes((store.case_dir(cid) / ref["path"]).read_bytes()) == ref["sha256"]
     assert "documents/original" not in json.dumps(manifest)
-    assert manifest["narrative"]["approved_by"] == "Anna Safety"  # signed by a person (P-37)
+    assert manifest["narrative"]["approved_by"] == "Dr. Anna Weber"  # signed by a person (P-37)
     assert manifest["narrative"]["simulated_ai"] is False  # drafted from a recorded live answer
     notes = [json.loads(p.read_text()) for p in paths.outbox.glob("*.json")]
     assert any(n["template"] == "ready_for_adjudication" and n["case_id"] == cid for n in notes)

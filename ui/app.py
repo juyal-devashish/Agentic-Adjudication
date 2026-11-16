@@ -8,11 +8,11 @@ from __future__ import annotations
 import mail_toasts
 import streamlit as st
 import theme
-from common import Context, demo_ready, paths, pipeline, users
+from common import Context, demo_ready, organisation, paths, pipeline, site_name, users
 from wording import ROLE_NAMES, ROLE_PAGES
 
 st.set_page_config(
-    page_title="Event adjudication intake", layout="wide", initial_sidebar_state="auto"
+    page_title="Clinical event adjudication", layout="wide", initial_sidebar_state="auto"
 )
 theme.apply()
 theme.synthetic_band()
@@ -49,6 +49,7 @@ else:
     match = []
 if match and f"user_{match[0]['role']}" not in st.session_state:
     st.session_state[f"user_{match[0]['role']}"] = match[0]
+theme.brand(organisation())
 menu = st.sidebar.container()  # filled below, once the pages are registered
 with st.sidebar:
     st.subheader("You are")
@@ -66,6 +67,7 @@ with st.sidebar:
     st.session_state["role"] = role
     role_users = [u for u in all_users if u["role"] == role]
     user = st.selectbox("Name", role_users, format_func=lambda u: u["name"], key=f"user_{role}")
+    st.caption(site_name(user["site"]) if role == "site" else organisation())
 
     states = pipeline().store.list_case_states()
     states = [cs for cs in states if Context(user, None).sees(cs.subject)]  # site segregation

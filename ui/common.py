@@ -85,6 +85,16 @@ def doc_label(type_: str) -> str:
     return Checklist.for_study(paths().config, STUDY).label(type_)
 
 
+def site_name(site_id: str | None) -> str:
+    """'101' -> 'Larkfield General Hospital', from `site_names` in study.yaml."""
+    names = study_config().get("site_names") or {}
+    return names.get(str(site_id), f"site {site_id}")
+
+
+def organisation() -> str:
+    return study_config().get("organisation", "")
+
+
 def doc_types() -> dict[str, dict[str, Any]]:
     """The study's document types, in checklist order."""
     return Checklist.for_study(paths().config, STUDY).types
@@ -114,7 +124,7 @@ def case_header(ctx: Context, here: str) -> None:
         ("Status", f"{theme.state_status(cs.state)} {since}"),
         ("Onset", html.escape(theme.date_words(snap["onset_date"]))),
         ("Subject", html.escape(snap["subject_id"])),
-        ("Site", html.escape(str(snap["site_id"]))),
+        ("Site", html.escape(site_name(snap["site_id"]))),
         ("AE", html.escape(snap["ae_id"])),
     ]
     if cs.flags:
@@ -126,7 +136,7 @@ def case_header(ctx: Context, here: str) -> None:
             next_step(
                 ctx.role,
                 cs.state,
-                site=snap["site_id"],
+                site=site_name(snap["site_id"]),
                 requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
                 ready=submission_status(pipe.store, ctx.case_id).ready,
                 has_files=bool(documents_of(pipe.store, ctx.case_id).files),
@@ -145,7 +155,7 @@ def case_list(ctx: Context, intro: str) -> None:
 
     states = [cs for cs in pipeline().store.list_case_states() if ctx.sees(cs.subject)]
     if ctx.role == "site":
-        theme.quiet(f"Only cases of site {ctx.user['site']} are shown.")
+        theme.quiet(f"Only cases of {site_name(ctx.user['site'])} are shown.")
     if not states:
         st.write(
             "No cases yet. They appear here once the data manager imports AE records."

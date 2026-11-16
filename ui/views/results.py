@@ -12,7 +12,7 @@ import sys
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, case_list, context, paths, pipeline, users
+from common import case_header, case_list, context, paths, pipeline, site_name, users
 
 from adjud.ai.gateway import Gateway
 from adjud.handoff import read_manifest
@@ -56,6 +56,35 @@ EVENT_WORDS = {
     "case.flagged": "Case flagged",
     "case.withdrawn": "Case withdrawn",
 }
+
+
+# Automatic steps in the audit trail, in words (people are named from users.yaml).
+ACTOR_WORDS = {
+    "system:intake": "Automatic: case intake",
+    "system:deid": "Automatic: identifier removal",
+    "system:qc": "Automatic: quality checks",
+    "system:narrative": "Automatic: narrative draft",
+    "system:dossier": "Automatic: dossier",
+    "system:mailer": "Automatic: e-mail",
+    "system:upload-folder": "Automatic: upload folder",
+}
+
+
+def who(actor: str, names: dict[str, str]) -> str:
+    if actor in names:
+        return names[actor]
+    if actor.startswith("agent:"):
+        return "AI agent, checked by code"
+    return ACTOR_WORDS.get(actor, "Automatic")
+
+
+def recipient(to: str) -> str:
+    """'site:101' -> 'Larkfield General Hospital'; 'role:safety_specialist' -> 'Safety
+    Specialist'."""
+    kind, _, value = to.partition(":")
+    if kind == "site":
+        return site_name(value)
+    return value.replace("_", " ").title() if kind == "role" else to
 
 
 def measurements(heading: bool = True) -> None:
@@ -141,7 +170,8 @@ def measurements(heading: bool = True) -> None:
 if ctx.case_id is None:
     st.title("Case record")
     case_list(ctx, "Select a case to open its full record, or choose one in the sidebar.")
-    measurements()
+    with st.expander("Technical details"):
+        measurements(heading=False)
     st.stop()
 
 cid = ctx.case_id
@@ -173,8 +203,6 @@ else:
         st.download_button(
             f"Download {name}{pages}", store.get_file(cid, d["path"]), file_name=name, key=d["path"]
         )
-    with st.expander("Package contents (flow2_manifest.json)"):
-        st.json(manifest)
 
 flow3 = next((e for e in reversed(store.events(cid)) if e["type"] == "handoff.flow3_ready"), None)
 if flow3:
@@ -188,21 +216,19 @@ if flow3:
         f"Dossier version {package['dossier']['version']} and the narrative approved by "
         f"{by} on {theme.date_words(n['approved_at'])} were handed to adjudication."
     )
-    with st.expander("Package contents (flow3_manifest.json)"):
-        st.json(package)
 
 # --- audit trail -------------------------------------------------------------------------------
 st.header("Audit trail", anchor="audit-trail")
 report = verify_case_log(store.case_dir(cid))
 if report.ok:
     st.html(
-        f"<p>{theme.status('Intact', 'good')}: all {report.records} entries are chained and "
-        "every file they refer to is unchanged.</p>"
+        f"<p>{theme.status('Intact', 'good')}: nothing in this record has changed since it "
+        f"was written ({report.records} entries, every file checked).</p>"
     )
 else:
     st.html(
         f"<p>{theme.status('Changed after the fact', 'bad')}. The record no longer matches "
-        "its seal:</p><ul>" + "".join(f"<li>{p}</li>" for p in report.problems) + "</ul>"
+        "what was written:</p><ul>" + "".join(f"<li>{p}</li>" for p in report.problems) + "</ul>"
     )
 events = store.events(cid)
 names = {u["id"]: u["name"] for u in users()}
@@ -218,10 +244,9 @@ st.dataframe(
         [
             {
                 "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
-                "Who": names.get(e["actor"], e["actor"].replace("system:", "System, ")),
+                "Who": who(e["actor"], names),
                 "What": EVENT_WORDS.get(e["type"], e["type"]),
                 "Reason": e.get("reason") or "",
-                "Seal": e["hash"][7:15],
             }
             for e in shown
         ]
@@ -238,8 +263,14 @@ with tabs[0]:
     st.dataframe(
         pd.DataFrame(
             [
-                {"Field": label, "Value": theme.plain_value(str(snap.get(field, "")))}
+                {
+                    "Field": label,
+                    "Value": site_name(snap.get(field))
+                    if field == "site_id"
+                    else theme.plain_value(str(snap.get(field, ""))),
+                }
                 for field, label in theme.AE_FIELDS
+                if field not in theme.AE_CODES  # coding details: under Technical details
             ]
         ),
         hide_index=True,
@@ -249,9 +280,8 @@ with tabs[1]:
     elig = store.get_json(cid, "source/eligibility_v1.json")
     verdict = "met" if elig["eligible"] else "did not meet"
     st.html(
-        f"<p>When the case was created, this AE {verdict} rule set "
-        f"{theme.html.escape(str(elig['rule_set']))} version {elig['version']}.</p>"
-        f"<ul>{theme.rules_html(elig['results'])}</ul>"
+        f"<p>When the case was created, this adverse event {verdict} the study's rules for "
+        f"adjudication.</p><ul>{theme.rules_html(elig['results'])}</ul>"
     )
 with tabs[2]:
     related = store.get_json(cid, "source/related_data.json")
@@ -317,9 +347,7 @@ if mine:
             [
                 {
                     "When (UTC)": f"{theme.date_words(n['created_at'])} {n['created_at'][11:16]}",
-                    "To": n["to"]
-                    .replace("site:", "Site ")
-                    .replace("role:safety_specialist", "Safety Specialist"),
+                    "To": recipient(n["to"]),
                     "Message": n["subject"],
                     "E-mail": {"sent": "Sent", "failed": "Failed"}.get(
                         emailed.get(n["id"], ""), "Not sent"
@@ -340,30 +368,79 @@ gw = Gateway.for_study(store, paths().config)
 calls = [e for e in store.events(cid) if e["type"] == "ai.called"]
 mode_words = {"off": "off", "replay": "replaying recorded answers", "live": "live"}
 st.write(
-    f"AI is {mode_words[gw.cfg.mode]} for this study (model {gw.cfg.model}). Agents only "
-    "propose; code checks every proposal before it can move a case."
+    "AI agents read the documents and draft the narrative. They only propose: code checks "
+    "every answer, and the Safety Specialist decides."
 )
 if calls:
-    rows = []
-    for e in calls:
-        d = e["data"]
-        rec = store.get_json(cid, d["call"]["path"])
-        rows.append(
-            {
-                "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:16]}",
-                "Task": d["function"].replace("_", " ").capitalize(),
-                "Source": "Simulated AI" if d["simulated"] else "AI",
-                "Answer": "Valid" if d["valid"] else "Not usable",
-                "Tools used": len(rec.get("tool_calls", [])),
-                "Tokens": sum(rec.get("usage", {}).values()),
-                "Cost (USD)": f"{d['cost_usd']:.4f}",
-            }
-        )
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:16]}",
+                    "Task": e["data"]["function"].replace("_", " ").capitalize(),
+                    "Source": "Simulated AI" if e["data"]["simulated"] else "AI",
+                    "Answer": "Valid" if e["data"]["valid"] else "Not usable",
+                }
+                for e in calls
+            ]
+        ),
+        hide_index=True,
+        width="stretch",
+    )
 else:
     st.write("No AI calls for this case.")
-spent = gw.spent_usd()
-st.caption(f"All cases: ${spent:.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget.")
 
-with st.expander("How well identifiers are removed (test kit, the same for every case)"):
+# --- technical details: one place, collapsed, for whoever asks ---------------------------------
+with st.expander("Technical details"):
+    st.subheader("AI")
+    st.write(f"AI is {mode_words[gw.cfg.mode]} for this study (model {gw.cfg.model}).")
+    if calls:
+        rows = []
+        for e in calls:
+            d = e["data"]
+            rec = store.get_json(cid, d["call"]["path"])
+            rows.append(
+                {
+                    "Task": d["function"].replace("_", " ").capitalize(),
+                    "Tools used": len(rec.get("tool_calls", [])),
+                    "Tokens": sum(rec.get("usage", {}).values()),
+                    "Cost (USD)": f"{d['cost_usd']:.4f}",
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption(f"All cases: ${gw.spent_usd():.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget.")
+    st.subheader("Audit trail seals")
+    st.write("Each entry carries the hash of the one before it, so any change shows.")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {"When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
+                 "What": EVENT_WORDS.get(e["type"], e["type"]), "Seal": e["hash"][7:15]}
+                for e in events
+            ]
+        ),
+        hide_index=True,
+        width="stretch",
+    )  # fmt: skip
+    st.subheader("Coding and rules")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {"Field": label, "Value": str(snap.get(field, ""))}
+                for field, label in theme.AE_FIELDS
+                if field in theme.AE_CODES
+            ]
+            + [{"Field": "Eligibility rule set",
+                "Value": f"{elig['rule_set']} version {elig['version']}"}]
+        ),
+        hide_index=True,
+        width="stretch",
+    )  # fmt: skip
+    if manifest is not None:
+        st.subheader("Package for adjudication (flow2_manifest.json)")
+        st.json(manifest, expanded=False)
+    if flow3:
+        st.subheader("Package for Flow 3 (flow3_manifest.json)")
+        st.json(package, expanded=False)
+    st.subheader("How well identifiers are removed (test kit, every case)")
     measurements(heading=False)

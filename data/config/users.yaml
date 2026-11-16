@@ -1,33 +1,34 @@
 # Demo users (from the Flow 1 test kit, with the study admin replaced by a data manager:
-# plan P-25). SYNTHETIC DEMO ONLY: no real authentication.
-# Every demo password is "demo"; only its bcrypt hash is stored here. E-mail addresses use the
-# reserved example.com domain; for a demo, SMTP_REDIRECT_TO sends every message to one inbox.
+# plan P-25). SYNTHETIC DEMO ONLY: no real authentication. The people are fictional.
+# Every demo password is "demo"; only its bcrypt hash is stored here. Site staff use reserved
+# .example domains; Tech Observer staff use tech-observer.com, so if SMTP ever points at a
+# real mail server, set SMTP_REDIRECT_TO to send every message to the presenter instead.
 users:
   - id: site101.coord
-    name: Site 101 Coordinator
+    name: Priya Nair
     role: site
     site: "101"
-    email: site101@example.com
+    email: priya.nair@larkfield-general.example
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: site102.coord
-    name: Site 102 Coordinator
+    name: Tom Hollis
     role: site
     site: "102"
-    email: site102@example.com
+    email: tom.hollis@brennanvalley-mc.example
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: site104.coord
-    name: Site 104 Coordinator
+    name: Katrin Vogel
     role: site
     site: "104"
-    email: site104@example.com
+    email: katrin.vogel@klinikum-auenstadt.example
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: ss.anna
-    name: Anna Safety
+    name: Dr. Anna Weber
     role: safety_specialist
-    email: safety@example.com
+    email: anna.weber@tech-observer.com
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: dm.dana
-    name: Dana Data
+    name: Rahul Mehta
     role: data_manager
-    email: data.manager@example.com
+    email: rahul.mehta@tech-observer.com
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
