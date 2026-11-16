@@ -254,3 +254,47 @@ def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
     assert {a for a in people if not a.startswith("system:")} == {site, "ss.anna"}
     assert store.state(ae005).state == State.QC_REVIEW
     assert store.get_json(ae005, "qc/checks_v1.json")["proposal"] == "unclear"
+
+
+def test_the_short_demo_has_three_cases_and_keeps_its_recorded_ai(tmp_path, monkeypatch):
+    """`tools.reset_demo` without --all: three cases and one record that is not eligible,
+    and the recorded agent answers still match although the case numbers changed."""
+    from adjud.documents import upload
+    from adjud.paths import DataPaths
+    from adjud.review import submit
+    from adjud.runner import Runner
+    from adjud.workflow import State
+    from tools.reset_demo import DEMO_AES, reset
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True, only=DEMO_AES)
+    staged = sorted(p.name for p in (paths.root / "demo_uploads" / "documents").iterdir())
+    assert staged == ["DEMO01-101-0001_AE-001", "DEMO01-101-0005_AE-006",
+                      "DEMO01-102-0004_AE-005"]  # fmt: skip
+    runner = Runner(paths)
+    runner.run_once()
+    pipe, store = runner.pipeline, runner.pipeline.store
+    assert sorted(store.list_cases()) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
+    assert pipe.case_for("DEMO01|DEMO01-102-0004|AE-005") == "DEMO01-0002"
+    for folder, site in (("DEMO01-101-0001_AE-001", "101"), ("DEMO01-102-0004_AE-005", "102")):
+        subject, ae = folder.split("_")
+        cid = pipe.case_for(f"DEMO01|{subject}|{ae}")
+        files = sorted((KIT / "documents" / folder).iterdir())
+        upload(store, cid, [(f.name, f.read_bytes()) for f in files], f"site{site}.coord")
+        runner.run_case_steps()
+        submit(store, cid, f"site{site}.coord", "demo", paths.config)
+    for _ in range(2):
+        runner.run_case_steps()
+    assert store.get_json("DEMO01-0001", "qc/checks_v1.json")["proposal"] == "pass"
+    unsure = store.get_json("DEMO01-0002", "qc/checks_v1.json")
+    assert unsure["proposal"] == "unclear" and unsure["ai"][0]["label"] == "AI"  # recorded
+    runner.flow2.sign_qc_pass("DEMO01-0001", "ss.anna", "demo")
+    runner.run_case_steps()
+    assert store.state("DEMO01-0001").state == State.NARRATIVE_REVIEW
+    drafted = next(e for e in store.events("DEMO01-0001") if e["type"] == "narrative.drafted")
+    assert drafted["data"]["source"] == "ai" and drafted["data"]["simulated"] is False
