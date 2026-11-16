@@ -158,7 +158,6 @@ def main() -> None:
             ("8_record_needs_qc", f"record?role=safety_specialist&case={cases['qc_review']}"),
             ("9_narrative_review", f"qc?role=safety_specialist&case={cases['narrative']}"),
             ("10_site_query", f"documents?role=site&case={cases['query']}"),
-            ("11_documents_reader", f"documents?role=safety_specialist&case={cases['review']}"),
             ("12_documents_no_case", "documents?role=site&user=site101.coord"),
         ]
         with sync_playwright() as pw:

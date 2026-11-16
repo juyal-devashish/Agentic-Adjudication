@@ -82,6 +82,14 @@ ROLE_NAMES = {  # in demo order; the first is where the app opens (on AE import)
 }
 
 
+# The pages each role works on, its landing page first. Case record is read-only for all.
+ROLE_PAGES = {
+    "data_manager": ["import", "record"],
+    "site": ["documents", "record"],
+    "safety_specialist": ["qc", "record"],
+}
+
+
 def in_sentence(name: str) -> str:
     """'Laboratory results' -> 'laboratory results'; 'ECG report' stays."""
     name = name.replace("_", " ")
