@@ -244,3 +244,44 @@ def test_invalid_boxes_are_refused(ctx, box, match):
     proc.process_case(cid)
     with pytest.raises(ReviewRefused, match=match):
         change_redactions(store, cid, SITE, boxes=[box])
+
+
+def test_documents_are_typed_from_their_title_and_the_site_can_correct_a_type(ctx):
+    """P-38: no type is asked at upload; processing reads each title. A correction by the
+    site is its own event and is handed to Flow 2 as the site's label; automatic types are
+    not, so QC reads the titles itself as before."""
+    from adjud.review import relabel_document
+    from adjud.workflow import TransitionRefused
+
+    store, proc, cid = ctx
+    names = ("discharge_summary.pdf", "ecg_report.pdf", "troponin_results.xlsx")
+    upload(store, cid, [(n, (DOCS / n).read_bytes()) for n in names], SITE)
+    upload(store, cid, [("note.pdf", pdf("Thank you for seeing this patient."))], SITE)
+    proc.process_case(cid)
+    docs = documents_of(store, cid)
+    assert {n: docs.type_of(n) for n in (*names, "note.pdf")} == {
+        "discharge_summary.pdf": ("discharge_summary", "auto"),
+        "ecg_report.pdf": ("ecg_report", "auto"),
+        "troponin_results.xlsx": ("lab_results", "auto"),
+        "note.pdf": (None, ""),  # no title: left to QC and its agent
+    }
+
+    relabel_document(store, cid, "note.pdf", "referral_letter", SITE, CONFIG)
+    relabel_document(store, cid, "ecg_report.pdf", "ecg_report", SITE, CONFIG)  # no change
+    labelled = [e for e in store.events(cid) if e["type"] == "document.labelled"]
+    assert [(e["actor"], e["data"]) for e in labelled] == [
+        (SITE, {"name": "note.pdf", "label": "referral_letter", "previous": None})
+    ]
+    assert documents_of(store, cid).type_of("note.pdf") == ("referral_letter", "site")
+    with pytest.raises(ReviewRefused, match="not a document type"):
+        relabel_document(store, cid, "note.pdf", "x-ray", SITE, CONFIG)
+    with pytest.raises(ReviewRefused, match="no current document"):
+        relabel_document(store, cid, "missing.pdf", "other", SITE, CONFIG)
+
+    submit(store, cid, SITE, "demo", CONFIG)
+    write_handoff(store, cid, CONFIG, proc.outbox)
+    types = {d["source_name"]: d["document_type"] for d in read_manifest(store, cid)["documents"]}
+    assert types == {"discharge_summary.pdf": None, "ecg_report.pdf": None,
+                     "troponin_results.xlsx": None, "note.pdf": "referral_letter"}  # fmt: skip
+    with pytest.raises(TransitionRefused):  # signed: types are fixed
+        relabel_document(store, cid, "note.pdf", "other", SITE, CONFIG)

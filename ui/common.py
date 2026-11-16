@@ -85,6 +85,11 @@ def doc_label(type_: str) -> str:
     return Checklist.for_study(paths().config, STUDY).label(type_)
 
 
+def doc_types() -> dict[str, dict[str, Any]]:
+    """The study's document types, in checklist order."""
+    return Checklist.for_study(paths().config, STUDY).types
+
+
 def study_config() -> dict[str, Any]:
     return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
 

@@ -110,6 +110,21 @@ def output_pages(store: FileCaseStore, case_id: str, rel_path: str) -> list[str]
     return list(_pages(hashlib.sha256(content).hexdigest(), content, kind))
 
 
+def first_page_text(content: bytes, rel_path: str) -> str:
+    """Text of the first page only (first sheet of a spreadsheet), as output_pages reads it:
+    enough for the document's title without OCR of every page (P-38)."""
+    if rel_path.endswith(".xlsx"):
+        return _pages(hashlib.sha256(content).hexdigest(), content, "xlsx")[0]
+    with pymupdf.open(stream=content, filetype="pdf") as doc:
+        p = doc[0]
+        text = p.get_text()
+        if not text.strip() and ocr.available():
+            pix = p.get_pixmap(dpi=ocr.TARGET_DPI, colorspace=pymupdf.csGRAY)
+            img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+            text = ocr.ocr_unit(img, ocr.TARGET_DPI).text
+        return text[:MAX_PAGE_CHARS]
+
+
 def page_text(store: FileCaseStore, case_id: str, file: str, page: int) -> str | None:
     """Text of one page of a redacted output, by the original file name. None if there is
     no such file or page. Used by tools and by the gates."""

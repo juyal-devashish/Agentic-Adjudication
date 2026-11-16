@@ -483,3 +483,26 @@ def test_switching_role_moves_to_that_roles_page_and_keeps_the_role(demo):
         assert not at.exception, at.exception
         assert at.session_state["role"] == role and at.query_params["role"] == role
         assert title in [t.value for t in at.title]
+
+
+def test_the_site_sees_recognised_document_types_and_can_correct_one(demo):
+    from adjud.documents import documents_of, upload
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    src = demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    files = [(f.name, f.read_bytes()) for f in sorted(src.iterdir())]
+    upload(runner.pipeline.store, "DEMO01-0001", files, "site101.coord")
+    runner.run_once()
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    table = next(df.value for df in at.dataframe if "Type" in df.value.columns)
+    assert sorted(table["Type"]) == ["Discharge or death summary", "ECG report",
+                                     "Laboratory results"]  # fmt: skip
+    kind = next(s for s in at.selectbox if s.label == "Document type")
+    assert kind.value == "discharge_summary" and not kind.disabled
+    kind.select("other").run()
+    assert not at.exception, at.exception
+    docs = documents_of(runner.pipeline.store, "DEMO01-0001")
+    assert docs.type_of("discharge_summary.pdf") == ("other", "site")
