@@ -19,7 +19,7 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 
 ## Script (about 15 minutes)
 
-1. **Roles.** The roles are data manager, site user (101, 102 and 104) and Safety Specialist. As *Site 101 Coordinator*, only site 101's cases and records are visible.
+1. **Roles.** The roles are data manager, site user (101, 102 and 104) and Safety Specialist. Each sees only its own pages: the data manager *AE import*, the site *Documents*, the Safety Specialist *Quality check*, and everyone the read-only *Case record*. Switching role opens that role's page. As *Site 101 Coordinator*, only site 101's cases and records are visible.
    - **E-mails.** Each e-mail the runner sends pops up at the bottom right within a few seconds, for every role, about cases that role may see. Keep Mailpit (:8025) open beside the app to show the same message arriving; its link opens the case.
 2. **AE import.** As data manager, on *AE import*:
    - **Import queued files** gives 3 cases and 1 record that isn't eligible. Click it within 5 minutes of the reset; after that the runner imports the file itself.
