@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 import theme
 from boxdraw import page_box
-from common import case_header, case_list, context, doc_label, pipeline, processor, study_config
+from common import case_header, case_list, context, doc_label, doc_types, pipeline, processor
 from preview import pdf_page, show_sheets
 
 from adjud.documents import documents_of, upload
@@ -20,6 +20,7 @@ from adjud.review import (
     ReviewRefused,
     change_redactions,
     delete_document,
+    relabel_document,
     submission_status,
     submit,
 )
@@ -38,7 +39,6 @@ if ctx.case_id is None:
 cid = ctx.case_id
 case_header(ctx, "views/site_documents.py")
 cs = store.state(cid)
-requested = study_config().get("requested_documents", [])
 is_site = ctx.role == "site"
 if not is_site:
     st.caption(
@@ -100,29 +100,10 @@ if can_upload:
             accept_multiple_files=True,
             key=f"uploader_{cid}_{n}",
         )
-        labels: dict[str, str] = {}
-        if files:
-            st.caption(
-                "What is each file? Leave it as Not specified and the type is recognised "
-                "from the document."
-            )
-            for i, f in enumerate(files):
-                label = st.selectbox(
-                    f.name,
-                    [None, *requested],
-                    format_func=lambda r: "Not specified" if r is None else doc_label(r),
-                    key=f"label_{cid}_{n}_{i}",
-                )
-                if label:
-                    labels[f.name] = label
+        if files:  # each file's type is read from its title once processed (P-38)
+            theme.quiet("Each file's type is recognised from the document; you can correct it.")
         if st.button("Add to case", disabled=not files):
-            names = upload(
-                store,
-                cid,
-                [(f.name, f.getvalue()) for f in files],
-                ctx.actor,
-                labels=labels or None,
-            )
+            names = upload(store, cid, [(f.name, f.getvalue()) for f in files], ctx.actor)
             st.session_state[round_key] = n + 1
             st.toast(f"Added {', '.join(names)} to the case")
             wait_for_redaction("Removing identifiers. Scanned pages take a few seconds each.", 60)
@@ -148,13 +129,13 @@ if not docs.files:
     st.stop()
 
 rows = []
-for name, f in sorted(docs.files.items()):
+for name in sorted(docs.files):
     done = docs.processed.get(name)
     word, _ = theme.FILE_STATUS[done["status"] if done else "processing"]
     rows.append(
         {
             "File": name,
-            "Type": (f.label or "").replace("_", " ").capitalize(),
+            "Type": doc_label(t) if (t := docs.type_of(name)[0]) else "Not recognised yet",
             "Status": word,
             "Identifiers removed": done["findings"] if done else None,
             "Still found": done["residuals"] if done else None,
@@ -168,8 +149,6 @@ def _ink(value: str) -> str:
 
 
 files_table = pd.DataFrame(rows)
-if not files_table["Type"].any():  # nobody labelled the files: leave the column out
-    files_table = files_table.drop(columns="Type")
 st.dataframe(files_table.style.map(_ink, subset=["Status"]), hide_index=True, width="stretch")
 
 for name in sorted(docs.files):
@@ -195,11 +174,33 @@ reviewable = [
 ]
 if reviewable:
     st.header("Review")
-    name = st.selectbox("File to review", reviewable)
+    can_change = is_site and store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    pick_file, pick_type = st.columns([3, 2], gap="large")
+    name = pick_file.selectbox("File to review", reviewable)
+    # The type recognised from the title (P-38); the site corrects it here if it is wrong.
+    current, set_by = docs.type_of(name)
+    types = list(doc_types())
+    chosen = pick_type.selectbox(
+        "Document type",
+        types,
+        index=types.index(current) if current in types else None,
+        format_func=doc_label,
+        placeholder="Not recognised yet",
+        disabled=not can_change,
+        key=f"type_{cid}_{name}",
+    )
+    if can_change and chosen and chosen != current:
+        relabel_document(store, cid, name, chosen, ctx.actor, pipe.paths.config)
+        st.toast(f"{name} is now marked as {doc_label(chosen).lower()}")
+        st.rerun()
+    pick_type.caption(
+        {"site": "Set by the site.", "auto": "Recognised from the document's title."}.get(
+            set_by, "No title recognised; the quality check will identify it."
+        )
+    )
     done = docs.processed[name]
     report = store.get_json(cid, done["report"]["path"])
     output = store.get_file(cid, done["output"]["path"])
-    can_change = is_site and store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
     is_sheet = done["output"]["path"].endswith(".xlsx")
     left, right = st.columns([3, 2], gap="large")
     with left:
