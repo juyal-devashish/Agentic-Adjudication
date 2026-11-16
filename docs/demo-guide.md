@@ -22,7 +22,7 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 1. **Roles.** The roles are data manager, site user (101, 102 and 104) and Safety Specialist. As *Site 101 Coordinator*, only site 101's cases and records are visible.
 2. **AE import.** As data manager, on *AE import*:
    - **Import queued files** gives 3 cases and 1 record that isn't eligible. Click it within 5 minutes of the reset; after that the runner imports the file itself.
-   - **Why?** on AE-008 lists each rule's result: it is not serious.
+   - Click the AE-008 row in the results table: below it, each rule's result shows why it is not a case (it is not serious).
    - **Pull AE records now** is a stand-in that reads the mock EDC; no live EDC is connected.
 3. **Upload.** Case DEMO01-0001's site gets an e-mail (show it in Mailpit). Then either:
    - as *Site 101 Coordinator*, on *Documents*, add the three files from `data/demo_uploads/documents/DEMO01-101-0001_AE-001/`. Each file can be given its type, or left as *Not specified* to be recognised; or

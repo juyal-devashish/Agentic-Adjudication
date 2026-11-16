@@ -125,7 +125,8 @@ else:
             width="stretch",
         )
     if outcomes:
-        st.dataframe(
+        # Selecting a row shows below the table why that record did or did not become a case.
+        picked = st.dataframe(
             pd.DataFrame(
                 [
                     {
@@ -142,23 +143,30 @@ else:
             ),
             hide_index=True,
             width="stretch",
+            on_select="rerun",
+            selection_mode="single-row",
+            key=f"outcomes_{chosen.name}",
         )
-
-        latest = {
-            e["key"]: e for e in read_log(pipe.store.evaluations_path) if e.get("explanation")
-        }
-        keys = [o["key"] for o in outcomes]
-        key = st.selectbox(
-            "Why?", keys, format_func=lambda k: f"{k.split('|')[1]}, {k.split('|')[2]}"
-        )
-        if key in latest:
-            e = latest[key]
-
-            verdict = "meets" if e["eligible"] else "does not meet"
-            st.html(
-                f"<p>This record {verdict} rule set {html.escape(e['rule_set'])} "
-                f"version {e['rule_version']}.</p><ul>{theme.rules_html(e['explanation'])}</ul>"
-            )
+        rows = picked.selection.rows
+        if not rows:
+            theme.quiet("Select a row to see why that record did or did not become a case.")
+        else:
+            key = outcomes[rows[0]]["key"]
+            latest = {
+                e["key"]: e for e in read_log(pipe.store.evaluations_path) if e.get("explanation")
+            }
+            subject, ae = key.split("|")[1:3]
+            st.subheader(f"Why: {subject}, {ae}")
+            if key in latest:
+                e = latest[key]
+                verdict = "meets" if e["eligible"] else "does not meet"
+                st.html(
+                    f"<p>This record {verdict} rule set {html.escape(e['rule_set'])} "
+                    f"version {e['rule_version']}.</p>"
+                    f"<ul>{theme.rules_html(e['explanation'])}</ul>"
+                )
+            else:
+                st.write("No rule explanation is stored for this record.")
 
 # --- manual entry (F1-08) ----------------------------------------------------------------------
 st.header("Enter an AE by hand")

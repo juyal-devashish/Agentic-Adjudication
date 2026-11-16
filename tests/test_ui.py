@@ -387,3 +387,18 @@ def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
     assert not at.get("page_link")  # already on Documents
     at = run("views/results.py", role="safety_specialist", case_id="DEMO01-0001")
     assert not at.get("page_link")  # nothing for the Safety Specialist to do yet
+
+
+def test_selecting_an_import_result_shows_why_below_the_table(demo):
+    at = run(role="data_manager")
+    next(b for b in at.button if b.label == "Import queued files").click().run()
+    assert any("Select a row to see why" in h for h in html_text(at).splitlines())
+    table = next(df for df in at.dataframe if "Rules not met" in df.value.columns)
+    row = int(table.value.index[table.value["AE"] == "AE-008"][0])
+    at.session_state["outcomes_01_initial.csv.report.json"] = {
+        "selection": {"rows": [row], "columns": [], "cells": []}
+    }
+    at.run()
+    assert not at.exception, at.exception
+    assert any(s.value == "Why: DEMO01-101-0007, AE-008" for s in at.subheader)
+    assert "This record does not meet rule set" in html_text(at)
