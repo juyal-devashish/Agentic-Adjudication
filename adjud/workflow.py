@@ -69,6 +69,7 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "deid.completed": {State.DEIDENTIFYING: State.AWAITING_SITE_CONFIRMATION},
     "deid.failed": {State.DEIDENTIFYING: State.AWAITING_DOCUMENTS},
     "redactions.changed": {State.AWAITING_SITE_CONFIRMATION: State.DEIDENTIFYING},
+    "document.labelled": {State.AWAITING_SITE_CONFIRMATION: SAME},  # site corrects a type
     "document.deleted": {
         State.AWAITING_DOCUMENTS: SAME,
         State.AWAITING_SITE_CONFIRMATION: SAME,

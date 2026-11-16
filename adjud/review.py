@@ -3,6 +3,7 @@
     change_redactions()  untick findings (reason required) and/or add terms
                          -> redactions.changed (AWAITING_SITE_CONFIRMATION -> DEIDENTIFYING)
     delete_document()    -> document.deleted
+    relabel_document()   site corrects an automatic document type -> document.labelled
     submission_status()  can this case be signed now, and if not, why
     submit()             demo signature -> submission.signed (-> SUBMITTED)
 
@@ -96,6 +97,29 @@ def delete_document(
         case_id,
         EventDraft(type="document.deleted", actor=actor, data={"name": name}, reason=reason),
     )
+
+
+def relabel_document(
+    store: FileCaseStore, case_id: str, name: str, label: str, actor: str, config_dir: Path
+) -> None:
+    """The site corrects a document's type during its review (P-38). The study's checklist
+    lists the types; the state does not change."""
+    from adjud.qc import Checklist
+
+    docs = documents_of(store, case_id)
+    if name not in docs.files:
+        raise ReviewRefused(f"no current document named {name!r}")
+    study = store.state(case_id).study
+    if label not in Checklist.for_study(config_dir, study).types:
+        raise ReviewRefused(f"{label!r} is not a document type of this study")
+    previous, _ = docs.type_of(name)
+    if label == previous:
+        return
+    store.append_event(
+        case_id,
+        EventDraft(type="document.labelled", actor=actor,
+                   data={"name": name, "label": label, "previous": previous}),
+    )  # fmt: skip
 
 
 @dataclass

@@ -88,6 +88,15 @@ class CaseDocuments:
     last_run: dict[str, Any] | None = None  # data of the last deid.completed / failed
     processed: dict[str, dict[str, Any]] = field(default_factory=dict)  # last run's files
 
+    def type_of(self, name: str) -> tuple[str | None, str]:
+        """A file's document type and who set it: the site's label ("site") if there is
+        one, else the type read from its title when it was processed ("auto", P-38)."""
+        f = self.files.get(name)
+        if f and f.label:
+            return f.label, "site"
+        detected = (self.processed.get(name) or {}).get("detected_type")
+        return (detected, "auto") if detected else (None, "")
+
 
 def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
     docs = CaseDocuments()
@@ -99,6 +108,8 @@ def documents_of(store: FileCaseStore, case_id: str) -> CaseDocuments:
             for f in d["files"]:
                 docs.files[f["name"]] = CaseDocument(f["name"], f["path"], f["sha256"],
                                                      f.get("label"))  # fmt: skip
+        elif t == "document.labelled" and d["name"] in docs.files:
+            docs.files[d["name"]].label = d["label"]
         elif t == "document.deleted":
             docs.files.pop(d["name"], None)
             docs.keep.pop(d["name"], None)
@@ -204,6 +215,16 @@ class DocumentProcessor:
             return None
         return phi_detector(gw, case_id, self.policy)
 
+    def _detect_type(self, output: bytes, rel_path: str) -> str | None:
+        """The document type named by the title on the redacted first page (P-38), with
+        the same check QC uses; None when there is no recognisable title."""
+        from adjud.ai.tools import first_page_text  # imports this module
+        from adjud.qc import Checklist
+
+        checklist = Checklist.for_study(self.config_dir, self.study)
+        spreadsheet = rel_path.endswith(".xlsx")
+        return checklist.keyword_type(first_page_text(output, rel_path), spreadsheet=spreadsheet)
+
     def process_case(self, case_id: str) -> dict[str, Any]:
         """One de-identification run over all current documents of a DEIDENTIFYING case."""
         store = self.store
@@ -246,6 +267,7 @@ class DocumentProcessor:
             if r.output is not None and r.output_name:
                 rel = f"documents/redacted/r{run}/{r.output_name}"
                 data["output"] = {"path": rel, "sha256": store.put_file(case_id, rel, r.output)}
+                data["detected_type"] = self._detect_type(r.output, rel)
             rel = f"documents/reports/r{run}/{r.name}.json"
             report_sha = store.put_file(case_id, rel, json_bytes(r.report()))
             data["report"] = {"path": rel, "sha256": report_sha}
