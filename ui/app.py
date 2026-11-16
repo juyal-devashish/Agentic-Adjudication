@@ -9,7 +9,7 @@ import mail_toasts
 import streamlit as st
 import theme
 from common import Context, demo_ready, paths, pipeline, users
-from wording import ROLE_NAMES
+from wording import ROLE_NAMES, ROLE_PAGES
 
 st.set_page_config(
     page_title="Event adjudication intake", layout="wide", initial_sidebar_state="auto"
@@ -49,15 +49,21 @@ else:
     match = []
 if match and f"user_{match[0]['role']}" not in st.session_state:
     st.session_state[f"user_{match[0]['role']}"] = match[0]
+menu = st.sidebar.container()  # filled below, once the pages are registered
 with st.sidebar:
     st.subheader("You are")
+    # The chosen role lives in session state, not in the widget: switching role can send
+    # the person to another page (their own first page), and a page switch drops a keyed
+    # widget's new value, so the role snapped back. Unkeyed, the picker is rebuilt from it.
+    roles = list(ROLE_NAMES)
     role = st.selectbox(
         "Role",
-        list(ROLE_NAMES),
+        roles,
+        index=roles.index(st.session_state.get("role", roles[0])),
         format_func=ROLE_NAMES.get,
-        key="role",
         help="Roles are simulated for the demo; anyone can switch.",
     )
+    st.session_state["role"] = role
     role_users = [u for u in all_users if u["role"] == role]
     user = st.selectbox("Name", role_users, format_func=lambda u: u["name"], key=f"user_{role}")
 
@@ -94,26 +100,35 @@ if case_id:
 else:
     st.query_params.pop("case", None)
 
-st.navigation(
-    [
-        st.Page(
-            "views/edc_input.py",
-            title="AE import",
-            icon=":material/move_to_inbox:",
-            url_path="import",
-            default=True,
-        ),
-        st.Page(
-            "views/site_documents.py",
-            title="Documents",
-            icon=":material/description:",
-            url_path="documents",
-        ),
-        st.Page(
-            "views/quality_check.py", title="Quality check", icon=":material/rule:", url_path="qc"
-        ),
-        st.Page(
-            "views/results.py", title="Case record", icon=":material/fact_check:", url_path="record"
-        ),
-    ]
-).run()
+# Each role sees only the pages for its own work (ROLE_PAGES); the first is where it lands.
+# Every page stays registered, so links in e-mails and the next-step box always resolve;
+# the menu is drawn here with the role's pages only, and a page that is not the role's
+# (a typed URL, or a role switched while on it) sends the person to their own first page.
+PAGES = {
+    "import": ("views/edc_input.py", "AE import", ":material/move_to_inbox:"),
+    "documents": ("views/site_documents.py", "Documents", ":material/description:"),
+    "qc": ("views/quality_check.py", "Quality check", ":material/rule:"),
+    "record": ("views/results.py", "Case record", ":material/fact_check:"),
+}
+
+
+def landing() -> None:
+    """The bare address: replaced at once by the role's first page."""
+
+
+pages = {
+    key: st.Page(file, title=title, icon=icon, url_path=key)
+    for key, (file, title, icon) in PAGES.items()
+}
+current = st.navigation(
+    [st.Page(landing, title="Start", url_path="start", default=True), *pages.values()],
+    position="hidden",
+)
+own = ROLE_PAGES[role]
+if current.url_path not in own:
+    st.switch_page(pages[own[0]])
+with menu:
+    for key in own:
+        st.page_link(pages[key], label=PAGES[key][1], icon=PAGES[key][2])
+    st.divider()
+current.run()
