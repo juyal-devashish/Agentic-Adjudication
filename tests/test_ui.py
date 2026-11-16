@@ -225,6 +225,15 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     assert 'aria-current="step">Quality check' in html_text(at)
     doc = next(s for s in at.selectbox if s.label == "Document")  # the submitted files, read-only
     assert doc.options == ["ecg.pdf", "summary.pdf"] and at.get("image")
+    # Query fields only once the Safety Specialist chooses to send a query.
+    decision = next(r for r in at.radio if r.label == "Your decision")
+    assert decision.value == "pass" and not at.multiselect
+    assert not any(a.label == "Message to the site" for a in at.text_area)
+    decision.set_value("query").run()
+    assert [m.label for m in at.multiselect] == ["Query reasons"]
+    assert any(a.label == "Message to the site" for a in at.text_area)
+    next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
+    assert not at.multiselect
     at.text_input[-1].input("demo")
     next(b for b in at.button if b.label == "Sign decision").click().run()
     assert not at.exception, at.exception
