@@ -135,7 +135,9 @@ for name in sorted(docs.files):
     rows.append(
         {
             "File": name,
-            "Type": doc_label(t) if (t := docs.type_of(name)[0]) else "Not recognised yet",
+            "Type": doc_label(t)
+            if (t := docs.type_of(name)[0])
+            else ("" if done and done["status"] == "rejected" else "Not recognised yet"),
             "Status": word,
             "Identifiers removed": done["findings"] if done else None,
             "Still found": done["residuals"] if done else None,

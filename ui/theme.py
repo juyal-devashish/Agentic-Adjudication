@@ -200,7 +200,7 @@ def plain_value(value: str) -> str:
         return date_words(value)
     if value in ("Y", "N"):
         return {"Y": "Yes", "N": "No"}[value]
-    if value and value.isupper() and len(value) > 3:
+    if re.fullmatch(r"[A-Z_]{4,}", value or ""):  # a code word, not an id like DEMO01-101
         return value.replace("_", " ").capitalize()
     return value or "Not recorded"
 

@@ -263,7 +263,12 @@ with tabs[0]:
     st.dataframe(
         pd.DataFrame(
             [
-                {"Field": label, "Value": theme.plain_value(str(snap.get(field, "")))}
+                {
+                    "Field": label,
+                    "Value": site_name(snap.get(field))
+                    if field == "site_id"
+                    else theme.plain_value(str(snap.get(field, ""))),
+                }
                 for field, label in theme.AE_FIELDS
                 if field not in theme.AE_CODES  # coding details: under Technical details
             ]
