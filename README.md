@@ -181,7 +181,7 @@ Tesseract (English and German) and the spaCy model are built into the image.
 
 ```bash
 cp -n .env.example .env                                                  # optional settings (keeps an existing .env)
-docker compose run --rm runner python -m tools.reset_demo --preload    # fresh demo data
+docker compose run --rm runner python -m tools.reset_demo --preload    # fresh demo data: 3 cases (--all: whole kit)
 docker compose up --build                                               # UI on http://localhost:8501
 ```
 

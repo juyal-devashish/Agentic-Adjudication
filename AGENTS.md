@@ -103,7 +103,7 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
 | Measure de-identification on the kit corpus with the kit's harness and gate (~30 s; real API calls if AI-1 is on: ask first) | `uv run python -m tools.deid_check` |
 | Run only our pipeline over the kit corpus (outputs + per-file reports) | `uv run python -m tools.run_corpus` |
-| Reset the demo (wipes runtime data, loads kit EDC; `--preload` puts `01_initial.csv` in the inbox) | `uv run python -m tools.reset_demo` |
+| Reset the demo (wipes runtime data, loads the short demo: 3 cases and 1 record that isn't eligible; `--preload` puts `01_initial.csv` in the inbox; `--all` loads the whole kit) | `uv run python -m tools.reset_demo` |
 | Flow 2 QC scenarios (also staged by reset) | `uv run python -m tools.make_flow2_fixtures --out <dir>` |
 | Rewrite the simulated replay answers for the demo cases (no API calls) | `uv run python -m tools.simulate_ai` |
 | Run the UI or runner with recorded agent answers | `ADJUD_AI_MODE=replay uv run python -m adjud.runner` |
