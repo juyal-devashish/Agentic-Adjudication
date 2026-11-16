@@ -5,6 +5,7 @@ uv run streamlit run ui/app.py
 
 from __future__ import annotations
 
+import mail_toasts
 import streamlit as st
 import theme
 from common import Context, demo_ready, paths, pipeline, users
@@ -85,6 +86,7 @@ with st.sidebar:
         st.caption("No cases yet." if role != "site" else "No cases for your site yet.")
 
 st.session_state["ctx"] = Context(user=user, case_id=case_id)
+mail_toasts.show()  # a pop-up for each e-mail the runner sends about a visible case
 # Keep who and which case in the URL, so a browser refresh comes back to the same place.
 st.query_params.update({"role": role, "user": user["id"]})
 if case_id:
