@@ -26,6 +26,7 @@ import smtplib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from email.message import EmailMessage
+from email.utils import formataddr
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -105,13 +106,13 @@ def compose(
     case = note.get("case_id") or "-"
     msg["Subject"] = f"[{note['study']}] {note['subject']}: case {case}"
     msg["From"] = s.sender
-    msg["To"] = s.redirect_to or user["email"]
+    msg["To"] = s.redirect_to or formataddr((user["name"], user["email"]))
     link = f"{s.base_url}{note['link']}" if note.get("link") else s.base_url
     zip_hint = note["template"] in ("documents_requested", "query_opened", "upload_rejected")
     lines = [
         f"Dear {user['name']},",
         "",
-        f"{note['subject']} for case {case}.",
+        f"Case {case}: {note['subject'][:1].lower()}{note['subject'][1:]}.",
         "",
         f"Open the case: {link}",
         *(

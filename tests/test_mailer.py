@@ -71,7 +71,8 @@ def test_every_new_case_mails_its_site_once_without_clinical_content(pipe):
     assert len(client.sent) == 11
     msg = client.sent[0]
     body = msg.get_content()
-    assert msg["To"] == "priya.nair@larkfield-general.example"
+    assert msg["To"] == "Priya Nair <priya.nair@larkfield-general.example>"
+    assert "Case DEMO01-0001: documents requested for an adjudication case." in body
     assert body.startswith("Dear Priya Nair,") and "Tech Observer Clinical Adjudication" in body
     assert "http://localhost:8501/documents?role=site&case=DEMO01-0001" in body
     snap = pipe.store.get_json("DEMO01-0001", "source/ae_snapshot_v1.json")
