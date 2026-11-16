@@ -71,7 +71,8 @@ def test_every_new_case_mails_its_site_once_without_clinical_content(pipe):
     assert len(client.sent) == 11
     msg = client.sent[0]
     body = msg.get_content()
-    assert msg["To"] == "site101@example.com"
+    assert msg["To"] == "priya.nair@larkfield-general.example"
+    assert body.startswith("Dear Priya Nair,") and "Tech Observer Clinical Adjudication" in body
     assert "http://localhost:8501/documents?role=site&case=DEMO01-0001" in body
     snap = pipe.store.get_json("DEMO01-0001", "source/ae_snapshot_v1.json")
     for clinical in (snap["ae_term"], snap["onset_date"], snap["subject_id"]):
@@ -86,7 +87,7 @@ def test_redirect_sends_everything_to_the_presenter(pipe):
     s = SmtpSettings(host="h", port=1025, sender="me@x.org", redirect_to="presenter@x.org")
     mailer(pipe, client, s).deliver_pending()
     assert {m["To"] for m in client.sent} == {"presenter@x.org"}
-    assert "For: Site 101 Coordinator" in client.sent[0].get_content()
+    assert client.sent[0].get_content().startswith("Dear Priya Nair,")  # still named
 
 
 def test_failures_are_logged_and_retried_at_most_three_times(pipe):

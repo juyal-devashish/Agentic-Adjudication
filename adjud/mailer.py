@@ -97,25 +97,35 @@ def recipients(to: str, users: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [u for u in found if u.get("email")]
 
 
-def compose(note: dict[str, Any], user: dict[str, Any], s: SmtpSettings) -> EmailMessage:
+def compose(
+    note: dict[str, Any], user: dict[str, Any], s: SmtpSettings, organisation: str = ""
+) -> EmailMessage:
+    """A short letter: who it is for, the task, the case and a link. No clinical content."""
     msg = EmailMessage()
     case = note.get("case_id") or "-"
     msg["Subject"] = f"[{note['study']}] {note['subject']}: case {case}"
     msg["From"] = s.sender
     msg["To"] = s.redirect_to or user["email"]
     link = f"{s.base_url}{note['link']}" if note.get("link") else s.base_url
+    zip_hint = note["template"] in ("documents_requested", "query_opened", "upload_rejected")
     lines = [
-        f"For: {user['name']}",
-        f"Case: {case}",
-        f"Task: {note['subject']}",
-        f"Open: {link}",
+        f"Dear {user['name']},",
+        "",
+        f"{note['subject']} for case {case}.",
+        "",
+        f"Open the case: {link}",
         *(
-            [f"Or put one ZIP file with all the documents in the upload folder {case}."]
-            if note["template"] in ("documents_requested", "query_opened", "upload_rejected")
+            ["You can also put all documents for this case in one ZIP file in its upload folder."]
+            if zip_hint
             else []
         ),
         "",
-        "Synthetic demo data. This message carries no clinical content.",
+        "This message contains no patient or clinical information.",
+        "",
+        "Kind regards,",
+        f"{organisation} Clinical Adjudication".strip(),
+        "",
+        "Demonstration with synthetic data only.",
     ]
     msg.set_content("\n".join(lines))
     return msg
@@ -156,12 +166,22 @@ class Mailer:
             if "sent" not in done.get(n["id"], []) and len(done.get(n["id"], [])) < MAX_ATTEMPTS
         ]
 
+    def _organisation(self, study: str) -> str:
+        """Who signs the e-mails: `organisation` in the study's study.yaml, if set."""
+        path = self.config_dir / study / "study.yaml"
+        return (
+            (yaml.safe_load(path.read_text()) or {}).get("organisation", "")
+            if (study and path.exists())
+            else ""
+        )
+
     def deliver_pending(self) -> dict[str, int]:
         notes = self.pending()
         counts = {"sent": 0, "failed": 0}
         if not notes:
             return counts
         users = yaml.safe_load((self.config_dir / "users.yaml").read_text())["users"]
+        organisation = self._organisation(notes[0].get("study", ""))
         try:
             client = self.connect(self.settings)
         except (OSError, smtplib.SMTPException) as exc:  # server down: every note failed once
@@ -178,7 +198,7 @@ class Mailer:
                     continue
                 try:
                     for u in people:
-                        client.send_message(compose(n, u, self.settings))
+                        client.send_message(compose(n, u, self.settings, organisation))
                 except (OSError, smtplib.SMTPException) as exc:
                     self._record(n, "failed", [u["id"] for u in people], type(exc).__name__)
                     counts["failed"] += 1

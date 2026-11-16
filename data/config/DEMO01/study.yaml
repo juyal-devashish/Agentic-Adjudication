@@ -10,6 +10,11 @@ upload_limits:
   max_file_mb: 50
   max_dicom_study_mb: 500
   max_pdf_pages: 200
+organisation: Tech Observer    # shown in the app and signs the e-mails
+site_names:                    # display names of the study's (fictional) sites
+  "101": Larkfield General Hospital
+  "102": Brennan Valley Medical Centre
+  "104": Klinikum Auenstadt
 # Shown to the site on page 2 as "documents requested".
 requested_documents:
   - discharge_summary

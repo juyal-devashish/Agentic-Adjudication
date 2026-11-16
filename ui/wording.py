@@ -137,9 +137,9 @@ def next_step(
         }[state]
     return {
         State.EVENT_CREATED: "Related data is being pulled from the EDC.",
-        State.AWAITING_DOCUMENTS: f"Waiting for site {site} to upload documents.",
-        State.DEIDENTIFYING: f"Identifiers are being removed from site {site}'s uploads.",
-        State.AWAITING_SITE_CONFIRMATION: f"Waiting for site {site} to review and sign.",
+        State.AWAITING_DOCUMENTS: f"Waiting for {site} to upload documents.",
+        State.DEIDENTIFYING: f"Identifiers are being removed from {site}'s uploads.",
+        State.AWAITING_SITE_CONFIRMATION: f"Waiting for {site} to review and sign.",
         State.SUBMITTED: "Signed by the site. The quality check starts automatically.",
         State.QC_CHECKS: "The quality check is running.",
         State.QC_REVIEW: (
@@ -148,7 +148,7 @@ def next_step(
             if role == "safety_specialist"
             else "Waiting for the Safety Specialist to review the quality check."
         ),
-        State.QUERY_OPEN: f"Waiting for site {site} to answer the query.",
+        State.QUERY_OPEN: f"Waiting for {site} to answer the query.",
         State.NARRATIVE: "The narrative is being drafted.",
         State.NARRATIVE_REVIEW: (
             "The narrative draft is ready. Check it against the dossier, then sign it."

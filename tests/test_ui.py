@@ -98,8 +98,8 @@ def test_results_and_documents_pages_render_for_a_case(demo):
     case_id = sorted(p.name for p in demo.cases.iterdir() if p.is_dir())[0]
     at = run("views/results.py", role="safety_specialist", case_id=case_id)
     assert "Intact" in html_text(at) and "Case " + case_id in html_text(at)
-    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
-               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    site101 = {"id": "site101.coord", "name": "Priya Nair", "role": "site",
+               "site": "101", "email": "priya.nair@larkfield-general.example"}  # fmt: skip
     run("views/site_documents.py", role="site", user_site=site101, case_id=case_id)
 
 
@@ -137,7 +137,7 @@ def test_site_flow_upload_process_review_and_sign(demo):
 
     runner.run_case_steps()  # writes the handoff
     at = run("views/results.py", role="safety_specialist", case_id=cid)
-    assert any("Signed by Site 101 Coordinator" in m.value for m in at.markdown)
+    assert any("Signed by Priya Nair" in m.value for m in at.markdown)
 
 
 def test_reset_keeps_corpus_metrics_and_stages_demo_files(demo):
@@ -238,7 +238,7 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     next(b for b in at.button if b.label == "Sign decision").click().run()
     assert not at.exception, at.exception
     assert store.state(cid).state.value == "NARRATIVE"
-    assert any("Passed and signed by Anna Safety" in s.value for s in at.success)
+    assert any("Passed and signed by Dr. Anna Weber" in s.value for s in at.success)
     assert "Findings:" in html_text(at)
 
     runner.run_case_steps()  # template draft
@@ -300,8 +300,8 @@ def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
     states = runner.pipeline.store.list_case_states()
     own = {cs.case_id for cs in states if cs.subject.startswith("DEMO01-101-")}
     assert own and len(own) < len(states)
-    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
-               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    site101 = {"id": "site101.coord", "name": "Priya Nair", "role": "site",
+               "site": "101", "email": "priya.nair@larkfield-general.example"}  # fmt: skip
     for page in (None, "views/results.py"):
         at = run(page, role="site", user_site=site101)
         shown = [df.value for df in at.dataframe]
@@ -424,7 +424,7 @@ def test_selecting_an_import_result_shows_why_below_the_table(demo):
     at = run(role="data_manager")
     next(b for b in at.button if b.label == "Import queued files").click().run()
     assert any("Select a row to see why" in h for h in html_text(at).splitlines())
-    table = next(df for df in at.dataframe if "Rules not met" in df.value.columns)
+    table = next(df for df in at.dataframe if "Result" in df.value.columns)
     row = int(table.value.index[table.value["AE"] == "AE-008"][0])
     at.session_state["outcomes_01_initial.csv.report.json"] = {
         "selection": {"rows": [row], "columns": [], "cells": []}
@@ -432,7 +432,8 @@ def test_selecting_an_import_result_shows_why_below_the_table(demo):
     at.run()
     assert not at.exception, at.exception
     assert any(s.value == "Why: DEMO01-101-0007, AE-008" for s in at.subheader)
-    assert "This record does not meet rule set" in html_text(at)
+    assert "This record does not meet the study's rules" in html_text(at)
+    assert "Not met</span>: Serious adverse event" in html_text(at)
 
 
 def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
@@ -445,8 +446,8 @@ def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
     Runner(demo).run_once()  # three sites' "documents requested" notifications, not e-mailed
     notes = {n["case_id"]: n for n in (json.loads(f.read_text())
              for f in demo.outbox.glob("*.json"))}  # fmt: skip
-    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
-               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    site101 = {"id": "site101.coord", "name": "Priya Nair", "role": "site",
+               "site": "101", "email": "priya.nair@larkfield-general.example"}  # fmt: skip
     log = demo.outbox / "delivery.jsonl"
     earlier = {"id": notes["DEMO01-0001"]["id"], "status": "sent", "to": ["site101.coord"],
                "at": "2026-11-16T00:00:00Z"}  # fmt: skip

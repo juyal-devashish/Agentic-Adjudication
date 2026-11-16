@@ -99,6 +99,10 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 [data-testid="stToastContainer"] { top: auto !important; bottom: 1rem !important; }
 [data-testid="stToast"] { width: 27rem; max-width: calc(100vw - 2rem); }
 
+.adj-brand { margin: 0 0 .25rem 0; line-height: 1.3; }
+.adj-brand strong { display: block; font-size: 1.05rem; color: #1C2833; }
+.adj-brand span { font-size: .875rem; color: #5A6B78; }
+
 .adj-status { font-weight: 600; }
 .adj-quiet { color: #5A6B78; font-size: .875rem; }
 .adj-bar { display: inline-block; background: #000; color: #000; border-radius: 1px;
@@ -179,6 +183,10 @@ AE_FIELDS = [  # (field, label) in the order a clinician reads an AE
 ]
 
 
+# Coding details of an AE: shown under Technical details, not in the main record.
+AE_CODES = {"pt_code", "soc_code", "meddra_version", "last_modified", "ae_id"}
+
+
 def category_words(category: str) -> str:
     return CATEGORY_WORDS.get(category, category.replace("_", " ").capitalize())
 
@@ -198,20 +206,22 @@ def plain_value(value: str) -> str:
 
 
 def rules_html(results: list[dict]) -> str:
-    """Eligibility explanation as a nested list of met / not met rules."""
+    """Eligibility explanation as a nested list of met / not met rules, in words: the rule's
+    description and the record's value ("Serious: No"), without rule codes."""
+    labels = dict(AE_FIELDS)
     out = []
     for r in results:
         word = status("Met", "good") if r["passed"] else status("Not met", "bad")
-        label = html.escape(f"{r.get('id') or ''} {r.get('description') or ''}")
+        label = html.escape(r.get("description") or r.get("id") or "")
         if "group" in r:
             kind = "all of" if r["group"] == "all" else "any of"
             out.append(f"<li>{word}: {label} ({kind})<ul>{rules_html(r['children'])}</ul></li>")
         else:
-            actual = html.escape(str(r["actual"]) or "empty")
-            why = "" if r["passed"] else f", {html.escape(r['reason'])}"
+            field = labels.get(r["field"], r["field"].replace("_", " ").capitalize())
+            value = plain_value(str(r["actual"] if r["actual"] is not None else ""))
             out.append(
                 f"<li>{word}: {label} <span class='adj-quiet'>"
-                f"({html.escape(r['field'])} is {actual}{why})</span></li>"
+                f"({html.escape(field)}: {html.escape(value)})</span></li>"
             )
     return "".join(out)
 
@@ -227,6 +237,14 @@ FILE_STATUS = {  # word, ink
 
 def apply() -> None:
     st.html(CSS)
+
+
+def brand(organisation: str) -> None:
+    """The organisation and the product, as text at the top of the sidebar."""
+    st.sidebar.html(
+        f'<p class="adj-brand"><strong>{html.escape(organisation)}</strong>'
+        "<span>Clinical event adjudication</span></p>"
+    )
 
 
 def synthetic_band() -> None:

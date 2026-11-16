@@ -3,14 +3,13 @@ rule-by-rule reasons, enter an AE by hand, and see flagged cases."""
 
 from __future__ import annotations
 
-import html
 import json
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 import theme
-from common import context, paths, pipeline
+from common import context, paths, pipeline, site_name
 from wording import (
     AE_CHOICES,
     AE_FIELD_LABELS,
@@ -87,7 +86,7 @@ waiting = sorted(f.name for f in p.inbox.glob("*") if f.is_file()) if p.inbox.ex
 if waiting:
     st.write(
         f"{len(waiting)} file(s) are waiting in the import queue: {', '.join(waiting)}. "
-        "The runner imports them every few minutes."
+        "They are imported automatically every few minutes."
     )
     if st.button("Import queued files", disabled=not can_import):
         finish("queue", pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor))
@@ -105,7 +104,7 @@ else:
     rep = json.loads(chosen.read_text())
     outcomes = [o for o in rep.get("outcomes") or [] if ctx.sees(o["key"].split("|")[1])]
     if ctx.role == "site":  # site segregation: no totals or rows from other sites
-        theme.quiet(f"Only records of site {ctx.user['site']} are shown.")
+        theme.quiet(f"Only records of {site_name(ctx.user['site'])} are shown.")
     else:
         st.write(import_summary(rep))
     if rep["errors"] and ctx.role != "site":
@@ -126,21 +125,22 @@ else:
         )
     if outcomes:
         # Selecting a row shows below the table why that record did or did not become a case.
+        table = pd.DataFrame(
+            [
+                {
+                    "Subject": o["key"].split("|")[1],
+                    "AE": o["key"].split("|")[2],
+                    "Result": IMPORT_OUTCOME.get(o["outcome"], o["outcome"]),
+                    "Case": o.get("case_id") or "",
+                    "Flags": theme.flag_words(o.get("flags") or []),
+                }
+                for o in outcomes
+            ]
+        )
+        if not table["Flags"].any():  # no flags in this file: leave the column out
+            table = table.drop(columns="Flags")
         picked = st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Row": o.get("row"),
-                        "Subject": o["key"].split("|")[1],
-                        "AE": o["key"].split("|")[2],
-                        "Result": IMPORT_OUTCOME.get(o["outcome"], o["outcome"]),
-                        "Rules not met": ", ".join(o.get("failed_rules") or []),
-                        "Case": o.get("case_id") or "",
-                        "Flags": theme.flag_words(o.get("flags") or []),
-                    }
-                    for o in outcomes
-                ]
-            ),
+            table,
             hide_index=True,
             width="stretch",
             on_select="rerun",
@@ -161,8 +161,7 @@ else:
                 e = latest[key]
                 verdict = "meets" if e["eligible"] else "does not meet"
                 st.html(
-                    f"<p>This record {verdict} rule set {html.escape(e['rule_set'])} "
-                    f"version {e['rule_version']}.</p>"
+                    f"<p>This record {verdict} the study's rules for adjudication.</p>"
                     f"<ul>{theme.rules_html(e['explanation'])}</ul>"
                 )
             else:

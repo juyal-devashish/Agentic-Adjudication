@@ -80,7 +80,7 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     query = query_of(store, cid)
     assert query["codes"] == ["missing_document"] and "ECG report" in query["text"]
     opened = next(e for e in store.events(cid) if e["type"] == "query.opened")
-    assert opened["actor"] == SS and opened["signature"]["signer"] == "Anna Safety"
+    assert opened["actor"] == SS and opened["signature"]["signer"] == "Dr. Anna Weber"
     assert "query_opened" in templates(store)
 
     # The site answers through Flow 1 again; a new manifest version is handed off.
@@ -117,7 +117,7 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     flow2.sign_narrative(cid, SS, "demo", completed)
     assert state(store, cid) == State.READY_FOR_ADJUDICATION
     signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")
-    assert signed["data"]["edited"] and signed["signature"]["signer"] == "Anna Safety"
+    assert signed["data"]["edited"] and signed["signature"]["signer"] == "Dr. Anna Weber"
     with pytest.raises(Flow2Refused):  # frozen once signed
         flow2.sign_narrative(cid, SS, "demo", "other text")
 

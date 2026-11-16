@@ -114,7 +114,7 @@ if can_upload:
         )
 
 if store.state(cid).state == State.DEIDENTIFYING:
-    st.write("The runner picks uploads up within a few seconds. To see the result now:")
+    st.write("Uploads are processed automatically within a few seconds. To see the result now:")
     if st.button("Remove identifiers now", type="primary"):
         with st.spinner("Finding and removing identifiers. Scanned pages take a few seconds each."):
             summary = processor().process_case(cid)
