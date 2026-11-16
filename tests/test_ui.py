@@ -67,12 +67,28 @@ def test_import_now_from_page_1_creates_cases(demo):
     assert not any("waiting in the import queue" in m.value for m in at.markdown)
 
 
-@pytest.mark.parametrize("role", ["site", "safety_specialist"])
-def test_only_the_data_manager_can_import(demo, role):
+@pytest.mark.parametrize(
+    ("role", "own"),
+    [
+        ("data_manager", ["edc_input", "results"]),
+        ("site", ["site_documents", "results"]),
+        ("safety_specialist", ["quality_check", "results"]),
+    ],
+)
+def test_each_role_sees_only_its_own_pages(demo, role, own):
+    """The menu lists only the role's pages, it lands on its own first page, and another
+    role's page (a typed URL) sends it back there."""
+    titles = {"edc_input": "AE import", "site_documents": "Documents",
+              "quality_check": "Quality check", "results": "Case record"}  # fmt: skip
     at = run(role=role)
-    assert next(b for b in at.button if b.label == "Import queued files").disabled
-    assert next(b for b in at.button if b.label == "Import file").disabled
-    assert "Only the data manager can enter an AE by hand." in [m.value for m in at.markdown]
+    assert titles[own[0]] in [t.value for t in at.title]
+    assert [link.proto.label for link in at.get("page_link")] == [titles[p] for p in own]
+    for page in ("edc_input", "site_documents", "quality_check", "results"):
+        at.switch_page(f"views/{page}.py")
+        at.run()
+        assert not at.exception, at.exception
+        landed = titles[page] if page in own else titles[own[0]]
+        assert landed in [t.value for t in at.title], (page, landed)
 
 
 def test_results_and_documents_pages_render_for_a_case(demo):
@@ -82,7 +98,9 @@ def test_results_and_documents_pages_render_for_a_case(demo):
     case_id = sorted(p.name for p in demo.cases.iterdir() if p.is_dir())[0]
     at = run("views/results.py", role="safety_specialist", case_id=case_id)
     assert "Intact" in html_text(at) and "Case " + case_id in html_text(at)
-    run("views/site_documents.py", role="safety_specialist", case_id=case_id)
+    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
+               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    run("views/site_documents.py", role="site", user_site=site101, case_id=case_id)
 
 
 def test_site_flow_upload_process_review_and_sign(demo):
@@ -380,13 +398,17 @@ def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
     from adjud.runner import Runner
 
     Runner(demo).run_once()  # cases wait for documents
+
+    def step_links(at):  # the sidebar menu's links are not next steps
+        menu = {"AE import", "Documents", "Quality check", "Case record"}
+        return [p.proto.label for p in at.get("page_link") if p.proto.label not in menu]
+
     at = run("views/results.py", role="site", case_id="DEMO01-0001")
-    links = [(p.proto.page, p.proto.label) for p in at.get("page_link")]
-    assert any(label == "Upload documents" for _, label in links), links
+    assert step_links(at) == ["Upload documents"]
     at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
-    assert not at.get("page_link")  # already on Documents
+    assert not step_links(at)  # already on Documents
     at = run("views/results.py", role="safety_specialist", case_id="DEMO01-0001")
-    assert not at.get("page_link")  # nothing for the Safety Specialist to do yet
+    assert not step_links(at)  # nothing for the Safety Specialist to do yet
 
 
 def test_selecting_an_import_result_shows_why_below_the_table(demo):
@@ -437,3 +459,18 @@ def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
     assert any(t.startswith("DEMO01-0006: e-mail sent to") for t in shown)
     assert not any("DEMO01-0003" in t for t in shown)  # site 102's case
     assert any(t.startswith("DEMO01-0008: e-mail to") and "failed" in t for t in shown)
+
+
+def test_switching_role_moves_to_that_roles_page_and_keeps_the_role(demo):
+    """On AE import as data manager, switching to site user lands on Documents as a site
+    user (the page switch once dropped the new role and snapped back)."""
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.query_params["role"] = "data_manager"
+    at.run()
+    assert "AE import" in [t.value for t in at.title]
+    for role, title in (("site", "Documents"), ("safety_specialist", "Quality check"),
+                        ("data_manager", "AE import")):  # fmt: skip
+        next(s for s in at.selectbox if s.label == "Role").select(role).run()
+        assert not at.exception, at.exception
+        assert at.session_state["role"] == role and at.query_params["role"] == role
+        assert title in [t.value for t in at.title]
