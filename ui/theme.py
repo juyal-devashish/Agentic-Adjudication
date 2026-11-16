@@ -94,6 +94,11 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
   border-radius: 4px; padding: .9rem 1rem; line-height: 1.55; max-width: 80ch;
   color: #1C2833; margin: 0; font-size: 1rem; font-family: inherit; }
 
+/* E-mail pop-ups (ui/mail_toasts.py): at the bottom right, wide enough that the task and
+   case number are never cut off behind "view more". */
+[data-testid="stToastContainer"] { top: auto !important; bottom: 1rem !important; }
+[data-testid="stToast"] { width: 27rem; max-width: calc(100vw - 2rem); }
+
 .adj-status { font-weight: 600; }
 .adj-quiet { color: #5A6B78; font-size: .875rem; }
 .adj-bar { display: inline-block; background: #000; color: #000; border-radius: 1px;

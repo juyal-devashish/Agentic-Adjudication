@@ -402,3 +402,38 @@ def test_selecting_an_import_result_shows_why_below_the_table(demo):
     assert not at.exception, at.exception
     assert any(s.value == "Why: DEMO01-101-0007, AE-008" for s in at.subheader)
     assert "This record does not meet rule set" in html_text(at)
+
+
+def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
+    """E-mails the runner sends pop up at the bottom of the screen; a site user sees those
+    about its own cases only, and nothing already sent before the page was opened."""
+    import json
+
+    from adjud.runner import Runner
+
+    Runner(demo).run_once()  # three sites' "documents requested" notifications, not e-mailed
+    notes = {n["case_id"]: n for n in (json.loads(f.read_text())
+             for f in demo.outbox.glob("*.json"))}  # fmt: skip
+    site101 = {"id": "site101.coord", "name": "Site 101 Coordinator", "role": "site",
+               "site": "101", "email": "site101@example.com"}  # fmt: skip
+    log = demo.outbox / "delivery.jsonl"
+    earlier = {"id": notes["DEMO01-0001"]["id"], "status": "sent", "to": ["site101.coord"],
+               "at": "2026-11-16T00:00:00Z"}  # fmt: skip
+    log.write_text(json.dumps(earlier) + "\n")
+    at = run(role="site", user_site=site101)
+    assert not at.toast  # sent before the page was opened
+
+    with log.open("a") as f:
+        for cid, status in (("DEMO01-0006", "sent"), ("DEMO01-0003", "sent"),
+                            ("DEMO01-0008", "failed")):  # fmt: skip
+            note = notes[cid]
+            f.write(json.dumps({"id": note["id"], "status": status, "to": ["x"],
+                                "at": "2026-11-16T00:00:10Z"}) + "\n")  # fmt: skip
+    at.run()
+    assert not at.exception, at.exception
+    shown = [t.value for t in at.toast]
+    sites = {cid: notes[cid]["to"] for cid in ("DEMO01-0006", "DEMO01-0003", "DEMO01-0008")}
+    assert sites["DEMO01-0006"] == "site:101" and sites["DEMO01-0003"] == "site:102"
+    assert any(t.startswith("DEMO01-0006: e-mail sent to") for t in shown)
+    assert not any("DEMO01-0003" in t for t in shown)  # site 102's case
+    assert any(t.startswith("DEMO01-0008: e-mail to") and "failed" in t for t in shown)
