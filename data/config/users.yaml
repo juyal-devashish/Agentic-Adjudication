@@ -1,7 +1,7 @@
 # Demo users (from the Flow 1 test kit, with the study admin replaced by a data manager:
 # plan P-25). SYNTHETIC DEMO ONLY: no real authentication. The people are fictional.
 # Every demo password is "demo"; only its bcrypt hash is stored here. Site staff use reserved
-# .example domains; Tech Observer staff use tech-observer.com, so if SMTP ever points at a
+# .example domains; Tech Observer staff use techobserver.com, so if SMTP ever points at a
 # real mail server, set SMTP_REDIRECT_TO to send every message to the presenter instead.
 users:
   - id: site101.coord
@@ -25,10 +25,10 @@ users:
   - id: ss.anna
     name: Dr. Anna Weber
     role: safety_specialist
-    email: anna.weber@tech-observer.com
+    email: anna.weber@techobserver.com
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
   - id: dm.dana
     name: Rahul Mehta
     role: data_manager
-    email: rahul.mehta@tech-observer.com
+    email: rahul.mehta@techobserver.com
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
