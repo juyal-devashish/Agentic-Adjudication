@@ -18,8 +18,9 @@ from typing import Any
 
 import yaml
 
+from adjud.delivery import EMAIL, SLACK, Deliverer, channels_from_env
 from adjud.documents import DocumentProcessor
-from adjud.events import Clock, utc_now
+from adjud.events import Clock, format_time, utc_now
 from adjud.flow2 import Flow2
 from adjud.flow3 import Flow3
 from adjud.flow4 import Flow4
@@ -27,6 +28,8 @@ from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
+from adjud.slack import ACTOR as SLACK_ACTOR
+from adjud.slack import SlackChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
@@ -51,10 +54,30 @@ class Runner:
         self.flow3 = Flow3(self.pipeline.store, self.paths.config, self.study)
         self.flow4 = Flow4(self.pipeline.store, self.paths.config, self.study)
         self.uploads = UploadFolders(self.pipeline.store, self.documents.outbox, self.clock)
+        channels = channels_from_env()  # None: as before P-54, e-mail when SMTP is set
         smtp = SmtpSettings.from_env()
+        if channels is not None and EMAIL in channels and smtp is None:
+            log.warning("NOTIFY_CHANNELS lists smtp, but SMTP_HOST is not set: e-mail off")
+        if channels is not None and EMAIL not in channels:
+            smtp = None
         self.mailer = (
             Mailer(self.pipeline.store, self.paths.config, smtp, clock=self.clock) if smtp else None
         )
+        self.slack: Deliverer | None = None
+        if channels is not None and SLACK in channels:
+            settings = SlackSettings.from_env()
+            if settings is None:
+                log.warning("NOTIFY_CHANNELS lists slack, but SLACK_WEBHOOK_URL is not set: off")
+            else:  # Slack posts only what is queued from now on (P-54)
+                self.slack = Deliverer(
+                    self.pipeline.store,
+                    self.paths.config,
+                    SlackChannel(settings),
+                    SLACK_ACTOR,
+                    since=format_time(self.clock()),
+                    clock=self.clock,
+                )
+                log.info("Slack on: notifications queued from now on are posted too")
 
     def send_mail(self) -> None:
         """E-mail queued notifications when SMTP is configured (plan P-29)."""
@@ -63,6 +86,19 @@ class Runner:
         counts = self.mailer.deliver_pending()
         if counts["sent"] or counts["failed"]:
             log.info("e-mail: %d sent, %d failed", counts["sent"], counts["failed"])
+
+    def send_slack(self) -> None:
+        """Post queued notifications to Slack when it is switched on (P-54). Runs after
+        e-mail, and nothing that goes wrong here reaches the e-mail or the workflow."""
+        if self.slack is None:
+            return
+        try:
+            counts = self.slack.deliver_pending()
+        except Exception:
+            log.exception("Slack delivery failed this tick; e-mail and cases are unaffected")
+            return
+        if counts["sent"] or counts["failed"]:
+            log.info("Slack: %d sent, %d failed", counts["sent"], counts["failed"])
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -172,6 +208,7 @@ class Runner:
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
+        self.send_slack()
 
     def tick(self, now: float) -> None:
         """One loop iteration at monotonic time `now`. The inbox is checked every
@@ -185,6 +222,7 @@ class Runner:
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
+        self.send_slack()
 
     def run_forever(self) -> None:
         while True:
