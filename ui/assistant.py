@@ -439,7 +439,24 @@ class Assistant:
             return f"Suggested outcome: **pass**: the documents match the EDC{note}."
         if proposal == "query":
             return f"Suggested outcome: **send a query**: {reasons}."
-        return f"No suggested outcome: something is not sure ({reasons})."
+        # In plain words; the Quality check page has the details and the reasons.
+        sg = result.get("suggestion") or {}
+        unsure = [
+            f["label"].lower()
+            for f in sg.get("fields", [])
+            if f["status"] == "not_sure" and f["field"] in ("ae_term", "onset_date")
+        ]
+        open_checks = sum(c["status"] == "unknown" for c in result.get("checks", []))
+        parts = [f"the AI isn't sure about the {' and '.join(unsure)}"] if unsure else []
+        if sg.get("status") != "ok":
+            parts.append("there is no AI Suggestion")
+        if open_checks:
+            parts.append(
+                f"{open_checks} check{'s' if open_checks > 1 else ''} could not be decided by code"
+            )
+        return (
+            f"No suggested outcome: {', and '.join(parts) or 'something is not sure'}. You decide."
+        )
 
 
 def _failed_rules(results: list[dict[str, Any]]) -> list[str]:
