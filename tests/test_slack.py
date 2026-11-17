@@ -200,3 +200,22 @@ def test_parity_is_clean_only_when_every_notification_was_posted_once(pipe):  # 
     assert not report["clean"]
     assert any("posted 0 times" in p for p in report["problems"])
     assert any("HTTP 500" in p for p in report["problems"])
+
+
+def test_an_unexpected_error_is_a_recorded_attempt_named_by_type_only(pipe):  # noqa: F811
+    since = format_time(pipe.clock())
+    queue_two(pipe)
+    counts = deliverer(pipe, FakeSlack(ValueError(URL)), since).deliver_pending()
+    assert counts == {"sent": 0, "failed": 2}
+    written = (pipe.store.paths.outbox / "delivery.jsonl").read_text()
+    assert "error: ValueError" in written and "secret" not in written
+
+
+def test_a_restart_keeps_the_time_slack_was_switched_on(pipe):  # noqa: F811
+    from adjud.runner import slack_since
+
+    log = DeliveryLog(pipe.store, pipe.clock)
+    first = slack_since(log, pipe.clock)  # nothing tried yet: now
+    a, _ = queue_two(pipe)
+    log.record(a, SLACK, ACTOR, "failed", [], "timeout")
+    assert slack_since(log, pipe.clock) == a["created_at"] >= first

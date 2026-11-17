@@ -67,7 +67,7 @@ Slack runs alongside e-mail, never instead of it, until it meets the reliability
 1. **Set up once.**
    - Create a separate free Slack workspace for the demo, never the company's, with a channel such as `#adjudication-demo`. Keep yourself its only member: it shows every recipient's notices, including who adjudicates which case.
    - Create a Slack app *from scratch* in that workspace, turn on **Incoming Webhooks**, add one for the channel and copy its URL.
-2. **Switch it on.** In `.env`, set `NOTIFY_CHANNELS=outbox,smtp,slack` and `SLACK_WEBHOOK_URL=<the URL>`. The URL is a secret: never commit it or paste it into chat. Restart the runner. Only notices queued after the restart are posted.
+2. **Switch it on.** In `.env`, set `NOTIFY_CHANNELS=outbox,smtp,slack` and `SLACK_WEBHOOK_URL=<the URL>`. The URL is a secret: never commit it or paste it into chat. Restart the runner. Only notices queued from then on are posted; a later restart keeps that starting point, and a demo reset clears it.
 3. **One reliability run.**
    - `tools.reset_demo --preload`, restart the runner, then follow this run sheet through all four flows: an agreed case, a disputed case through the committee, one more-data request and one re-adjudication.
    - When the runner has caught up, run `uv run python -m tools.notify_parity`. **CLEAN** means every notice was posted exactly once, with no failed attempt and as many e-mails as Slack posts.

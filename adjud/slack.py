@@ -12,7 +12,8 @@ Configuration, from the environment only (never written to data/ or the reposito
     SLACK_WEBHOOK_URL  the channel's incoming webhook; a secret, never logged
     APP_BASE_URL       where links point (default http://localhost:8501), as for e-mail
 
-Only Notifications created after the runner started with Slack on are posted. A failure
+Only Notifications queued since Slack was first switched on are posted (a restart keeps
+that time). A failure
 is a recorded Delivery Attempt and never blocks the workflow or the e-mail.
 """
 
@@ -130,6 +131,8 @@ class SlackChannel:
             raise ChannelError("timeout", unreachable=True) from exc
         except OSError as exc:
             raise ChannelError(f"cannot connect: {type(exc).__name__}", unreachable=True) from exc
+        except Exception as exc:  # anything else: recorded by type only, never its message
+            raise ChannelError(f"error: {type(exc).__name__}") from None
         if status == 200 and text.strip() == "ok":
             return
         # Rate limited or Slack's side failing: stop for this tick; the next tick tries again.

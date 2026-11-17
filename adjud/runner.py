@@ -18,7 +18,7 @@ from typing import Any
 
 import yaml
 
-from adjud.delivery import EMAIL, SLACK, Deliverer, channels_from_env
+from adjud.delivery import EMAIL, SLACK, Deliverer, DeliveryLog, channels_from_env
 from adjud.documents import DocumentProcessor
 from adjud.events import Clock, format_time, utc_now
 from adjud.flow2 import Flow2
@@ -33,6 +33,14 @@ from adjud.slack import SlackChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
+
+
+def slack_since(delivery: DeliveryLog, clock: Clock) -> str:
+    """When Slack was switched on: the first Notification it tried, if any (so a runner
+    restart does not skip what was queued meanwhile); otherwise now."""
+    notes = {n["id"]: n["created_at"] for n in delivery.notes()}
+    tried = [notes[i] for i in delivery.attempts(SLACK) if i in notes]
+    return min(tried) if tried else format_time(clock())
 
 
 @dataclass
@@ -68,13 +76,13 @@ class Runner:
             settings = SlackSettings.from_env()
             if settings is None:
                 log.warning("NOTIFY_CHANNELS lists slack, but SLACK_WEBHOOK_URL is not set: off")
-            else:  # Slack posts only what is queued from now on (P-54)
+            else:  # Slack posts what is queued from when it was first switched on (P-54)
                 self.slack = Deliverer(
                     self.pipeline.store,
                     self.paths.config,
                     SlackChannel(settings),
                     SLACK_ACTOR,
-                    since=format_time(self.clock()),
+                    since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
                     clock=self.clock,
                 )
                 log.info("Slack on: notifications queued from now on are posted too")
