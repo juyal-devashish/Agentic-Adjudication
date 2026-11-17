@@ -5,13 +5,13 @@
 | **Goal** | A working proof of concept of Flows 1 and 2 in which AI agents do the work and people step in only where a signature has meaning or an agent cannot decide |
 | **Starting point** | Flow 1 is built and demonstrated (steps 0–7 below). Kit 53/53, de-identification gate passed |
 | **Behavior sources** | Flow 1: the code, its tests and the test kit (the Flow 1 spec and plan were retired after the demo; they are in git history before this plan). Flow 2: [mvp-spec.md](mvp-spec.md) §5.2, §8 (MVP-11 to MVP-15), §9 and [spec.md](spec.md) §6.3–6.4 (QC-, NAR- IDs), **as changed by the autonomy model (§2) and the decisions (§4)** |
-| **Status** | Steps 8–26 done; live rehearsal outstanding. Step 27 (Flows 3 and 4, P-41 to P-53) built on branch `flow3-4`, not merged. Tick boxes as steps are completed and committed |
+| **Status** | Steps 8–26 done; live rehearsal outstanding. Step 27 (Flows 3 and 4, P-41 to P-53) and step 28 (Slack alongside e-mail, P-54; reliability bar outstanding) merged into `main` on 2026-11-17. Tick boxes as steps are completed and committed |
 
 ---
 
 ## 1. What we are building
 
-> An AE file arrives → eligible records become cases, every "no" explained → the case gets its own upload folder and the site is e-mailed → the site drops one ZIP → identifiers are removed (rules plus an AI detector on scans) and verified by code → the site reviews, draws boxes over anything missed, and signs → **an AI agent runs QC**: required documents, readability, residual PHI, document type, documents match the subject and the event → the dossier is built → **an AI agent drafts the narrative**, every sentence cited and checked by code → the case is ready for adjudication (Flow 3) and the Safety Specialist is e-mailed. A person is asked only when an agent's result fails a code gate. Since step 27 (branch `flow3-4`): two blind reviews, Adjudicator 3 and the committee settle the outcome, which is exported to the EDC; people adjudicate, code assigns and compares (P-41 to P-53).
+> An AE file arrives → eligible records become cases, every "no" explained → the case gets its own upload folder and the site is e-mailed → the site drops one ZIP → identifiers are removed (rules plus an AI detector on scans) and verified by code → the site reviews, draws boxes over anything missed, and signs → **an AI agent runs QC**: required documents, readability, residual PHI, document type, documents match the subject and the event → the dossier is built → **an AI agent drafts the narrative**, every sentence cited and checked by code → the case is ready for adjudication (Flow 3) and the Safety Specialist is e-mailed. A person is asked only when an agent's result fails a code gate. Since step 27: two blind reviews, Adjudicator 3 and the committee settle the outcome, which is exported to the EDC; people adjudicate, code assigns and compares (P-41 to P-53).
 
 The project's aim is to **minimise the people needed in the whole process.** Every new step is designed agent-first. Since P-37, a step that needs a medical specialist's judgement stays with a person on every case; agents do the work before and between those steps and prepare each decision.
 
@@ -324,7 +324,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Done when:** each role lands on the Assistant, sees only its own cases, can import (data manager only), ask why a record is not a case, get the quality-check summary, and reach every manual step by a button; nothing is signed from the chat; full suite and kit pass.
 
-### Step 27 — Flows 3 and 4 (P-41 to P-53) ✅ on branch `flow3-4`
+### Step 27 — Flows 3 and 4 (P-41 to P-53) ✅
 
 - [x] States, transitions and notifications for Flows 3–4 (`adjud/workflow.py`, `adjud/notify.py`; e-mail to one person or a mailbox)
 - [x] The form and its comparators (`adjud/forms.py`, `forms/mi_v1.yaml`)
@@ -336,7 +336,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Done when:** a case goes from ready for adjudication to closed by agreement, through Adjudicator 3, and through the committee; more data comes back through Flow 1 and the Quality Check; a re-adjudication supersedes the old outcome; every final value names the signature it came from; the site sees nothing of it; full suite and kit pass; `verify_log` and `rebuild_state --check` clean.
 
-### Step 28 — Slack alongside e-mail (P-54, ADR 0002) on branch `notify/slack`
+### Step 28 — Slack alongside e-mail (P-54, ADR 0002)
 
 - [x] Delivery Attempts per Channel (`adjud/delivery.py`); e-mail unchanged in behaviour
 - [x] Slack Channel (`adjud/slack.py`), `NOTIFY_CHANNELS`, runner runs each Channel on its own

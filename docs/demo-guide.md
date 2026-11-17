@@ -1,4 +1,4 @@
-# Demo run sheet: Flows 1 and 2 with AI
+# Demo run sheet: Flows 1 to 4
 
 Synthetic data only. This shows the mechanics; it is not validated, and roles are simulated (switch them in the sidebar).
 
@@ -49,7 +49,7 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - **Low confidence gets no suggestion.** As *Tom Hollis* (site 102), upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0002 and sign. The AI is not sure about the poor-quality scan, or about the event term, so nothing is pre-selected and the Not sure findings say why. Dr. Weber decides.
    - **More documents needed.** As *Priya Nair* (site 101), upload `data/demo_uploads/documents/DEMO01-101-0005_AE-006/` into DEMO01-0003 and sign. The AI types the untitled letter as a clinic letter, so the discharge summary and ECG are missing; the AI Suggestion also says lab results would help (advice only). The query is suggested and pre-filled: choose **Send a query to the site** and sign. The narrative draft is dropped; a new one follows the site's answer.
    - With AI off, the page says there is no AI Suggestion and the narrative starts from the template; it can only be signed once the template's [bracketed] instruction is replaced.
-7. **Flows 3 and 4: adjudication and outcome** (branch `flow3-4`, P-41 to P-53). No AI takes part: code assigns, compares and exports; people adjudicate and sign.
+7. **Flows 3 and 4: adjudication and outcome** (P-41 to P-53). No AI takes part: code assigns, compares and exports; people adjudicate and sign.
    - New people (password `demo`): *Sofia Marques* (CEC Coordinator) and three adjudicators, *Dr. Daniel Okafor* (the committee's Chair), *Dr. Elin Lindqvist* and *Dr. Marco Reyes*. Pick the role *Adjudicator* or *CEC Coordinator* in the sidebar.
    - Within a runner tick of the Quality Check signature, two adjudicators are assigned by round-robin and e-mailed. Each sees only their own cases; the Assistant offers **Adjudicate DEMO01-0001**.
    - As each adjudicator, fill the form on *Adjudication* and sign. Neither sees the other's answers. If they agree, the outcome is derived, exported to `data/exports/edc/`, acknowledged by the mock EDC, and the case closes. The Case record's *Adjudication and outcome* shows each final answer and who signed it.

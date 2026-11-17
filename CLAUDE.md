@@ -12,7 +12,7 @@ Check the plan's ticked boxes for progress. `adjud/` is our implementation; `dat
 
 ## Which document governs what
 
-The project builds **Flows 1 and 2** on `main`; **Flows 3 and 4** (adjudication, outcome, export, re-adjudication) are built on branch `flow3-4` (plan P-41 to P-53, step 27).
+The project builds **Flows 1 to 4** on `main`: Flows 3 and 4 (adjudication, outcome, export, re-adjudication) are plan P-41 to P-53, step 27.
 
 | Document | Use it for |
 |---|---|
