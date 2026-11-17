@@ -83,10 +83,10 @@ ROLE_NAMES = {  # in demo order; the first is where the app opens (on AE import)
 
 
 # The pages each role works on, its landing page first. Case record is read-only for all.
-ROLE_PAGES = {
-    "data_manager": ["import", "record"],
-    "site": ["documents", "record"],
-    "safety_specialist": ["qc", "record"],
+ROLE_PAGES = {  # every role lands on the Assistant, the guided chat (P-40)
+    "data_manager": ["assistant", "import", "record"],
+    "site": ["assistant", "documents", "record"],
+    "safety_specialist": ["assistant", "qc", "record"],
 }
 
 

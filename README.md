@@ -124,6 +124,10 @@ The step-by-step table, with the trigger, component and actor for each step, is 
 - A **narrative agent** drafts facts-only statements, each quoting a dossier page, before the review. Code checks that every quote is found and no forbidden wording (causality, relatedness, allocation) is used. The Safety Specialist edits it at the same stop and signs it with the QC pass; the Case record shows what changed from the draft.
 - A versioned, hashed **Flow 3 handoff manifest**. It never lists anything from `documents/original/`.
 
+**Assistant (P-40)**
+- Everyone lands on a **guided chat**: what is waiting for them, where a case is, the quality check and the AI Suggestion in a few lines, why a record is not a case, and the data manager's import, by starter button, slash action or plain question. Updates on their cases appear as they happen.
+- Answers come from the case records, written by code; AI-written parts are labelled. Every manual step is a button to its page; the chat never signs or decides.
+
 **Platform**
 - An **event-sourced audit trail**: each case's only source of truth is an append-only, hash-chained `events.jsonl`. Any edited line or modified file is detected, and the state is rebuilt by replaying events.
 - **One AI gateway** with modes `off`, `replay` and `live`; nothing else in the code calls the API. Agents act only through read-only local tools. Every call is recorded with its prompt version, input hash, tokens, cost and latency, and is subject to a budget cap.

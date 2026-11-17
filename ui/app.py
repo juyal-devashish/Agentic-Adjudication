@@ -53,16 +53,25 @@ theme.brand(organisation())
 menu = st.sidebar.container()  # filled below, once the pages are registered
 with st.sidebar:
     st.subheader("You are")
-    # The chosen role lives in session state, not in the widget: switching role can send
-    # the person to another page (their own first page), and a page switch drops a keyed
-    # widget's new value, so the role snapped back. Unkeyed, the picker is rebuilt from it.
+    # The chosen role lives in session state, copied there by the picker's callback before
+    # the rerun: switching role can send the person to another page, and a page switch
+    # drops a widget's new value, so the role snapped back. Unkeyed, the picker lost the
+    # second switch in a row when no page switch happened (both land on the Assistant).
     roles = list(ROLE_NAMES)
+
+    def _pick_role() -> None:
+        st.session_state["role"] = st.session_state["role_picker"]
+
+    st.session_state.setdefault("role", roles[0])
+    if st.session_state.get("role_picker") != st.session_state["role"]:
+        st.session_state["role_picker"] = st.session_state["role"]  # e.g. after a page switch
     role = st.selectbox(
         "Role",
         roles,
-        index=roles.index(st.session_state.get("role", roles[0])),
         format_func=ROLE_NAMES.get,
         help="Roles are simulated for the demo; anyone can switch.",
+        key="role_picker",
+        on_change=_pick_role,
     )
     st.session_state["role"] = role
     role_users = [u for u in all_users if u["role"] == role]
@@ -107,6 +116,7 @@ else:
 # the menu is drawn here with the role's pages only, and a page that is not the role's
 # (a typed URL, or a role switched while on it) sends the person to their own first page.
 PAGES = {
+    "assistant": ("views/assistant.py", "Assistant", ":material/forum:"),
     "import": ("views/edc_input.py", "AE import", ":material/move_to_inbox:"),
     "documents": ("views/site_documents.py", "Documents", ":material/description:"),
     "qc": ("views/quality_check.py", "Quality check", ":material/rule:"),

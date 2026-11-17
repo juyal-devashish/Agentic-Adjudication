@@ -52,7 +52,7 @@ def test_app_without_edc_asks_for_a_reset(tmp_path, monkeypatch):
 
 
 def test_import_now_from_page_1_creates_cases(demo):
-    at = run(role="data_manager")
+    at = run("views/edc_input.py", role="data_manager")
     assert "Synthetic data only." in html_text(at)
     import_now = next(b for b in at.button if b.label == "Import queued files")
     import_now.click().run()
@@ -70,20 +70,20 @@ def test_import_now_from_page_1_creates_cases(demo):
 @pytest.mark.parametrize(
     ("role", "own"),
     [
-        ("data_manager", ["edc_input", "results"]),
-        ("site", ["site_documents", "results"]),
-        ("safety_specialist", ["quality_check", "results"]),
+        ("data_manager", ["assistant", "edc_input", "results"]),
+        ("site", ["assistant", "site_documents", "results"]),
+        ("safety_specialist", ["assistant", "quality_check", "results"]),
     ],
 )
 def test_each_role_sees_only_its_own_pages(demo, role, own):
-    """The menu lists only the role's pages, it lands on its own first page, and another
-    role's page (a typed URL) sends it back there."""
-    titles = {"edc_input": "AE import", "site_documents": "Documents",
+    """The menu lists only the role's pages, it lands on its own first page (the
+    Assistant, P-40), and another role's page (a typed URL) sends it back there."""
+    titles = {"assistant": "Assistant", "edc_input": "AE import", "site_documents": "Documents",
               "quality_check": "Quality check", "results": "Case record"}  # fmt: skip
     at = run(role=role)
     assert titles[own[0]] in [t.value for t in at.title]
     assert [link.proto.label for link in at.get("page_link")] == [titles[p] for p in own]
-    for page in ("edc_input", "site_documents", "quality_check", "results"):
+    for page in ("assistant", "edc_input", "site_documents", "quality_check", "results"):
         at.switch_page(f"views/{page}.py")
         at.run()
         assert not at.exception, at.exception
@@ -316,7 +316,7 @@ def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
     assert own and len(own) < len(states)
     site101 = {"id": "site101.coord", "name": "Priya Nair", "role": "site",
                "site": "101", "email": "priya.nair@larkfield-general.example"}  # fmt: skip
-    for page in (None, "views/results.py"):
+    for page in ("views/site_documents.py", "views/results.py"):
         at = run(page, role="site", user_site=site101)
         shown = [df.value for df in at.dataframe]
         subjects = {s for df in shown if "Subject" in df for s in df["Subject"]}
@@ -324,7 +324,7 @@ def test_a_site_sees_only_its_own_subjects_on_every_page(demo):
         picker = next(s for s in at.selectbox if s.label == "Case")
         listed = {o.split(",")[0] for o in picker.options}
         assert listed == own, listed
-    at = run(role="data_manager")
+    at = run("views/edc_input.py", role="data_manager")
     subjects = {s for df in at.dataframe if "Subject" in df.value for s in df.value["Subject"]}
     assert {s.split("-")[1] for s in subjects} >= {"101", "102"}
 
@@ -375,7 +375,7 @@ def test_manual_ae_form_uses_pickers_and_saves_a_case(demo):
     """Readable labels, pickers for coded fields, date pickers; every problem at once."""
     import datetime as dt
 
-    at = run(role="data_manager")
+    at = run("views/edc_input.py", role="data_manager")
     next(b for b in at.button if b.label == "Save AE").click().run()
     error = at.error[0].value
     assert "Why it is entered by hand: required" in error and "Subject ID: required" in error
@@ -405,7 +405,7 @@ def test_manual_ae_form_uses_pickers_and_saves_a_case(demo):
 
 
 def test_cases_to_check_names_the_case_a_duplicate_may_repeat(demo):
-    at = run(role="data_manager")
+    at = run("views/edc_input.py", role="data_manager")
     next(b for b in at.button if b.label == "Import queued files").click().run()
     shutil.copy(KIT_SCEN / "07_duplicate_candidate.csv", demo.inbox)
     at.run()  # the button shows only while a file is queued
@@ -423,7 +423,7 @@ def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
     Runner(demo).run_once()  # cases wait for documents
 
     def step_links(at):  # the sidebar menu's links are not next steps
-        menu = {"AE import", "Documents", "Quality check", "Case record"}
+        menu = {"Assistant", "AE import", "Documents", "Quality check", "Case record"}
         return [p.proto.label for p in at.get("page_link") if p.proto.label not in menu]
 
     at = run("views/results.py", role="site", case_id="DEMO01-0001")
@@ -435,7 +435,7 @@ def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
 
 
 def test_selecting_an_import_result_shows_why_below_the_table(demo):
-    at = run(role="data_manager")
+    at = run("views/edc_input.py", role="data_manager")
     next(b for b in at.button if b.label == "Import queued files").click().run()
     assert any("Select a row to see why" in h for h in html_text(at).splitlines())
     table = next(df for df in at.dataframe if "Result" in df.value.columns)
@@ -486,18 +486,19 @@ def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
 
 
 def test_switching_role_moves_to_that_roles_page_and_keeps_the_role(demo):
-    """On AE import as data manager, switching to site user lands on Documents as a site
-    user (the page switch once dropped the new role and snapped back)."""
+    """Switching role keeps the new role (the page switch once dropped it and snapped
+    back), lands on the Assistant, and the menu offers that role's own pages."""
     at = AppTest.from_file(APP, default_timeout=30)
     at.query_params["role"] = "data_manager"
     at.run()
-    assert "AE import" in [t.value for t in at.title]
-    for role, title in (("site", "Documents"), ("safety_specialist", "Quality check"),
-                        ("data_manager", "AE import")):  # fmt: skip
+    assert "Assistant" in [t.value for t in at.title]
+    for role, page in (("site", "Documents"), ("safety_specialist", "Quality check"),
+                       ("data_manager", "AE import")):  # fmt: skip
         next(s for s in at.selectbox if s.label == "Role").select(role).run()
         assert not at.exception, at.exception
         assert at.session_state["role"] == role and at.query_params["role"] == role
-        assert title in [t.value for t in at.title]
+        assert "Assistant" in [t.value for t in at.title]
+        assert page in [link.proto.label for link in at.get("page_link")]
 
 
 def test_the_site_sees_recognised_document_types_and_can_correct_one(demo):
