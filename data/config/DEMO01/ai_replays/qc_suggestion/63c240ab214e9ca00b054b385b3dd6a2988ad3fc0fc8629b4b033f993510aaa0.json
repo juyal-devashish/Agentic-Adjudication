@@ -1,0 +1,167 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2025-05-20",
+      "onset_date": "2025-05-20",
+      "outcome": "FATAL",
+      "serious": "Y",
+      "seriousness_criteria": "DEATH"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "referral_letter_mixed.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:d87d9e087e151a315dbdff02984fa7e0793bdc90fdd5178356690e49ca82b908",
+        "type": "referral_letter"
+      },
+      {
+        "file": "summary_letter_lowquality.jpg",
+        "pages": 1,
+        "text_sha256": "sha256:b41648cd1d110c2a8da4cbd54c496931c890c30fb318c2f2e7e756c94fb04a28",
+        "type": "unknown"
+      }
+    ],
+    "missing_required_types": [
+      "discharge_summary"
+    ],
+    "required_types": [
+      "discharge_summary"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.6,
+        "document_value": "Chest pain with T-wave inversion in V1-V4, collapse and death; no diagnosis named",
+        "evidence": [],
+        "field": "ae_term",
+        "reason": "The documents describe chest pain, T-wave inversion, collapse and death but do not name myocardial infarction or any other diagnosis, and the post-mortem findings are still awaited.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.6,
+        "document_value": "2025-05-20 (admitted with chest pain); emergency department visit for chest pain on 2025-05-19",
+        "evidence": [
+          {
+            "file": "summary_letter_lowquality.jpg",
+            "page": 1,
+            "quote": "was admitted on 20/05/2025 with chest pain and collapsed on the ward the"
+          },
+          {
+            "file": "referral_letter_mixed.pdf",
+            "page": 1,
+            "quote": "seen in the emergency department on 19/05/2025 with exertional chest pain"
+          }
+        ],
+        "field": "onset_date",
+        "reason": "The admission with chest pain on 20/05/2025 agrees with the EDC onset date, although an emergency department visit for chest pain on 19/05/2025, one day earlier, is also documented.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "2025-05-20 (date of death)",
+        "evidence": [
+          {
+            "file": "summary_letter_lowquality.jpg",
+            "page": 1,
+            "quote": "Despite resuscitation she died on 20/05/2025."
+          }
+        ],
+        "field": "end_date",
+        "reason": "The summary letter gives the date of death as 20/05/2025, which agrees with the EDC end date.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "Fatal (died despite resuscitation)",
+        "evidence": [
+          {
+            "file": "summary_letter_lowquality.jpg",
+            "page": 1,
+            "quote": "Despite resuscitation she died on 20/05/2025."
+          }
+        ],
+        "field": "outcome",
+        "reason": "The summary letter states that the patient died despite resuscitation, which agrees with the fatal outcome in the EDC.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "Yes, death",
+        "evidence": [
+          {
+            "file": "summary_letter_lowquality.jpg",
+            "page": 1,
+            "quote": "Despite resuscitation she died on 20/05/2025."
+          }
+        ],
+        "field": "serious",
+        "reason": "The documented death supports the EDC entry of serious with death as the seriousness criterion.",
+        "status": "match"
+      }
+    ],
+    "summary": "The referral letter documents an emergency department visit on 19/05/2025 with exertional chest pain and T-wave inversion in V1-V4. The summary letter (low-quality image, document type unknown) documents admission on 20/05/2025 with chest pain, collapse on the ward and death the same day despite resuscitation, which agrees with the EDC dates, fatal outcome and seriousness. No document names myocardial infarction as a diagnosis, the required discharge summary is missing, and the post-mortem findings are still awaited.",
+    "would_help": [
+      {
+        "document_type": "autopsy_report",
+        "reason": "The summary letter says post-mortem findings are awaited, and that report could confirm the cause of death recorded as myocardial infarction."
+      },
+      {
+        "document_type": "ecg_report",
+        "reason": "The referral letter mentions T-wave inversion in V1-V4, but no ECG report is included to support the event term."
+      },
+      {
+        "document_type": "lab_results",
+        "reason": "No laboratory results, such as cardiac markers, are included to support the myocardial infarction term."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "referral_letter_mixed.pdf",
+        "page": 1
+      },
+      "result_sha256": "f16f922e479a7481e4a111cac60297675a39bd6b4e9d6502a3b56f66715d7c99",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "summary_letter_lowquality.jpg",
+        "page": 1
+      },
+      "result_sha256": "2ebacb97cd4016ee4250b4f30d7e16247171df4c68e9487fe25397ebf198a0b1",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {},
+      "result_sha256": "39f6e857430b38bfa059dd8a286ce1e8602a18df5983b48aa12ba18b50ca0f3b",
+      "tool": "get_ae_record"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 6169,
+    "output_tokens": 1646
+  },
+  "cost_usd": 0.057596
+}

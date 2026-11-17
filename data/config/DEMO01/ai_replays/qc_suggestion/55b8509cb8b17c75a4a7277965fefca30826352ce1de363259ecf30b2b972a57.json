@@ -1,0 +1,149 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Unstable angina",
+      "end_date": "2025-05-14",
+      "onset_date": "2025-05-12",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "angiography_report_rotated.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:b12a8ddd394b18ec28a71596d130363341bff81da1597d2bcb1f55ecaa80b754",
+        "type": "imaging_report"
+      },
+      {
+        "file": "clinic_letter.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:807e86bb884d55fe5f4ac0a611ed645923058d45aa67eec29e1775ce9b5da9d9",
+        "type": "clinic_letter"
+      }
+    ],
+    "missing_required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.95,
+        "document_value": "Unstable angina",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "after her admission with unstable"
+          },
+          {
+            "file": "angiography_report_rotated.pdf",
+            "page": 1,
+            "quote": "Indication: unstable angina."
+          }
+        ],
+        "field": "ae_term",
+        "reason": "The clinic letter and the angiography indication both name unstable angina, the same as the EDC term.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "2025-05-12",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "angina on 12/05/2025."
+          }
+        ],
+        "field": "onset_date",
+        "reason": "The clinic letter dates the admission with unstable angina to 12/05/2025, the same as the EDC onset date.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.8,
+        "document_value": "",
+        "evidence": [],
+        "field": "end_date",
+        "reason": "Neither document gives a discharge date or the date the event ended, so the EDC end date of 2025-05-14 cannot be checked.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.7,
+        "document_value": "",
+        "evidence": [],
+        "field": "outcome",
+        "reason": "The clinic letter describes an outpatient review on 02/06/2025 but does not say whether the event resolved, and the angiography plans a staged PCI.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "Hospital admission for unstable angina",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "after her admission with unstable"
+          }
+        ],
+        "field": "serious",
+        "reason": "The clinic letter records a hospital admission for the event, which fits the EDC seriousness criterion of hospitalisation.",
+        "status": "match"
+      }
+    ],
+    "summary": "The documents are a coronary angiography report from 13/05/2025, done because of unstable angina, and a cardiology clinic letter that confirms an admission with unstable angina on 12/05/2025. These agree with the EDC term, onset date and hospitalisation. Neither document gives the end date of 2025-05-14 or the recovered outcome, and the required discharge summary and ECG report are both missing.",
+    "would_help": [
+      {
+        "document_type": "lab_results",
+        "reason": "Cardiac biomarker results from the admission would help confirm how the event was characterised during the hospital stay."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "angiography_report_rotated.pdf",
+        "page": 1
+      },
+      "result_sha256": "b67bd62df8f056e620522d5dffa8ac5908716fc573128ced05d8a2596e1bf6de",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "clinic_letter.pdf",
+        "page": 1
+      },
+      "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 6041,
+    "output_tokens": 1032
+  },
+  "cost_usd": 0.044804
+}

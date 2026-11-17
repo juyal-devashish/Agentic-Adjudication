@@ -1,0 +1,155 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "discharge_summary.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:05473badc9ca52ade43017064b1757e6cd7818f81a5cecf967ae012427099229",
+        "type": "discharge_summary"
+      },
+      {
+        "file": "ecg_report.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:5b548c69176bd6f28a504473e2a4cbd91b94f4fd0efc4bdadfb071925a9ad7b9",
+        "type": "ecg_report"
+      }
+    ],
+    "missing_required_types": [],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.6,
+        "document_value": "Discharge summary: Fractured neck of femur; ECG: ST elevation consistent with an acute anterior infarct",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Diagnosis: Fractured neck of femur"
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "ST elevation in V1-V4, consistent with an acute anterior"
+          }
+        ],
+        "field": "ae_term",
+        "reason": "The discharge summary gives fractured neck of femur as the diagnosis, not myocardial infarction, although the ECG report describes findings consistent with an acute anterior infarct.",
+        "status": "mismatch"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "02/11/2025",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Admitted on 02/11/2025."
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "Recorded: 02/11/2025 19:10"
+          }
+        ],
+        "field": "onset_date",
+        "reason": "Both documents are dated 02/11/2025 (admission and ECG recording), which is months away from the EDC onset date of 2026-03-14, whichever way the date is read.",
+        "status": "mismatch"
+      },
+      {
+        "confidence": 0.7,
+        "document_value": "",
+        "evidence": [],
+        "field": "end_date",
+        "reason": "Neither document gives a discharge date or an end date for the event.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.5,
+        "document_value": "",
+        "evidence": [],
+        "field": "outcome",
+        "reason": "The discharge summary only says the patient went home in a stable condition, and part of that sentence is redacted, so it does not clearly state that the event resolved.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.55,
+        "document_value": "Hospital admission on 02/11/2025",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Admitted on 02/11/2025. Fell at home; hemiarthroplasty on the day of admission."
+          }
+        ],
+        "field": "serious",
+        "reason": "A hospital admission is documented, which agrees with serious = Y (hospitalisation), but the admission recorded is for a femoral fracture after a fall and its date does not match the EDC.",
+        "status": "match"
+      }
+    ],
+    "summary": "Both required documents are present, but they do not agree with the EDC record. The discharge summary describes a hospital admission on 02/11/2025 for a fractured neck of femur after a fall, and the ECG recorded the same day shows ST elevation consistent with an acute anterior infarct. Neither document is dated near the EDC onset of 2026-03-14 or the end date of 2026-03-21, and neither gives an end date or a clear outcome, so the site may have sent documents for a different episode.",
+    "would_help": [
+      {
+        "document_type": "lab_results",
+        "reason": "Cardiac biomarker results would help confirm the reported myocardial infarction and its timing."
+      },
+      {
+        "document_type": "clinic_letter",
+        "reason": "A cardiology letter could explain how the March 2026 event relates to the 02/11/2025 documents and give the dates and outcome of the event."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary.pdf",
+        "page": 1
+      },
+      "result_sha256": "5221d46ef67140f2327d4cdcd614d05d1e13faa593476dd611321f3623dae9b4",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "ecg_report.pdf",
+        "page": 1
+      },
+      "result_sha256": "27fa6a519e53f94f382c1b38aba4488fc7f2dd266f8b3117e246cf81ffc31a76",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5848,
+    "output_tokens": 1648
+  },
+  "cost_usd": 0.056352
+}

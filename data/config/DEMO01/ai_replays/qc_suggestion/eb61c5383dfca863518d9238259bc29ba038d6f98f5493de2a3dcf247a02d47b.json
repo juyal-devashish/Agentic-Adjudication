@@ -1,0 +1,155 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "discharge_summary.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:f5862b3bb0ba029eaee047bd47a06741ff0398a56a47ccad73cc7ce572e67703",
+        "type": "discharge_summary"
+      },
+      {
+        "file": "ecg_report.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:1c8f34966bd31f2eadb02deee9b1ab797a7fd2af26e2c31e3e7a707caddfbfa9",
+        "type": "ecg_report"
+      }
+    ],
+    "missing_required_types": [],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.95,
+        "document_value": "Acute anterior myocardial infarction",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Diagnosis: Acute anterior myocardial infarction"
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "ST elevation in V1-V4, consistent with an acute anterior"
+          }
+        ],
+        "field": "ae_term",
+        "reason": "The discharge summary diagnosis and the ECG interpretation both describe an acute anterior myocardial infarction, which matches the EDC term.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "14/03/2026",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Admitted on 14/03/2026."
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "Recorded: 14/03/2026 08:52"
+          }
+        ],
+        "field": "onset_date",
+        "reason": "The admission date and the ECG recording date are both 14/03/2026, the same as the EDC onset date of 2026-03-14.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "",
+        "evidence": [],
+        "field": "end_date",
+        "reason": "The discharge summary gives no discharge date or resolution date, so the EDC end date of 2026-03-21 cannot be checked.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.6,
+        "document_value": "",
+        "evidence": [],
+        "field": "outcome",
+        "reason": "The discharge summary only says the patient was discharged home in a stable condition, which does not clearly confirm the EDC outcome of RECOVERED.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "Hospitalised (admitted 14/03/2026)",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "Admitted on 14/03/2026. Presented with central chest pain"
+          }
+        ],
+        "field": "serious",
+        "reason": "The discharge summary records a hospital admission, which supports serious = Y with the hospitalisation criterion.",
+        "status": "match"
+      }
+    ],
+    "summary": "Both required documents are present: a discharge summary and an ECG report. They describe an acute anterior myocardial infarction with admission and ECG on 14/03/2026, which matches the EDC term, onset date and hospitalisation. Neither document gives a discharge or resolution date, so the EDC end date of 2026-03-21 cannot be checked, and 'discharged home in a stable condition' does not clearly confirm the EDC outcome of RECOVERED.",
+    "would_help": [
+      {
+        "document_type": "lab_results",
+        "reason": "The discharge summary gives only one troponin value, and serial laboratory results would show how the event progressed and when it resolved."
+      },
+      {
+        "document_type": "imaging_report",
+        "reason": "A report of any cardiac imaging or angiography done during the admission would add detail on the event described in the documents."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary.pdf",
+        "page": 1
+      },
+      "result_sha256": "9ad3e0f02ee97ce5e749b133a56c490f12c0a87f89cfdf62effd7f02c4f9830a",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "ecg_report.pdf",
+        "page": 1
+      },
+      "result_sha256": "815cff11bb8c7fe1d1cb2b1f7ccd9b5b6c9589bed272a18d1affa26a61ec4a4a",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5874,
+    "output_tokens": 1362
+  },
+  "cost_usd": 0.050736
+}

@@ -1,0 +1,191 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "discharge_summary.pdf",
+        "pages": 2,
+        "text_sha256": "sha256:ba6fdb8b431fd2fbaa8687bb4b2dfd6778c56edd120df20ea31aa4f16733d160",
+        "type": "discharge_summary"
+      },
+      {
+        "file": "ecg_report.pdf",
+        "pages": 1,
+        "text_sha256": "sha256:30a58059f04ea1a5a5bf040abd5aca00be9ffc6101a8cefc886cd254349ddd9b",
+        "type": "ecg_report"
+      },
+      {
+        "file": "troponin_results.xlsx",
+        "pages": 2,
+        "text_sha256": "sha256:7a6bf776615e9b0fbfecbc7c09705dd941e4b2a0c37f38cef508eb91bd0a7711",
+        "type": "lab_results"
+      }
+    ],
+    "missing_required_types": [],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.95,
+        "document_value": "Acute inferior ST-elevation myocardial infarction",
+        "evidence": [
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "Interpretation: acute inferior ST-elevation myocardial infarction."
+          }
+        ],
+        "field": "ae_term",
+        "reason": "The ECG report gives the interpretation 'acute inferior ST-elevation myocardial infarction', which is the same condition as the EDC term Myocardial infarction.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.92,
+        "document_value": "14/03/2026",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "was admitted on 14/03/2026 with central chest pain of two hours' duration."
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "14/03/2026 08:52"
+          }
+        ],
+        "field": "onset_date",
+        "reason": "The patient was admitted with chest pain on 14/03/2026 and the ECG was recorded that day, which agrees with the EDC onset date of 2026-03-14.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.8,
+        "document_value": "21/03/2026 (discharge date)",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 2,
+            "quote": "He was discharged home on 21/03/2026"
+          }
+        ],
+        "field": "end_date",
+        "reason": "The discharge date of 21/03/2026 is the same as the EDC end date, but no document gives a separate date when the event resolved.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.6,
+        "document_value": "Discharged home on 21/03/2026; recovery not explicitly stated",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 2,
+            "quote": "He was discharged home on 21/03/2026 on aspirin 75 mg, clopidogrel 75 mg"
+          }
+        ],
+        "field": "outcome",
+        "reason": "Discharge home fits the EDC outcome RECOVERED, but the documents never state the outcome outright and the patient left on ongoing medication.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.92,
+        "document_value": "Hospitalised 14/03/2026 to 21/03/2026",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 1,
+            "quote": "was admitted on 14/03/2026"
+          }
+        ],
+        "field": "serious",
+        "reason": "The patient was admitted on 14/03/2026 and discharged on 21/03/2026, which supports the EDC entry of serious (Y) with the criterion hospitalisation.",
+        "status": "match"
+      }
+    ],
+    "summary": "Both required documents are present: the discharge summary and the ECG report. Together with the troponin results, they describe an acute inferior ST-elevation myocardial infarction with admission on 14/03/2026 and discharge on 21/03/2026, which agrees with the EDC term, onset date, end date and seriousness (hospitalisation). The outcome RECOVERED fits a discharge home but is not stated outright, and the angiography procedure report is not included.",
+    "would_help": [
+      {
+        "document_type": "imaging_report",
+        "reason": "The discharge summary mentions coronary angiography and stenting on 15/03/2026, but the procedure report itself is not in the documents sent."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary.pdf",
+        "page": 1
+      },
+      "result_sha256": "441410b86cc5bfd175e6faf1e88fc34e5a3d95e7eb196b9a44272622319e28e5",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary.pdf",
+        "page": 2
+      },
+      "result_sha256": "b2f836258fa7b736fc3b3f78cd5983a4f4cb487c8d52ddbbe2c82b3eb898309c",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "ecg_report.pdf",
+        "page": 1
+      },
+      "result_sha256": "4be1489b31f6119782ee4d3c9fabe6a366eae6d6306aef8ac1c35d2973ab4878",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "troponin_results.xlsx",
+        "page": 1
+      },
+      "result_sha256": "d1918d89dd2c3068b43d0e4adbf67a43a33e7f117ecc898c8a2f027a38ed3109",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "troponin_results.xlsx",
+        "page": 2
+      },
+      "result_sha256": "17c32074b8e80c3d5c7ab291e40dbb669fb15eccb99eac155b59d75d16783fd5",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 7486,
+    "output_tokens": 1737
+  },
+  "cost_usd": 0.064684
+}
