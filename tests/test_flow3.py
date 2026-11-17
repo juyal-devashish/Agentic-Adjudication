@@ -198,6 +198,7 @@ def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
     assert state(store, cid) == State.CEC_MEETING
     assert f3.committee_fields(cid) == ["related_to_study_drug"]
     assert ("committee_needed", "role:cec_coordinator") in templates(store)
+    assert cid in assigned_cases(store, CHAIR, chair=True)  # the Chair sees committee cases
 
     with pytest.raises(Flow3Refused, match="no meeting"):
         f3.sign_consensus(cid, CHAIR, "demo")
@@ -209,6 +210,8 @@ def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
                       summary="The committee reviewed the dossier.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     assert ("consensus_to_sign", f"user:{CHAIR}") in templates(store)
+    note = next(json.loads(p.read_text()) for p in store.paths.outbox.glob("*consensus_to_sign*"))
+    assert note["link"].startswith("/committee?role=adjudicator&user=adj.okafor")
     other = next(a for a in ADJS if a != CHAIR)
     with pytest.raises(SignatureRefused, match="Chair"):
         f3.sign_consensus(cid, other, "demo")

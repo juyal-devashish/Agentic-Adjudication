@@ -1,6 +1,6 @@
 # Flows 1 to 4: how a case moves
 
-What happens to an adverse event (AE), step by step, from the EDC to a package ready for adjudication. For each step: what triggers it, which component does it, who or what acts, and where AI and the Anthropic API come in.
+What happens to an adverse event (AE), step by step, from the EDC to a package ready for adjudication, and (steps 19–26, branch `flow3-4`) through adjudication to the outcome sent back to the EDC. For each step: what triggers it, which component does it, who or what acts, and where AI and the Anthropic API come in.
 
 The design rule behind it ([plan §2](plan-mvp.md#2-autonomy-model)): **agents do the work, code checks every agent answer before it is used, and people do every step that needs medical judgement (P-37), sign, and handle exceptions.** Everything below runs with AI off as well; the steps marked *AI* then go to a person.
 

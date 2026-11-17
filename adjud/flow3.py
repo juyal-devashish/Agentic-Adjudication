@@ -109,14 +109,19 @@ def current_round(store: FileCaseStore, case_id: str) -> Round | None:
     return rnd
 
 
-def assigned_cases(store: FileCaseStore, user_id: str) -> set[str]:
-    """Cases this adjudicator holds or held a review on, in any round (ACC-02)."""
+COMMITTEE_EVENTS = ("adj3.unresolved", "comparison.to_committee", "committee.resumed")
+
+
+def assigned_cases(store: FileCaseStore, user_id: str, chair: bool = False) -> set[str]:
+    """Cases this adjudicator holds or held a review on, in any round (ACC-02); for the
+    committee's Chair, also every case that went to the committee."""
     out = set()
     for case_id in store.list_cases():
         for e in store.events(case_id):
             d = e["data"]
             if (
-                (e["type"] == "adjudication.assigned" and user_id in d["adjudicators"].values())
+                (chair and e["type"] in COMMITTEE_EVENTS)
+                or (e["type"] == "adjudication.assigned" and user_id in d["adjudicators"].values())
                 or (e["type"] == "adjudication.reassigned" and d["to"] == user_id)
                 or (e["type"] == "comparison.disputed" and d.get("adjudicator3") == user_id)
             ):
@@ -170,7 +175,8 @@ class Flow3:
         role = None
         if to.startswith("user:"):
             role = self.users()[to.removeprefix("user:")]["role"]
-        note = self.outbox.queue(case_id, to, template, role)
+        page = "committee" if template == "consensus_to_sign" else None  # the Chair signs there
+        note = self.outbox.queue(case_id, to, template, role, page)
         self._event(case_id, "notification.queued", actor,
                     {"to": to, "template": template, "id": note["id"]})  # fmt: skip
 

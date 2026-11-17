@@ -83,7 +83,8 @@ class Assistant:
         if self.role == "adjudicator":  # only cases assigned to them (ACC-02)
             from adjud.flow3 import assigned_cases
 
-            return case_id is not None and case_id in assigned_cases(self.store, self.user["id"])
+            mine = assigned_cases(self.store, self.user["id"], bool(self.user.get("chair")))
+            return case_id is not None and case_id in mine
         if self.role != "site":
             return True
         parts = (subject or "").split("-")

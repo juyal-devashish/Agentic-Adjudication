@@ -107,3 +107,21 @@ def test_server_down_marks_each_notification_failed_once_per_tick(pipe):
     m = Mailer(pipe.store, CONFIG, SETTINGS, connect=down, clock=pipe.clock)
     assert m.deliver_pending()["failed"] == 11
     assert m.attempts()[next(iter(m.attempts()))] == ["failed"]
+
+
+def test_one_person_and_a_mailbox_are_recipients(pipe):
+    """Flows 3–4 (P-50, P-53): e-mail to one assigned person, and to the pharmacovigilance
+    mailbox from study.yaml, which is not a user of the app and gets no link."""
+    from adjud.notify import Outbox
+
+    out = Outbox(pipe.store.paths, "DEMO01", clock=pipe.clock)
+    out.queue("DEMO01-0001", "user:adj.okafor", "consensus_to_sign", "adjudicator", "committee")
+    out.queue("DEMO01-0001", "mailbox:pharmacovigilance", "outcome_for_pv")
+    client = FakeSmtp()
+    assert mailer(pipe, client).deliver_pending()["failed"] == 0  # with the import's e-mails
+    to = {m["To"]: m for m in client.sent}
+    chair = next(m for t, m in to.items() if "daniel.okafor@" in t)
+    assert "/committee?role=adjudicator&user=adj.okafor&case=DEMO01-0001" in chair.get_content()
+    pv = next(m for t, m in to.items() if "pharmacovigilance@techobserver.com" in t)
+    assert "Open the case: http://localhost:8501\n" in pv.get_content()
+    assert "related" not in pv.get_content().lower()  # no clinical content

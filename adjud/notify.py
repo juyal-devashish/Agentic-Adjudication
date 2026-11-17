@@ -46,14 +46,16 @@ TEMPLATES = {
 ROLE_LANDING = {"adjudicator": "adjudicate", "cec_coordinator": "record"}
 
 
-def link(case_id: str | None, to: str, role: str | None = None) -> str | None:
+def link(
+    case_id: str | None, to: str, role: str | None = None, page: str | None = None
+) -> str | None:
     """Deep link into the UI for the recipient: a site lands on the case's documents, a
     role on the case record, one person (with their `role`) on their own page for the case
     (ui/app.py reads role, user and case from the query string). A mailbox gets no link."""
     if not case_id or to.startswith("mailbox:"):
         return None
     if to.startswith("user:") and role:
-        page = ROLE_LANDING.get(role, "record")
+        page = page or ROLE_LANDING.get(role, "record")
         return f"/{page}?role={role}&user={to.removeprefix('user:')}&case={case_id}"
     if to.startswith("site:"):
         return f"/documents?role=site&case={case_id}"
@@ -67,7 +69,12 @@ class Outbox:
     clock: Clock = field(default=utc_now)
 
     def queue(
-        self, case_id: str | None, to: str, template: str, role: str | None = None
+        self,
+        case_id: str | None,
+        to: str,
+        template: str,
+        role: str | None = None,
+        page: str | None = None,
     ) -> dict[str, Any]:
         if template not in TEMPLATES:
             raise ValueError(f"unknown notification template {template!r}")
@@ -79,7 +86,7 @@ class Outbox:
             "to": to,
             "template": template,
             "subject": TEMPLATES[template],
-            "link": link(case_id, to, role),
+            "link": link(case_id, to, role, page),
             "created_at": at,
         }
         name = f"{at.replace(':', '')}-{note['id'][:8]}-{template}.json"

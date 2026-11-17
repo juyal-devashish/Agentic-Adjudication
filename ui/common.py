@@ -58,7 +58,10 @@ class Context:
         if self.role == "adjudicator":
             from adjud.flow3 import assigned_cases
 
-            return case_id is not None and case_id in assigned_cases(pipeline().store, self.actor)
+            chair = bool(self.user.get("chair"))  # the Chair also sees committee cases
+            return case_id is not None and case_id in assigned_cases(
+                pipeline().store, self.actor, chair
+            )
         if self.role != "site":
             return True
         parts = (subject or "").split("-")

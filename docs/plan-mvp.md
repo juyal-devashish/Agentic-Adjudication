@@ -1,4 +1,4 @@
-# Plan — MVP: Flow 1 (Intake) + Flow 2 (QC and narrative), built around AI
+# Plan — MVP: Flow 1 (Intake) + Flow 2 (QC and narrative), built around AI; Flows 3–4 since step 27
 
 | | |
 |---|---|
@@ -11,7 +11,7 @@
 
 ## 1. What we are building
 
-> An AE file arrives → eligible records become cases, every "no" explained → the case gets its own upload folder and the site is e-mailed → the site drops one ZIP → identifiers are removed (rules plus an AI detector on scans) and verified by code → the site reviews, draws boxes over anything missed, and signs → **an AI agent runs QC**: required documents, readability, residual PHI, document type, documents match the subject and the event → the dossier is built → **an AI agent drafts the narrative**, every sentence cited and checked by code → the case is ready for adjudication (Flow 3) and the Safety Specialist is e-mailed. A person is asked only when an agent's result fails a code gate.
+> An AE file arrives → eligible records become cases, every "no" explained → the case gets its own upload folder and the site is e-mailed → the site drops one ZIP → identifiers are removed (rules plus an AI detector on scans) and verified by code → the site reviews, draws boxes over anything missed, and signs → **an AI agent runs QC**: required documents, readability, residual PHI, document type, documents match the subject and the event → the dossier is built → **an AI agent drafts the narrative**, every sentence cited and checked by code → the case is ready for adjudication (Flow 3) and the Safety Specialist is e-mailed. A person is asked only when an agent's result fails a code gate. Since step 27 (branch `flow3-4`): two blind reviews, Adjudicator 3 and the committee settle the outcome, which is exported to the EDC; people adjudicate, code assigns and compares (P-41 to P-53).
 
 The project's aim is to **minimise the people needed in the whole process.** Every new step is designed agent-first. Since P-37, a step that needs a medical specialist's judgement stays with a person on every case; agents do the work before and between those steps and prepare each decision.
 
@@ -71,7 +71,7 @@ Change any of these by editing this table first.
 
 | # | Decision | Value | Source |
 |---|---|---|---|
-| P-23 | Scope | Flows 1 and 2. Flow 2 ends at `READY_FOR_ADJUDICATION` with a handoff manifest for Flow 3 | User |
+| P-23 | Scope | Flows 1 and 2. Flow 2 ends at `READY_FOR_ADJUDICATION` with a handoff manifest for Flow 3. *Extended by P-41: Flows 3 and 4 on branch `flow3-4`* | User |
 | P-24 | Autonomy | Agents act, code gates decide, people handle exceptions (§2). *Narrowed by P-37: steps that need medical judgement are always done by a person* | User |
 | P-25 | AE import role | **Data manager** replaces study admin (import and manual entry). The study admin role is removed | Meeting, user |
 | P-26 | Model | Pinned in `study.yaml`. First `claude-haiku-5-5` (small, tested on a personal key); since 2026-11-12 `claude-opus-5-5`, the originally intended model, on the company key: every narrative passes its gate (Haiku 18 of 25), at about 20 times the cost (step 22 results) | Checklist |
