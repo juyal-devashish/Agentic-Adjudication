@@ -1,13 +1,16 @@
-"""Flow 2: quality check and narrative (plan steps 13–17, autonomy model in plan §2).
+"""Flow 2: the Quality Check and the narrative (plan steps 13–17, P-37, P-39).
 
 Automatic steps, run by the runner:
     start_qc        SUBMITTED → QC_CHECKS, reading only the latest Flow 2 manifest
-    run_qc          checks (+ QC agent) → qc.passed | query.opened | qc.review_needed
-    run_narrative   draft (template, or the narrative agent) → narrative.approved |
-                    narrative.review_needed
+    run_qc          checks, the AI Suggestion, the dossier and the Narrative Draft, all
+                    before the Safety Specialist looks → qc.review_needed (QC_REVIEW)
 
-Human actions (Safety Specialist, signed; only on exceptions):
-    sign_qc_pass, open_query, sign_narrative
+Human actions (Safety Specialist, signed, on every case; ADR 0001):
+    sign_qc_pass    one signature: the QC pass and the edited narrative → ready
+    open_query      a Site Query → QUERY_OPEN
+
+Cases from before P-39 may still sit in NARRATIVE or NARRATIVE_REVIEW: `run_narrative`
+and `sign_narrative` finish them the old way.
 
 A query sends the case back to the site; its answer goes through Flow 1 again
 (upload → de-identification → site review → signature → new manifest → QC again).
@@ -22,7 +25,7 @@ from typing import Any
 
 import yaml
 
-from adjud.ai.functions import DOCUMENT_TYPE, EVENT_MATCH, EVENT_VERDICTS, NARRATIVE
+from adjud.ai.functions import DOCUMENT_TYPE, NARRATIVE, QC_SUGGESTION
 from adjud.ai.gates import GateResult, gate
 from adjud.ai.gateway import AiResult, Gateway
 from adjud.ai.tools import case_toolbox, dossier_page_text, output_pages, page_text
@@ -33,6 +36,7 @@ from adjud.notify import Outbox
 from adjud.qc import Checklist, run_checks
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes
+from adjud.suggestion import assess, event_from_fields, suggested_outcome
 from adjud.workflow import State
 
 SYSTEM_QC = "system:qc"
@@ -40,10 +44,14 @@ SYSTEM_NARRATIVE = "system:narrative"
 QC_PASS_MEANING = "Quality check passed — the documents are complete and fit for adjudication"  # noqa: S105
 QUERY_MEANING = "Quality check failed — a query is sent to the site"
 NARRATIVE_MEANING = "Narrative approved — a factual summary for the adjudicators"
+REVIEW_MEANING = (
+    "Quality check passed — the documents are complete and fit for adjudication — "
+    "and narrative approved — a factual summary for the adjudicators"
+)
 QUERY_CODES = {
-    "missing_document": "A required document is missing",
+    "missing_document": "More documents needed",
     "wrong_patient": "A document seems to be about another patient",
-    "wrong_event": "A document does not match this event",
+    "wrong_event": "Documents don't match the EDC event",
     "unreadable": "A page cannot be read",
     "identifiers_left": "An identifier is still visible",
     "other": "Other",
@@ -121,51 +129,51 @@ class Flow2:
         self._event(case_id, "qc.started", SYSTEM_QC, {"manifest": ref})
 
     def run_qc(self, case_id: str) -> dict[str, Any]:
-        """One QC round, prepared for the Safety Specialist (P-37). Deterministic checks
-        first (step 14); what code cannot tell goes to the QC agents (step 15). The result
-        is a *proposal*, never a decision:
-        - a check failed            → propose a query, with its reason codes
-        - every check passed        → propose a pass
-        - still unclear             → no proposal; the Safety Specialist decides
-        The case always goes to QC review, where the Safety Specialist signs the pass or
-        sends the query: whether documents are fit for adjudication is a medical judgement.
-        """
+        """One QC round, prepared for the Safety Specialist (P-37, P-39). Code runs the
+        checks; the document-type agent types what code could not; the `qc_suggestion`
+        agent gives its Findings on every case; code derives the Suggested Outcome (pass,
+        query, or none when anything is unclear); the dossier is built and the narrative
+        drafted. The case then waits at one stop, QC review, where the Safety Specialist
+        reviews it all and signs the pass with the narrative, or a Site Query."""
         n = _rounds(self.store, case_id, "qc.checks_completed") + 1
         manifest_ref = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
         manifest = self.store.get_json(case_id, manifest_ref["path"])
+        ae = self.store.get_json(case_id, manifest["ae_snapshot"]["path"])
         outcome = run_checks(self.store, case_id, manifest, self.checklist)
         # Failures found by code alone: a signed pass is refused while any is present.
         failed_by_code = [c.id for c in outcome.failed]
         ai: list[dict[str, Any]] = []
-        if outcome.unknown and not outcome.failed:  # step 15: agents fill in the unknowns
-            ai_types, event = self._qc_agents(case_id, manifest, outcome, ai)
-            if ai_types or event:
-                outcome = run_checks(self.store, case_id, manifest, self.checklist,
-                                     ai_types=ai_types, event=event)  # fmt: skip
-        codes: list[str] = []
-        if outcome.failed:
-            proposal, reasons = "query", [c.detail for c in outcome.failed]
-            codes = list(dict.fromkeys(c.query_code for c in outcome.failed if c.query_code))
-        elif not outcome.unknown:
-            proposal, reasons = "pass", []
-        else:
-            proposal = "unclear"
-            reasons = [c.detail or c.label for c in outcome.unknown]
-            if not any(a["status"] != "unavailable" for a in ai):
-                why = next((a["note"] for a in ai), "") or "AI is off"
-                reasons.append(f"No AI answer ({why}): the Safety Specialist decides")
+        ai_types = self._type_agent(case_id, manifest, outcome, ai)
+        if ai_types:
+            outcome = run_checks(self.store, case_id, manifest, self.checklist,
+                                 ai_types=ai_types)  # fmt: skip
+        suggestion = self._suggestion_agent(case_id, manifest, outcome, ae, ai)
+        onset = next(c for c in outcome.checks if c.id == "subject_and_onset")
+        if onset.status == "unknown" and (event := event_from_fields(suggestion)):
+            outcome = run_checks(self.store, case_id, manifest, self.checklist,
+                                 ai_types=ai_types, event=event)  # fmt: skip
+        checks = outcome.as_dicts()
+        proposal, reasons, codes = suggested_outcome(checks, suggestion)
+        if proposal == "unclear":
             reasons += [f"{a['task']} for {a['about']}: {r}" for a in ai
+                        if a["task"] == "Document type"
                         for r in (a["gate"] or {}).get("reasons", [])]  # fmt: skip
+        dossier = build_and_record(self.store, case_id, manifest_ref, outcome.types,
+                                   self.config_dir, self.study)  # fmt: skip
+        narrative = self._draft_narrative(case_id, dossier)
         result = {
             "round": n,
             "manifest": manifest_ref,
-            "checks": outcome.as_dicts(),
+            "checks": checks,
             "types": outcome.types,
-            "decision": "review",  # always the Safety Specialist's (P-37)
-            "proposal": proposal,
+            "decision": "review",  # always the Safety Specialist's (P-37, ADR 0001)
+            "proposal": proposal,  # the Suggested Outcome: pass | query | unclear
             "query_codes": codes,
             "failed_by_code": failed_by_code,
             "reasons": reasons,
+            "suggestion": suggestion,
+            "dossier": {"version": dossier["version"], **dossier["dossier"]},
+            "narrative": narrative,
             "ai": ai,
         }
         rel = f"qc/checks_v{n}.json"
@@ -178,20 +186,20 @@ class Flow2:
         self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
         return result
 
-    # -- QC agents (step 15) -----------------------------------------------------------------
+    # -- QC agents ---------------------------------------------------------------------------
 
-    def _qc_agents(
-        self,
-        case_id: str,
-        manifest: dict[str, Any],
-        outcome: Any,
-        log: list[dict[str, Any]],
-    ) -> tuple[dict[str, str], dict[str, str] | None]:
-        """Ask the agents about what code left unknown; keep only gated answers."""
+    def _pages_of(self, case_id: str, manifest: dict[str, Any]) -> dict[str, int]:
+        return {d["source_name"]: len(output_pages(self.store, case_id, d["path"]))
+                for d in manifest["documents"]}  # fmt: skip
+
+    def _type_agent(
+        self, case_id: str, manifest: dict[str, Any], outcome: Any, log: list[dict[str, Any]]
+    ) -> dict[str, str]:
+        """Ask the document-type agent about each document code could not type; keep
+        only gated answers."""
         assert self.gateway is not None
         cfg, toolbox = self.gateway.cfg, case_toolbox(self.store, case_id)
-        pages_of = {d["source_name"]: len(output_pages(self.store, case_id, d["path"]))
-                    for d in manifest["documents"]}  # fmt: skip
+        pages_of = self._pages_of(case_id, manifest)
 
         def text_of(file: str, page: int) -> str | None:
             return page_text(self.store, case_id, file, page)
@@ -217,31 +225,60 @@ class Flow2:
                     ai_types[name] = out["document_type"]
             answer = self.checklist.label(out["document_type"]) if out else ""
             self._log_ai(case_id, log, "Document type", name, r, g, answer)
+        return ai_types
 
-        event = None
-        check = next(c for c in outcome.checks if c.id == "subject_and_onset")
-        if check.status == "unknown":
-            ae = self.store.get_json(case_id, manifest["ae_snapshot"]["path"])
-            payload = {
-                "ae": {k: ae.get(k) for k in ("ae_term", "onset_date", "end_date", "outcome")},
-                "documents": [{"file": n, "pages": c} for n, c in sorted(pages_of.items())],
-            }
-            r = self.gateway.run(case_id, EVENT_MATCH, payload, toolbox)
-            out = r.output or {}
-            g = None
-            if r.status != "unavailable":
-                verdict = out.get("verdict")
-                g = gate(r, min_confidence=cfg.min_confidence, page_text=text_of,
-                         citations=out.get("evidence") or [],
-                         checks=[(f"verdict {verdict!r} is not allowed", verdict in EVENT_VERDICTS),
-                                 ("the AI could not tell", verdict != "unclear"),
-                                 ("no quote given", bool(out.get("evidence")))])  # fmt: skip
-                if g.passed:
-                    event = {"verdict": out["verdict"], "reason": out["reason"]}
-            answer = f"{out.get('verdict', '').replace('_', ' ')}: {out.get('reason', '')}"
-            self._log_ai(case_id, log, "Event match", "all documents", r, g,
-                         answer if out else "")  # fmt: skip
-        return ai_types, event
+    def _suggestion_agent(
+        self,
+        case_id: str,
+        manifest: dict[str, Any],
+        outcome: Any,
+        ae: dict[str, Any],
+        log: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """The AI Suggestion (P-39): the agent's Findings, each checked by code, plus the
+        Required Documents finding, which is code's."""
+        assert self.gateway is not None
+        texts = {d["source_name"]: output_pages(self.store, case_id, d["path"])
+                 for d in manifest["documents"]}  # fmt: skip
+        required = self.checklist.required_for(ae)
+        present = {t["type"] for t in outcome.types.values()}
+        payload = {
+            "ae": {k: ae.get(k) for k in ("ae_term", "onset_date", "end_date", "outcome",
+                                          "serious", "seriousness_criteria")},
+            # each file's text hash too, so a recorded answer replays only for the same
+            # documents (the redacted files' own bytes differ from run to run)
+            "documents": [{"file": n, "pages": len(texts[n]), "type": outcome.types[n]["type"],
+                           "text_sha256": sha256_bytes("\f".join(texts[n]).encode())}
+                          for n in sorted(texts)],
+            "required_types": required,
+            "missing_required_types": [t for t in required if t not in present],
+            "allowed_types": list(self.checklist.types),
+        }  # fmt: skip
+        r = self.gateway.run(case_id, QC_SUGGESTION, payload, case_toolbox(self.store, case_id))
+
+        def text_of(file: str, page: int) -> str | None:
+            return page_text(self.store, case_id, file, page)
+
+        suggestion = assess(r, ae, page_text=text_of,
+                            min_confidence=self.gateway.cfg.min_confidence,
+                            allowed_types=list(self.checklist.types),
+                            present_types=present)  # fmt: skip
+        req = next(c for c in outcome.checks if c.id == "required_documents")
+        suggestion["documents"] = {
+            "status": {"passed": "ok", "failed": "problem"}.get(req.status, "not_sure"),
+            "detail": req.detail,
+            "required": [self.checklist.label(t) for t in required],
+            "would_help": [{**d, "label": self.checklist.label(d["type"])}
+                           for d in suggestion["would_help"]],
+        }  # fmt: skip
+        g = None
+        if r.status != "unavailable":
+            problems = [f"{f['label']}: {p}" for f in suggestion["fields"] for p in f["problems"]]
+            if not r.ok:
+                problems.insert(0, f"AI result not usable ({r.note or r.status})")
+            g = GateResult(passed=not problems, reasons=problems)
+        self._log_ai(case_id, log, "AI Suggestion", "all documents", r, g, suggestion["summary"])
+        return suggestion
 
     def _log_ai(self, case_id: str, log: list[dict[str, Any]], task: str, about: str,
                 r: AiResult, g: GateResult | None, answer: str) -> None:  # fmt: skip
@@ -266,13 +303,11 @@ class Flow2:
         return build_and_record(self.store, case_id, manifest, checks.get("types", {}),
                                 self.config_dir, self.study)  # fmt: skip
 
-    def run_narrative(self, case_id: str) -> str:
-        """Build the dossier, then draft the narrative (step 17). The narrative agent writes
-        facts-only statements, each quoting a dossier page, and code checks every quote.
-        The draft (the agent's, labelled, or the study template when AI is off or its
-        answer is unusable) always goes to the Safety Specialist, who edits and signs it
-        (P-37). A passing gate only means every quote was found on its page."""
-        dossier = self.ensure_dossier(case_id)
+    def _draft_narrative(self, case_id: str, dossier: dict[str, Any]) -> dict[str, Any]:
+        """Draft the narrative from the dossier (step 17): the narrative agent writes
+        facts-only statements, each quoting a dossier page, and code checks every quote;
+        when AI is off or its answer is unusable, the study template is filled in. A
+        person always edits and signs it. Returns the draft's reference and status."""
         n = _rounds(self.store, case_id, "narrative.drafted") + 1
         r, g, statements = self._narrative_agent(case_id, dossier)
         if statements:
@@ -282,9 +317,6 @@ class Flow2:
             text, source = self.template_draft(case_id), "template"
         rel = f"narrative/draft_v{n}.md"
         sha = self.store.put_file(case_id, rel, text.encode())
-        self._event(case_id, "narrative.drafted", SYSTEM_NARRATIVE,
-                    {"draft": {"path": rel, "sha256": sha}, "source": source,
-                     "simulated": r.simulated, "call": r.call})  # fmt: skip
         if g is not None and g.passed:
             reasons: list[str] = []  # nothing wrong with the draft; a person still signs it
         elif r.status == "unavailable":
@@ -292,11 +324,22 @@ class Flow2:
                        "the narrative"]  # fmt: skip
         else:
             reasons = [f"AI draft not accepted: {x}" for x in (g.reasons if g else [r.note])]
+        draft = {"draft": {"path": rel, "sha256": sha}, "source": source,
+                 "simulated": r.simulated, "call": r.call}  # fmt: skip
+        self._event(case_id, "narrative.drafted", SYSTEM_NARRATIVE, draft)
+        return {**draft, "label": r.label, "gate_passed": bool(g and g.passed),
+                "reasons": reasons}  # fmt: skip
+
+    def run_narrative(self, case_id: str) -> str:
+        """Cases from before P-39 only, sitting in NARRATIVE after a signed QC pass: build
+        the dossier, draft the narrative and send it to narrative review."""
+        dossier = self.ensure_dossier(case_id)
+        d = self._draft_narrative(case_id, dossier)
         self._event(case_id, "narrative.review_needed", SYSTEM_NARRATIVE,
-                    {"reasons": reasons, "gate_passed": bool(g and g.passed)})  # fmt: skip
+                    {"reasons": d["reasons"], "gate_passed": d["gate_passed"]})  # fmt: skip
         self._notify(case_id, "role:safety_specialist", "narrative_review_needed",
                      SYSTEM_NARRATIVE)  # fmt: skip
-        return text
+        return self.store.get_file(case_id, d["draft"]["path"]).decode()
 
     def _narrative_agent(
         self, case_id: str, dossier: dict[str, Any]
@@ -367,10 +410,12 @@ class Flow2:
         anything from documents/original/. Written once; a re-run after a crash reuses an
         identical file."""
         approval = next(e for e in reversed(self.store.events(case_id))
-                        if e["type"] in ("narrative.approved", "narrative.signed"))  # fmt: skip
+                        if e["type"] in ("narrative.approved", "narrative.signed",
+                                         "quality_check.signed"))  # fmt: skip
         dossier = latest_dossier(self.store, case_id)
         qc_pass = next(e for e in reversed(self.store.events(case_id))
-                       if e["type"] in ("qc.passed", "qc.signed_pass"))  # fmt: skip
+                       if e["type"] in ("qc.passed", "qc.signed_pass",
+                                        "quality_check.signed"))  # fmt: skip
         cs = self.store.state(case_id)
         manifest = {
             "case_id": case_id,
@@ -413,23 +458,60 @@ class Flow2:
             raise Flow2Refused("no QC results yet")
         return e["data"]["results"]
 
-    def sign_qc_pass(self, case_id: str, user_id: str, password: str,
+    def _check_narrative(self, text: str) -> None:
+        if not text.strip():
+            raise Flow2Refused("the narrative is empty")
+        template = (self.config_dir / self.study / "narrative_template.md").read_text()
+        if any(note in text for note in re.findall(r"\[[^\]]+\]", template)):
+            raise Flow2Refused(
+                "complete the narrative first: the template's instruction in [brackets] "
+                "is still in it"
+            )
+
+    def sign_qc_pass(self, case_id: str, user_id: str, password: str, narrative: str,
                      reason: str | None = None) -> None:  # fmt: skip
+        """The Safety Specialist's one signature at the Quality Check (P-39): the QC pass
+        and the narrative as edited, together. Refused while a check failed in code; a
+        pass against a suggested query (an AI-found problem) needs a reason."""
         if self.store.state(case_id).state != State.QC_REVIEW:
             raise Flow2Refused("the case is not waiting for a QC review")
         checks = self._checks_ref(case_id)
-        failed = self.store.get_json(case_id, checks["path"]).get("failed_by_code") or []
+        result = self.store.get_json(case_id, checks["path"])
+        failed = result.get("failed_by_code") or []
         if failed:
             raise Flow2Refused(
                 "a check failed (" + ", ".join(failed).replace("_", " ") + "): send a query "
                 "to the site instead"
             )
+        reason = (reason or "").strip() or None
+        if result.get("proposal") == "query" and not reason:
+            raise Flow2Refused("the suggested outcome is a query: give a reason for the pass")
+        draft = result.get("narrative")
+        if draft is None:
+            raise Flow2Refused("this round has no narrative draft")
+        self._check_narrative(narrative)
         user = _safety_specialist(self.config_dir, user_id)
+        n = (
+            _rounds(self.store, case_id, "quality_check.signed")
+            + _rounds(self.store, case_id, "narrative.signed")
+            + 1
+        )
+        rel = f"narrative/narrative_v{n}.md"
+        sha = self.store.put_file(case_id, rel, narrative.strip().encode() + b"\n")
         manifest = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
-        records = [{"name": "qc results", **checks}, {"name": "flow2 manifest", **manifest}]
-        signature = sign(user, password, QC_PASS_MEANING, records)
-        self._event(case_id, "qc.signed_pass", user_id, {"results": checks},
-                    signature=signature, reason=(reason or "").strip() or None)  # fmt: skip
+        dossier = {k: result["dossier"][k] for k in ("path", "sha256")}
+        records = [{"name": "qc results", **checks}, {"name": "flow2 manifest", **manifest},
+                   {"name": "dossier", **dossier}, {"name": "narrative", "path": rel,
+                                                     "sha256": sha}]  # fmt: skip
+        signature = sign(user, password, REVIEW_MEANING, records)
+        original = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip()
+        self._event(case_id, "quality_check.signed", user_id,
+                    {"outcome": "pass", "results": checks,
+                     "dossier": {**dossier, "version": result["dossier"]["version"]},
+                     "narrative": {"path": rel, "sha256": sha}, "draft": draft["draft"],
+                     "source": draft["source"], "simulated": bool(draft.get("simulated")),
+                     "edited": original != narrative.strip()},
+                    signature=signature, reason=reason)  # fmt: skip
 
     def open_query(self, case_id: str, codes: list[str], text: str, *,
                    user_id: str, password: str) -> None:  # fmt: skip
@@ -448,16 +530,10 @@ class Flow2:
         self._notify(case_id, _site(self.store, case_id), "query_opened", user_id)
 
     def sign_narrative(self, case_id: str, user_id: str, password: str, text: str) -> None:
+        """Cases from before P-39, waiting in NARRATIVE_REVIEW."""
         if self.store.state(case_id).state != State.NARRATIVE_REVIEW:
             raise Flow2Refused("the case is not waiting for a narrative review")
-        if not text.strip():
-            raise Flow2Refused("the narrative is empty")
-        template = (self.config_dir / self.study / "narrative_template.md").read_text()
-        if any(note in text for note in re.findall(r"\[[^\]]+\]", template)):
-            raise Flow2Refused(
-                "complete the narrative first: the template's instruction in [brackets] "
-                "is still in it"
-            )
+        self._check_narrative(text)
         user = _safety_specialist(self.config_dir, user_id)
         n = _rounds(self.store, case_id, "narrative.signed") + 1
         draft = _latest(self.store, case_id, "narrative.drafted")["data"]

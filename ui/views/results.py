@@ -4,6 +4,8 @@ de-identification measurements on the synthetic test corpus."""
 
 from __future__ import annotations
 
+import difflib
+import html
 import json
 import re
 import subprocess
@@ -35,6 +37,7 @@ EVENT_WORDS = {
     "qc.passed": "Quality check passed automatically",  # cases from before P-37
     "qc.review_needed": "Quality check ready for the Safety Specialist",
     "qc.signed_pass": "Quality check passed and signed",
+    "quality_check.signed": "Quality check passed and narrative signed",
     "query.opened": "Query sent to the site",
     "dossier.built": "Dossier built",
     "narrative.drafted": "Narrative drafted",
@@ -204,6 +207,39 @@ else:
             f"Download {name}{pages}", store.get_file(cid, d["path"]), file_name=name, key=d["path"]
         )
 
+
+def narrative_edit(case_id: str) -> None:
+    """The Narrative Edit: the draft it started from against the signed text (P-39). Both
+    files are in the hash chain; the comparison is only worked out here, never stored."""
+    signed = next((e for e in reversed(store.events(case_id))
+                   if e["type"] in ("quality_check.signed", "narrative.signed")), None)  # fmt: skip
+    if signed is None:
+        return
+    draft_ref = signed["data"].get("draft") or next(
+        (e["data"]["draft"] for e in reversed(store.events(case_id))
+         if e["type"] == "narrative.drafted" and e["at"] <= signed["at"]), None)  # fmt: skip
+    if draft_ref is None:
+        return
+    draft = store.get_file(case_id, draft_ref["path"]).decode().strip().splitlines()
+    final = store.get_file(case_id, signed["data"]["narrative"]["path"]).decode().strip()
+    final_lines = final.splitlines()
+    source = {"ai": "the AI draft", "template": "the template"}.get(
+        signed["data"].get("source", ""), "the draft"
+    )
+    with st.expander("Narrative: what the Safety Specialist changed"):
+        if draft == final_lines:
+            st.write(f"Signed exactly as {source} proposed it.")
+            return
+        diff = difflib.ndiff(draft, final_lines)
+        rows = "".join(
+            f'<div class="adj-diff {"del" if ln[0] == "-" else "add"}">'
+            f"{'Removed' if ln[0] == '-' else 'Added'}: {html.escape(ln[2:])}</div>"
+            for ln in diff if ln[:1] in "-+" and ln[2:].strip()
+        )  # fmt: skip
+        st.write(f"Changes from {source} to the signed narrative:")
+        st.html(rows)
+
+
 flow3 = next((e for e in reversed(store.events(cid)) if e["type"] == "handoff.flow3_ready"), None)
 if flow3:
     package = store.get_json(cid, flow3["data"]["manifest"]["path"])
@@ -216,6 +252,7 @@ if flow3:
         f"Dossier version {package['dossier']['version']} and the narrative approved by "
         f"{by} on {theme.date_words(n['approved_at'])} were handed to adjudication."
     )
+    narrative_edit(cid)
 
 # --- audit trail -------------------------------------------------------------------------------
 st.header("Audit trail", anchor="audit-trail")

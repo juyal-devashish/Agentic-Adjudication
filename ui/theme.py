@@ -94,6 +94,13 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
   border-radius: 4px; padding: .9rem 1rem; line-height: 1.55; max-width: 80ch;
   color: #1C2833; margin: 0; font-size: 1rem; font-family: inherit; }
 
+/* The Narrative Edit on the Case record: removed and added lines, marked by word and
+   by a left rule, not by colour alone. */
+.adj-diff { padding: .3rem .6rem; margin: .2rem 0; border-left: 3px solid; max-width: 80ch;
+  line-height: 1.5; color: #1C2833; }
+.adj-diff.del { border-color: #A6342B; background: #FBEDEB; text-decoration: line-through; }
+.adj-diff.add { border-color: #23704F; background: #EAF5EF; }
+
 /* E-mail pop-ups (ui/mail_toasts.py): at the bottom right, wide enough that the task and
    case number are never cut off behind "view more". */
 [data-testid="stToastContainer"] { top: auto !important; bottom: 1rem !important; }

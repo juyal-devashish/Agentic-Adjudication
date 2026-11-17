@@ -82,10 +82,13 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "qc.checks_completed": {State.QC_CHECKS: SAME},
     "qc.passed": {State.QC_CHECKS: State.NARRATIVE},  # by agent:qc when its gate passes
     "qc.review_needed": {State.QC_CHECKS: State.QC_REVIEW},
-    "qc.signed_pass": {State.QC_REVIEW: State.NARRATIVE},  # Safety Specialist
+    "qc.signed_pass": {State.QC_REVIEW: State.NARRATIVE},  # before P-39; still replays
+    # P-39: one signature covers the QC pass and the edited narrative
+    "quality_check.signed": {State.QC_REVIEW: State.READY_FOR_ADJUDICATION},
     "query.opened": {State.QC_CHECKS: State.QUERY_OPEN, State.QC_REVIEW: State.QUERY_OPEN},
-    "dossier.built": {State.NARRATIVE: SAME},  # once per passed QC round
-    "narrative.drafted": {State.NARRATIVE: SAME},
+    # Built in the QC round since P-39, after the pass before it (cases on disk replay)
+    "dossier.built": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
+    "narrative.drafted": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
     "narrative.approved": {State.NARRATIVE: State.READY_FOR_ADJUDICATION},  # agent gate
     "narrative.review_needed": {State.NARRATIVE: State.NARRATIVE_REVIEW},
     "narrative.signed": {State.NARRATIVE_REVIEW: State.READY_FOR_ADJUDICATION},

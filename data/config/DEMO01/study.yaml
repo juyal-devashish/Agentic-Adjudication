@@ -35,7 +35,8 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
     output: 20.0             # so recorded costs err slightly high
   functions:                 # each agent function on or off; `mode` is the master switch
     document_type: true      # AI-2: QC step, documents without a recognisable title
-    event_match: true        # QC step: do the documents describe this AE?
+    event_match: false       # retired from QC by P-39 (qc_suggestion covers it)
+    qc_suggestion: true      # P-39: AI Suggestion for the Quality Check, every case
     narrative: true          # AI-4: facts-only narrative, every statement cited
     phi_detection: false     # AI-1: unredacted page images, synthetic data only
 # Synthetic data only: verification also searches each output

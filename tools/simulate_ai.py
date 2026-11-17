@@ -136,19 +136,18 @@ def _submit_and_check(runner, case_key: str, files: list[Path]) -> str:
 
 
 def sign_proposed_passes(runner) -> None:
-    """Stand in for the Safety Specialist (P-37): sign the QC pass wherever the round
-    proposed one, so those cases go on to their narrative. Cases with a proposed query or
-    no proposal stay at QC review, as they would for a real person."""
+    """Stand in for the Safety Specialist (P-37, P-39): wherever the round suggested a
+    pass, sign it with the narrative draft unchanged. Cases with a suggested query or no
+    suggestion stay at QC review, as they would for a real person."""
     from adjud.workflow import State
 
     store = runner.pipeline.store
     for cs in store.list_case_states(State.QC_REVIEW):
         rounds = [e for e in store.events(cs.case_id) if e["type"] == "qc.checks_completed"]
-        if (
-            store.get_json(cs.case_id, rounds[-1]["data"]["results"]["path"]).get("proposal")
-            == "pass"
-        ):
-            runner.flow2.sign_qc_pass(cs.case_id, "ss.anna", "demo")
+        result = store.get_json(cs.case_id, rounds[-1]["data"]["results"]["path"])
+        if result.get("proposal") == "pass":
+            text = store.get_file(cs.case_id, result["narrative"]["draft"]["path"]).decode()
+            runner.flow2.sign_qc_pass(cs.case_id, "ss.anna", "demo", text)
 
 
 def _run_flow2(runner) -> list[tuple[str, str, dict[str, Any]]]:

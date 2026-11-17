@@ -97,7 +97,8 @@ def _case_report(store, cid: str, label: str, expected: str) -> dict[str, Any]:
         if c["gate"] is None and c["function"] != "narrative":
             c["gate"] = _qc_gate(store, cid, c)
     approved = next((e["actor"] for e in events if e["type"] in
-                     ("narrative.approved", "narrative.signed")), None)  # fmt: skip
+                     ("narrative.approved", "narrative.signed",
+                      "quality_check.signed")), None)  # fmt: skip
     outcome = decisions[0] if decisions else None
     people = sorted({e["actor"] for e in events if e["actor"].startswith(HUMAN)})
     return {

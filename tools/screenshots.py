@@ -72,11 +72,9 @@ def prepare(data: Path) -> dict[str, str]:
     flow2 = Flow2(pipe.store, paths.config)
     for _ in range(2):  # Flow 2: handoff, QC round
         runner.run_case_steps()
-    flow2.sign_qc_pass(done, "ss.anna", "demo")  # the Safety Specialist's two sign-offs (P-37)
-    runner.run_case_steps()  # dossier and narrative draft
     draft = next(e for e in pipe.store.events(done) if e["type"] == "narrative.drafted")
     text = pipe.store.get_file(done, draft["data"]["draft"]["path"]).decode()
-    flow2.sign_narrative(done, "ss.anna", "demo", text)
+    flow2.sign_qc_pass(done, "ss.anna", "demo", text)  # one signature: QC and narrative (P-39)
     runner.run_case_steps()  # handoff to Flow 3
 
     # The Safety Specialist's decision screens and a site's open query: documents without
@@ -104,11 +102,17 @@ def prepare(data: Path) -> dict[str, str]:
     query = to_qc_review("DEMO01|DEMO01-102-0003|AE-003", "site102.coord")
     flow2.open_query(query, ["missing_document"], "Please upload the ECG report.",
                      user_id="ss.anna", password="demo")  # noqa: S106  # fmt: skip
-    narrative = to_qc_review("DEMO01|DEMO01-101-0005|AE-006", "site101.coord")
-    flow2.sign_qc_pass(narrative, "ss.anna", "demo", "")
-    runner.run_case_steps()  # template draft: no recorded answer for these documents
+    # AE-006 with the kit's letters: the recorded AI Suggestion, a suggested query
+    more = pipe.case_for("DEMO01|DEMO01-101-0005|AE-006")
+    folder = docs / "DEMO01-101-0005_AE-006"
+    upload(pipe.store, more, [(f.name, f.read_bytes()) for f in sorted(folder.iterdir())],
+           "site101.coord")  # fmt: skip
+    runner.run_case_steps()
+    submit(pipe.store, more, "site101.coord", "demo", paths.config)
+    for _ in range(3):
+        runner.run_case_steps()
     return {"review": review, "done": done, "qc_review": qc_review, "query": query,
-            "narrative": narrative}  # fmt: skip
+            "more": more}  # fmt: skip
 
 
 def main() -> None:
@@ -156,7 +160,7 @@ def main() -> None:
             ("5_record_list", "record?role=safety_specialist"),
             ("7_qc_review", f"qc?role=safety_specialist&case={cases['qc_review']}"),
             ("8_record_needs_qc", f"record?role=safety_specialist&case={cases['qc_review']}"),
-            ("9_narrative_review", f"qc?role=safety_specialist&case={cases['narrative']}"),
+            ("9_qc_suggested_query", f"qc?role=safety_specialist&case={cases['more']}"),
             ("10_site_query", f"documents?role=site&case={cases['query']}"),
             ("12_documents_no_case", "documents?role=site&user=site101.coord"),
         ]

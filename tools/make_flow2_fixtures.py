@@ -34,7 +34,8 @@ KIT = ROOT / "data" / "flow1-testkit"
 SUBJECT = "DEMO01-101-0001"
 # What the QC round proposes to the Safety Specialist, who decides every case (P-37).
 EXPECTED = {
-    "complete": {"proposal": "pass", "codes": []},
+    # AI off: no AI Suggestion, so no suggested outcome (P-39); with it, a pass
+    "complete": {"proposal": "unclear", "codes": [], "with_ai": {"proposal": "pass", "codes": []}},
     "missing_document": {"proposal": "query", "codes": ["missing_document"]},
     "wrong_patient": {"proposal": "query", "codes": ["wrong_patient"]},
     "different_event": {
