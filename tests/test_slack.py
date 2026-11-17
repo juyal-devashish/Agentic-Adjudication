@@ -178,3 +178,25 @@ def test_the_case_record_shows_slack_attempts(data, monkeypatch):
     assert "Slack message failed: HTTP 404 no_service" in shown
     table = next(d.value for d in at.dataframe if "Slack" in d.value.columns)
     assert list(table["Slack"]) == ["Failed"] and list(table["E-mail"]) == ["Not sent"]
+
+
+def test_parity_is_clean_only_when_every_notification_was_posted_once(pipe):  # noqa: F811
+    from tools.notify_parity import parity
+
+    log = DeliveryLog(pipe.store, pipe.clock)
+    assert not parity(log)["clean"]  # Slack never tried
+    since = format_time(pipe.clock())
+    queue_two(pipe)
+    deliverer(pipe, FakeSlack(), since).deliver_pending()
+    mailer(pipe, FakeSmtp()).deliver_pending()
+    report = parity(log)
+    assert report["clean"], report["problems"]
+    assert (report["notifications"], report["slack_sent"], report["email_sent"]) == (2, 2, 2)
+
+    Outbox(pipe.store.paths, "DEMO01", clock=pipe.clock).queue("DEMO01-0001", "site:101",
+                                                               "query_opened")  # fmt: skip
+    deliverer(pipe, FakeSlack((500, "")), since).deliver_pending()
+    report = parity(log)
+    assert not report["clean"]
+    assert any("posted 0 times" in p for p in report["problems"])
+    assert any("HTTP 500" in p for p in report["problems"])
