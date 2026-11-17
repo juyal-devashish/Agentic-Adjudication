@@ -48,4 +48,4 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - With AI off, the page says there is no AI Suggestion and the narrative starts from the template; it can only be signed once the template's [bracketed] instruction is replaced.
 7. **Not built:** a live EDC connection, real logins, DICOM redaction, Flows 3 and 4, and anything for real patient data.
 
-Cost on Opus 5.5 is about $0.30 per full demo run. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
+Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.

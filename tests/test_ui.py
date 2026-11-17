@@ -235,11 +235,15 @@ def test_quality_check_page_is_one_stop_with_the_narrative_and_one_signature(dem
     assert decision.value == "pass" and not at.multiselect
     assert any(a.label == "Narrative" for a in at.text_area)  # the draft, ready to edit
     assert not any(a.label == "Message to the site" for a in at.text_area)
+    next(a for a in at.text_area if a.label == "Narrative").input("My edit. [Add").run()
     decision.set_value("query").run()
     assert [m.label for m in at.multiselect] == ["Query reasons"]
     assert any(a.label == "Message to the site" for a in at.text_area)
     next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
     assert not at.multiselect
+    box = next(a for a in at.text_area if a.label == "Narrative")
+    assert box.value == "My edit. [Add"  # the edit survived the switch to query and back
+    box.input(store.get_file(cid, "narrative/draft_v1.md").decode()).run()
     sign = "Sign the pass and the narrative"
     at.text_input[-1].input("demo")
     next(b for b in at.button if b.label == sign).click().run()
@@ -288,12 +292,13 @@ def test_quality_check_page_shows_the_ai_suggestion(demo, monkeypatch, tmp_path)
     page = html_text(at)
     onset = page[page.index("<b>Onset date</b>") :].split("</tr>")[0]
     assert "2026-03-14</td>" in onset and "Doesn&#x27;t match" in onset
-    assert "discharge_summary.pdf p. 1" in onset  # the quote it rests on
+    assert "discharge_summary_nov2025.pdf p. 1" in onset  # the quote it rests on
     # The AI suggests; the query is pre-filled and a person sends it (P-37, ADR 0001).
     assert "send a query to the site" in html_text(at)
     assert next(r for r in at.radio if r.label == "Your decision").value == "query"
     message = next(a for a in at.text_area if a.label.startswith("Message to the site"))
-    assert "Onset date: EDC 2026-03-14, documents 02/11/2025" in message.value
+    assert "Onset date: EDC 2026-03-14, documents 02/11/2025." in message.value
+    assert ".." not in message.value
     assert not at.info  # nothing has been sent to the site yet
     next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
     assert any(t.label.startswith("Why you pass despite") for t in at.text_input)

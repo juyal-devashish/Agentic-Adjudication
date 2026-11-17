@@ -177,22 +177,31 @@ def review_and_sign(latest: dict) -> None:
         key=f"qc_decision_{cid}_{latest['round']}",
         label_visibility="collapsed",
     )
+    # The narrative box sits outside the form too, so an edit survives switching the
+    # decision to "query" and back: its text is kept under its own key while hidden.
+    box, kept = f"narrative_{cid}_{latest['round']}", f"narrative_kept_{cid}_{latest['round']}"
+    text = ""
     if decision == "query":
         with st.expander("Narrative draft (dropped if you send the query)"):
             theme.frozen_text(draft, "Narrative draft")
+    else:
+        if box not in st.session_state:
+            st.session_state[box] = st.session_state.get(kept, draft)
+        text = st.text_area("Narrative", height=320, key=box)
+        st.session_state[kept] = text
     with st.form(f"qc_sign_{cid}_{latest['round']}"):
-        codes, message, text, reason = [], "", "", ""
+        codes, message, reason = [], "", ""
         if decision == "query":
             codes = st.multiselect("Query reasons", list(QUERY_CODES),
                                    default=latest.get("query_codes") or [],
                                    format_func=QUERY_CODES.get)  # fmt: skip
             message = st.text_area(
                 "Message to the site",
-                " ".join(f"{r}." for r in latest.get("reasons", [])) if suggested_query else "",
+                " ".join(f"{r.rstrip('.')}." for r in latest.get("reasons", []))
+                if suggested_query
+                else "",
             )
         else:
-            text = st.text_area("Narrative", draft, height=320,
-                                key=f"narrative_{cid}_{latest['round']}")  # fmt: skip
             reason = st.text_input(
                 "Why you pass despite the suggested query (required)"
                 if suggested_query

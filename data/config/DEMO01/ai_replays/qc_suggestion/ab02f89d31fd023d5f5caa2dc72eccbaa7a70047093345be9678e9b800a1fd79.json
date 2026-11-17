@@ -26,19 +26,16 @@
       {
         "file": "discharge_summary.pdf",
         "pages": 2,
-        "text_sha256": "sha256:ba6fdb8b431fd2fbaa8687bb4b2dfd6778c56edd120df20ea31aa4f16733d160",
         "type": "discharge_summary"
       },
       {
         "file": "ecg_report.pdf",
         "pages": 1,
-        "text_sha256": "sha256:30a58059f04ea1a5a5bf040abd5aca00be9ffc6101a8cefc886cd254349ddd9b",
         "type": "ecg_report"
       },
       {
         "file": "troponin_results.xlsx",
         "pages": 2,
-        "text_sha256": "sha256:7a6bf776615e9b0fbfecbc7c09705dd941e4b2a0c37f38cef508eb91bd0a7711",
         "type": "lab_results"
       }
     ],
@@ -51,22 +48,27 @@
   "output": {
     "fields": [
       {
-        "confidence": 0.95,
-        "document_value": "Acute inferior ST-elevation myocardial infarction",
+        "confidence": 0.93,
+        "document_value": "Acute inferior ST-elevation myocardial infarction; the right coronary artery was occluded and stented",
         "evidence": [
           {
             "file": "ecg_report.pdf",
             "page": 1,
             "quote": "Interpretation: acute inferior ST-elevation myocardial infarction."
+          },
+          {
+            "file": "discharge_summary.pdf",
+            "page": 2,
+            "quote": "showed an occluded right coronary artery, treated with a"
           }
         ],
         "field": "ae_term",
-        "reason": "The ECG report gives the interpretation 'acute inferior ST-elevation myocardial infarction', which is the same condition as the EDC term Myocardial infarction.",
+        "reason": "The ECG report reads an acute inferior ST-elevation myocardial infarction, which agrees with the EDC term Myocardial infarction.",
         "status": "match"
       },
       {
         "confidence": 0.92,
-        "document_value": "14/03/2026",
+        "document_value": "2026-03-14",
         "evidence": [
           {
             "file": "discharge_summary.pdf",
@@ -80,26 +82,12 @@
           }
         ],
         "field": "onset_date",
-        "reason": "The patient was admitted with chest pain on 14/03/2026 and the ECG was recorded that day, which agrees with the EDC onset date of 2026-03-14.",
+        "reason": "Admission with chest pain and the ECG are both dated 14/03/2026, the same as the EDC onset date.",
         "status": "match"
       },
       {
-        "confidence": 0.8,
-        "document_value": "21/03/2026 (discharge date)",
-        "evidence": [
-          {
-            "file": "discharge_summary.pdf",
-            "page": 2,
-            "quote": "He was discharged home on 21/03/2026"
-          }
-        ],
-        "field": "end_date",
-        "reason": "The discharge date of 21/03/2026 is the same as the EDC end date, but no document gives a separate date when the event resolved.",
-        "status": "match"
-      },
-      {
-        "confidence": 0.6,
-        "document_value": "Discharged home on 21/03/2026; recovery not explicitly stated",
+        "confidence": 0.75,
+        "document_value": "2026-03-21 (discharge date)",
         "evidence": [
           {
             "file": "discharge_summary.pdf",
@@ -107,30 +95,44 @@
             "quote": "He was discharged home on 21/03/2026 on aspirin 75 mg, clopidogrel 75 mg"
           }
         ],
-        "field": "outcome",
-        "reason": "Discharge home fits the EDC outcome RECOVERED, but the documents never state the outcome outright and the patient left on ongoing medication.",
+        "field": "end_date",
+        "reason": "The patient was discharged on 21/03/2026, the same as the EDC end date, but no document gives an explicit end date for the event.",
         "status": "match"
       },
       {
-        "confidence": 0.92,
-        "document_value": "Hospitalised 14/03/2026 to 21/03/2026",
+        "confidence": 0.6,
+        "document_value": "Discharged home on ongoing medication",
+        "evidence": [
+          {
+            "file": "discharge_summary.pdf",
+            "page": 2,
+            "quote": "He was discharged home on 21/03/2026"
+          }
+        ],
+        "field": "outcome",
+        "reason": "Discharge home fits the EDC outcome RECOVERED, but the documents do not say in words that the patient recovered.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "Hospitalised from 14/03/2026 to 21/03/2026",
         "evidence": [
           {
             "file": "discharge_summary.pdf",
             "page": 1,
-            "quote": "was admitted on 14/03/2026"
+            "quote": "was admitted on 14/03/2026 with central chest pain"
           }
         ],
         "field": "serious",
-        "reason": "The patient was admitted on 14/03/2026 and discharged on 21/03/2026, which supports the EDC entry of serious (Y) with the criterion hospitalisation.",
+        "reason": "The hospital admission recorded in the discharge summary supports the EDC seriousness criterion of hospitalisation.",
         "status": "match"
       }
     ],
-    "summary": "Both required documents are present: the discharge summary and the ECG report. Together with the troponin results, they describe an acute inferior ST-elevation myocardial infarction with admission on 14/03/2026 and discharge on 21/03/2026, which agrees with the EDC term, onset date, end date and seriousness (hospitalisation). The outcome RECOVERED fits a discharge home but is not stated outright, and the angiography procedure report is not included.",
+    "summary": "All five EDC fields agree with the documents. The discharge summary, ECG report and troponin results describe an admission on 14/03/2026 with an acute inferior ST-elevation myocardial infarction, with rising troponin T, stenting of the occluded right coronary artery and discharge home on 21/03/2026. Both required documents are present; the outcome RECOVERED is supported only by the discharge home, not by an explicit statement, and the angiography report is not included.",
     "would_help": [
       {
         "document_type": "imaging_report",
-        "reason": "The discharge summary mentions coronary angiography and stenting on 15/03/2026, but the procedure report itself is not in the documents sent."
+        "reason": "The discharge summary says coronary angiography was done on 15/03/2026, but the procedure report itself is not in the file."
       }
     ]
   },
@@ -184,8 +186,8 @@
   "usage": {
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
-    "input_tokens": 7486,
-    "output_tokens": 1737
+    "input_tokens": 7136,
+    "output_tokens": 1696
   },
-  "cost_usd": 0.064684
+  "cost_usd": 0.062464
 }

@@ -245,10 +245,10 @@ class Flow2:
         payload = {
             "ae": {k: ae.get(k) for k in ("ae_term", "onset_date", "end_date", "outcome",
                                           "serious", "seriousness_criteria")},
-            # each file's text hash too, so a recorded answer replays only for the same
-            # documents (the redacted files' own bytes differ from run to run)
-            "documents": [{"file": n, "pages": len(texts[n]), "type": outcome.types[n]["type"],
-                           "text_sha256": sha256_bytes("\f".join(texts[n]).encode())}
+            # Names, pages and types, not the text: a recorded answer still replays after
+            # the site's redaction edits or another OCR build; its quotes are checked
+            # against the real text either way, so a changed passage is never "verified"
+            "documents": [{"file": n, "pages": len(texts[n]), "type": outcome.types[n]["type"]}
                           for n in sorted(texts)],
             "required_types": required,
             "missing_required_types": [t for t in required if t not in present],

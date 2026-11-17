@@ -26,13 +26,11 @@
       {
         "file": "angiography_report_rotated.pdf",
         "pages": 1,
-        "text_sha256": "sha256:b12a8ddd394b18ec28a71596d130363341bff81da1597d2bcb1f55ecaa80b754",
         "type": "imaging_report"
       },
       {
         "file": "clinic_letter.pdf",
         "pages": 1,
-        "text_sha256": "sha256:807e86bb884d55fe5f4ac0a611ed645923058d45aa67eec29e1775ce9b5da9d9",
         "type": "clinic_letter"
       }
     ],
@@ -63,7 +61,7 @@
           }
         ],
         "field": "ae_term",
-        "reason": "The clinic letter and the angiography indication both name unstable angina, the same as the EDC term.",
+        "reason": "Both documents name unstable angina: the clinic letter as the reason for admission and the angiography report as the indication for the procedure.",
         "status": "match"
       },
       {
@@ -77,7 +75,7 @@
           }
         ],
         "field": "onset_date",
-        "reason": "The clinic letter dates the admission with unstable angina to 12/05/2025, the same as the EDC onset date.",
+        "reason": "The clinic letter gives 12/05/2025 as the date of admission with unstable angina, which matches the EDC onset date.",
         "status": "match"
       },
       {
@@ -85,7 +83,7 @@
         "document_value": "",
         "evidence": [],
         "field": "end_date",
-        "reason": "Neither document gives a discharge date or the date the event ended, so the EDC end date of 2025-05-14 cannot be checked.",
+        "reason": "Neither document gives a discharge date or the date the event resolved.",
         "status": "not_found"
       },
       {
@@ -93,12 +91,12 @@
         "document_value": "",
         "evidence": [],
         "field": "outcome",
-        "reason": "The clinic letter describes an outpatient review on 02/06/2025 but does not say whether the event resolved, and the angiography plans a staged PCI.",
+        "reason": "Neither document says the event resolved; the clinic follow-up on 02/06/2025 does not describe the outcome.",
         "status": "not_found"
       },
       {
         "confidence": 0.85,
-        "document_value": "Hospital admission for unstable angina",
+        "document_value": "Hospital admission",
         "evidence": [
           {
             "file": "clinic_letter.pdf",
@@ -107,15 +105,15 @@
           }
         ],
         "field": "serious",
-        "reason": "The clinic letter records a hospital admission for the event, which fits the EDC seriousness criterion of hospitalisation.",
+        "reason": "The clinic letter records a hospital admission for the event, which agrees with the hospitalisation criterion in the EDC.",
         "status": "match"
       }
     ],
-    "summary": "The documents are a coronary angiography report from 13/05/2025, done because of unstable angina, and a cardiology clinic letter that confirms an admission with unstable angina on 12/05/2025. These agree with the EDC term, onset date and hospitalisation. Neither document gives the end date of 2025-05-14 or the recovered outcome, and the required discharge summary and ECG report are both missing.",
+    "summary": "Two documents were provided. A coronary angiography report dated 13/05/2025 gives unstable angina as the indication, and a cardiology clinic letter confirms an admission with unstable angina on 12/05/2025, which matches the EDC term, onset date and hospitalisation. Both required documents, the discharge summary and the ECG report, are missing, so the EDC end date (2025-05-14) and the RECOVERED outcome are not supported by any document.",
     "would_help": [
       {
         "document_type": "lab_results",
-        "reason": "Cardiac biomarker results from the admission would help confirm how the event was characterised during the hospital stay."
+        "reason": "Cardiac biomarker results from the admission would help confirm the event term recorded in the EDC."
       }
     ]
   },
@@ -142,8 +140,8 @@
   "usage": {
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
-    "input_tokens": 6041,
-    "output_tokens": 1032
+    "input_tokens": 5821,
+    "output_tokens": 1004
   },
-  "cost_usd": 0.044804
+  "cost_usd": 0.043364
 }

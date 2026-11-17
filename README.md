@@ -50,8 +50,8 @@ flowchart LR
     end
     subgraph F2 [Flow 2 · QC and narrative]
         direction TB
-        B1[Quality checks + agents] --> B2[Hashed dossier]
-        B2 --> B3[Cited narrative]
+        B1[Quality checks + AI Suggestion] --> B2[Hashed dossier<br/>and cited narrative draft]
+        B2 --> B3[One review and signature<br/>by the Safety Specialist]
     end
     subgraph F3 [Flow 3 · Adjudication]
         direction TB

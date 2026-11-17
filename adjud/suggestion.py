@@ -115,6 +115,8 @@ def suggested_outcome(
     """(outcome, reasons, query codes): outcome is pass, query or unclear."""
     failed = [c for c in checks if c["status"] == "failed"]
     mismatched = [f for f in suggestion.get("fields") or [] if f["status"] == "mismatch"]
+    if mismatched:  # the event check failed on these same findings: say it once
+        failed = [c for c in failed if c.get("query_code") != "wrong_event"]
     if failed or mismatched:
         reasons = [c["detail"] for c in failed]
         reasons += [f"{f['label']}: EDC {f['edc_value'] or 'empty'}, documents "

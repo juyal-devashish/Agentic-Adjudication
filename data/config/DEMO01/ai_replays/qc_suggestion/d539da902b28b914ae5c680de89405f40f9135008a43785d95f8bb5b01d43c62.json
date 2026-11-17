@@ -26,13 +26,11 @@
       {
         "file": "discharge_summary.pdf",
         "pages": 1,
-        "text_sha256": "sha256:f5862b3bb0ba029eaee047bd47a06741ff0398a56a47ccad73cc7ce572e67703",
         "type": "discharge_summary"
       },
       {
         "file": "ecg_report.pdf",
         "pages": 1,
-        "text_sha256": "sha256:1c8f34966bd31f2eadb02deee9b1ab797a7fd2af26e2c31e3e7a707caddfbfa9",
         "type": "ecg_report"
       }
     ],
@@ -60,12 +58,12 @@
           }
         ],
         "field": "ae_term",
-        "reason": "The discharge summary diagnosis and the ECG interpretation both describe an acute anterior myocardial infarction, which matches the EDC term.",
+        "reason": "The discharge diagnosis and the ECG report both describe an acute anterior myocardial infarction, which matches the EDC term.",
         "status": "match"
       },
       {
         "confidence": 0.9,
-        "document_value": "14/03/2026",
+        "document_value": "2026-03-14",
         "evidence": [
           {
             "file": "discharge_summary.pdf",
@@ -79,27 +77,27 @@
           }
         ],
         "field": "onset_date",
-        "reason": "The admission date and the ECG recording date are both 14/03/2026, the same as the EDC onset date of 2026-03-14.",
+        "reason": "The admission date and the ECG recording date are both 14/03/2026, the same as the EDC onset date.",
         "status": "match"
       },
       {
-        "confidence": 0.85,
+        "confidence": 0.8,
         "document_value": "",
         "evidence": [],
         "field": "end_date",
-        "reason": "The discharge summary gives no discharge date or resolution date, so the EDC end date of 2026-03-21 cannot be checked.",
+        "reason": "The discharge summary does not give a discharge date or any other end date, so the EDC end date of 2026-03-21 cannot be checked.",
         "status": "not_found"
       },
       {
         "confidence": 0.6,
-        "document_value": "",
+        "document_value": "Discharged home in a stable condition",
         "evidence": [],
         "field": "outcome",
-        "reason": "The discharge summary only says the patient was discharged home in a stable condition, which does not clearly confirm the EDC outcome of RECOVERED.",
+        "reason": "The documents say only that the patient went home in a stable condition, which does not clearly confirm the EDC outcome of RECOVERED.",
         "status": "not_found"
       },
       {
-        "confidence": 0.9,
+        "confidence": 0.85,
         "document_value": "Hospitalised (admitted 14/03/2026)",
         "evidence": [
           {
@@ -109,19 +107,19 @@
           }
         ],
         "field": "serious",
-        "reason": "The discharge summary records a hospital admission, which supports serious = Y with the hospitalisation criterion.",
+        "reason": "The discharge summary records a hospital admission, which agrees with the EDC entry of serious because of hospitalisation.",
         "status": "match"
       }
     ],
-    "summary": "Both required documents are present: a discharge summary and an ECG report. They describe an acute anterior myocardial infarction with admission and ECG on 14/03/2026, which matches the EDC term, onset date and hospitalisation. Neither document gives a discharge or resolution date, so the EDC end date of 2026-03-21 cannot be checked, and 'discharged home in a stable condition' does not clearly confirm the EDC outcome of RECOVERED.",
+    "summary": "Both required documents are present. The discharge summary and the ECG report describe an acute anterior myocardial infarction with admission on 14/03/2026, which agrees with the EDC event term, onset date and hospitalisation. The documents give no discharge or end date, and they say only that the patient was discharged in a stable condition, so they do not confirm the EDC end date of 2026-03-21 or the outcome of RECOVERED.",
     "would_help": [
       {
         "document_type": "lab_results",
-        "reason": "The discharge summary gives only one troponin value, and serial laboratory results would show how the event progressed and when it resolved."
+        "reason": "Full troponin results would document the course of the event and the date it resolved, because the discharge summary gives only one peak value."
       },
       {
         "document_type": "imaging_report",
-        "reason": "A report of any cardiac imaging or angiography done during the admission would add detail on the event described in the documents."
+        "reason": "Reports from cardiac imaging or angiography during the admission would add detail on the event."
       }
     ]
   },
@@ -148,8 +146,8 @@
   "usage": {
     "cache_creation_input_tokens": 0,
     "cache_read_input_tokens": 0,
-    "input_tokens": 5874,
-    "output_tokens": 1362
+    "input_tokens": 5644,
+    "output_tokens": 1235
   },
-  "cost_usd": 0.050736
+  "cost_usd": 0.047276
 }

@@ -125,8 +125,10 @@ def make(out: Path) -> dict[str, dict]:
             "discharge_summary.pdf": _summary(p, **mi),
             "ecg_report.pdf": _ecg(other, trial_id=False),
         },
+        # Own file name: recorded agent answers are keyed on the documents' names and
+        # types, not their text, so this scenario must not share `complete`'s names
         "different_event": {
-            "discharge_summary.pdf": _summary(
+            "discharge_summary_nov2025.pdf": _summary(
                 p,
                 event="Fractured neck of femur",
                 date="02/11/2025",
