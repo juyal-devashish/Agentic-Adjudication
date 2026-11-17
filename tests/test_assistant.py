@@ -69,7 +69,7 @@ def test_site_sees_only_its_cases_and_gets_a_link_to_upload(demo):
     assert "discharge or death summary and ECG report" in text
     say(at, "/import")
     assert "data manager's job" in chat(at)
-    button = next(b for b in at.button if b.label == "Upload documents for DEMO01-0001 →")
+    button = next(b for b in at.button if b.label == "Upload documents for DEMO01-0001")
     button.click().run()
     assert not at.exception, at.exception
     assert at.session_state["case_id"] == "DEMO01-0001"
@@ -100,7 +100,7 @@ def test_safety_specialist_gets_the_quality_check_summary(demo, monkeypatch):
     text = chat(at)
     assert "AI Suggestion** (AI)" in text and "You decide and sign" in text
     assert "outcome: not sure" in text.lower()
-    assert any(b.label == "Review and sign DEMO01-0001 →" for b in at.button)
+    assert any(b.label == "Review and sign DEMO01-0001" for b in at.button)
     assert not any(b.label.startswith("Sign") for b in at.button)  # it never signs
 
 
