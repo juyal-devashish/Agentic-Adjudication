@@ -73,17 +73,21 @@ def test_import_now_from_page_1_creates_cases(demo):
         ("data_manager", ["assistant", "edc_input", "results"]),
         ("site", ["assistant", "site_documents", "results"]),
         ("safety_specialist", ["assistant", "quality_check", "results"]),
+        ("cec_coordinator", ["assistant", "assignments", "committee", "results"]),
+        ("adjudicator", ["assistant", "adjudication", "committee", "results"]),
     ],
 )
 def test_each_role_sees_only_its_own_pages(demo, role, own):
     """The menu lists only the role's pages, it lands on its own first page (the
     Assistant, P-40), and another role's page (a typed URL) sends it back there."""
     titles = {"assistant": "Assistant", "edc_input": "AE import", "site_documents": "Documents",
-              "quality_check": "Quality check", "results": "Case record"}  # fmt: skip
+              "quality_check": "Quality check", "results": "Case record",
+              "assignments": "Assignments", "adjudication": "Adjudication",
+              "committee": "Committee"}  # fmt: skip
     at = run(role=role)
     assert titles[own[0]] in [t.value for t in at.title]
     assert [link.proto.label for link in at.get("page_link")] == [titles[p] for p in own]
-    for page in ("assistant", "edc_input", "site_documents", "quality_check", "results"):
+    for page in titles:
         at.switch_page(f"views/{page}.py")
         at.run()
         assert not at.exception, at.exception

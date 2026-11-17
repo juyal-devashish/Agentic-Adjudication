@@ -31,6 +31,8 @@ STARTERS = {
     "data_manager": ["/tasks", "/import", "/why AE-008"],
     "site": ["/tasks", "/status 0001"],
     "safety_specialist": ["/tasks", "/qc 0001"],
+    "cec_coordinator": ["/tasks", "/status 0001"],
+    "adjudicator": ["/tasks", "/status 0001"],
 }
 STARTER_WORDS = {"/tasks": "What's waiting for me?", "/import": "Import the AE records",
                  "/why AE-008": "Why is AE-008 not a case?", "/status 0001": "Where is case 0001?",
