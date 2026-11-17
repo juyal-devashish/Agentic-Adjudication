@@ -79,6 +79,8 @@ ROLE_NAMES = {  # in demo order; the first is where the app opens (on AE import)
     "data_manager": "Data manager",
     "site": "Site user",
     "safety_specialist": "Safety Specialist",
+    "cec_coordinator": "CEC Coordinator",  # Flows 3 and 4 (P-41)
+    "adjudicator": "Adjudicator",
 }
 
 
@@ -87,6 +89,8 @@ ROLE_PAGES = {  # every role lands on the Assistant, the guided chat (P-40)
     "data_manager": ["assistant", "import", "record"],
     "site": ["assistant", "documents", "record"],
     "safety_specialist": ["assistant", "qc", "record"],
+    "cec_coordinator": ["assistant", "assignments", "committee", "record"],
+    "adjudicator": ["assistant", "adjudicate", "committee", "record"],
 }
 
 
@@ -134,7 +138,9 @@ def next_step(
             "needed.",
             State.READY_FOR_ADJUDICATION: "The case is ready for adjudication. Nothing more is "
             "needed from you.",
-        }[state]
+        }.get(
+            state, "The case is with the adjudication committee. Nothing more is needed from you."
+        )  # Flows 3–4: no adjudication details for the site (ACC-04)
     return {
         State.EVENT_CREATED: "Related data is being pulled from the EDC.",
         State.AWAITING_DOCUMENTS: f"Waiting for {site} to upload documents.",
@@ -155,11 +161,37 @@ def next_step(
             if role == "safety_specialist"
             else "Waiting for the Safety Specialist to sign the narrative."
         ),
-        State.READY_FOR_ADJUDICATION: "Ready for adjudication. No action is needed.",
+        State.READY_FOR_ADJUDICATION: "Ready for adjudication. The reviews are assigned "
+        "automatically.",
+        State.ADJ_REVIEW: (
+            "Your independent review may be open: complete and sign the form."
+            if role == "adjudicator"
+            else "Two adjudicators are reviewing independently."
+        ),
+        State.ADJ3_REVIEW: (
+            "Adjudicator 3 reviews the disputed fields: if that is you, sign the form."
+            if role == "adjudicator"
+            else "The reviews disagree on some fields; Adjudicator 3 is reviewing them."
+        ),
+        State.CEC_MEETING: (
+            "Record the committee's meeting and its decision on each open field."
+            if role == "cec_coordinator"
+            else "Waiting for the committee: the Chair signs the recorded consensus."
+        ),
+        State.MORE_DATA: "More data was requested; the site gets a query.",
+        State.OUTCOME: "The outcome is being derived from the signed answers.",
+        State.EXPORT: "The outcome is being exported to the EDC.",
+        State.CLOSED: (
+            "Closed. A re-adjudication can be started on the Assignments page."
+            if role == "cec_coordinator"
+            else "Closed. No action is needed."
+        ),
     }[state]
 
 
 DOCUMENTS_PAGE, QC_PAGE = "views/site_documents.py", "views/quality_check.py"
+ADJ_PAGE, COMMITTEE_PAGE = "views/adjudication.py", "views/committee.py"
+ASSIGN_PAGE = "views/assignments.py"
 
 
 def next_page(role: str, state: State) -> tuple[str, str, str] | None:
@@ -180,6 +212,19 @@ def next_page(role: str, state: State) -> tuple[str, str, str] | None:
         return {
             State.QC_REVIEW: (QC_PAGE, "Review the quality check", ":material/rule:"),
             State.NARRATIVE_REVIEW: (QC_PAGE, "Complete the narrative", ":material/rule:"),
+        }.get(state)
+    if role == "adjudicator":
+        return {
+            State.ADJ_REVIEW: (ADJ_PAGE, "Open the adjudication form", ":material/gavel:"),
+            State.ADJ3_REVIEW: (ADJ_PAGE, "Open the adjudication form", ":material/gavel:"),
+            State.CEC_MEETING: (COMMITTEE_PAGE, "Committee", ":material/groups:"),
+        }.get(state)
+    if role == "cec_coordinator":
+        return {
+            State.ADJ_REVIEW: (ASSIGN_PAGE, "Assignments", ":material/assignment_ind:"),
+            State.ADJ3_REVIEW: (ASSIGN_PAGE, "Assignments", ":material/assignment_ind:"),
+            State.CEC_MEETING: (COMMITTEE_PAGE, "Record the meeting", ":material/groups:"),
+            State.CLOSED: (ASSIGN_PAGE, "Re-adjudicate", ":material/replay:"),
         }.get(state)
     return None
 

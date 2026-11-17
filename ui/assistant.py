@@ -30,6 +30,9 @@ PAGES = {  # page key -> file, as registered in app.py
     "import": "views/edc_input.py",
     "documents": "views/site_documents.py",
     "qc": "views/quality_check.py",
+    "assignments": "views/assignments.py",
+    "adjudicate": "views/adjudication.py",
+    "committee": "views/committee.py",
     "record": "views/results.py",
 }
 HELP = (
@@ -76,14 +79,19 @@ class Assistant:
 
     # -- what this person may see ------------------------------------------------------------
 
-    def sees(self, subject: str | None) -> bool:
+    def sees(self, subject: str | None, case_id: str | None = None) -> bool:
+        if self.role == "adjudicator":  # only cases assigned to them (ACC-02)
+            from adjud.flow3 import assigned_cases
+
+            return case_id is not None and case_id in assigned_cases(self.store, self.user["id"])
         if self.role != "site":
             return True
         parts = (subject or "").split("-")
         return len(parts) > 1 and parts[1] == self.user.get("site")
 
     def cases(self) -> list[Any]:
-        return [cs for cs in self.store.list_case_states() if self.sees(cs.subject)]
+        return [cs for cs in self.store.list_case_states()
+                if self.sees(cs.subject, cs.case_id)]  # fmt: skip
 
     def find_case(self, text: str) -> str | None:
         """A case named in the text: DEMO01-0001, 0001, or an AE ID such as AE-001."""
@@ -188,9 +196,10 @@ class Assistant:
                 from adjud.flow2 import QUERY_CODES
 
                 why = ", ".join(QUERY_CODES.get(c, c).lower() for c in q.get("codes", []))
+                by = "a query" if "more_data" in q.get("codes", []) else (
+                    "the Safety Specialist sent a query")  # fmt: skip
                 return (
-                    f"{what}: the Safety Specialist sent a query ({why}). "
-                    f"{q.get('text', '')}".strip(),
+                    f"{what}: {by} ({why}). {q.get('text', '')}".strip(),
                     Action(f"Answer the query for {cs.case_id}", "documents", cs.case_id),
                 )
         if self.role == "safety_specialist":
@@ -203,6 +212,43 @@ class Assistant:
                 return (
                     f"{what}: the narrative draft is ready to check and sign.",
                     Action(f"Complete the narrative for {cs.case_id}", "qc", cs.case_id),
+                )
+        if self.role == "adjudicator":
+            return self._adjudicator_task(cs, what)
+        if self.role == "cec_coordinator" and cs.state == State.CEC_MEETING:
+            fields = ", ".join(self._flow3().form(cs.case_id).field(f).label.lower()
+                               for f in self._flow3().committee_fields(cs.case_id))  # fmt: skip
+            return (
+                f"{what} needs the committee, on: {fields}. Record the meeting and its "
+                "decisions; the Chair signs.",
+                Action(f"Record the meeting for {cs.case_id}", "committee", cs.case_id),
+            )
+        return None, None
+
+    def _flow3(self) -> Any:
+        from adjud.flow3 import Flow3
+
+        return Flow3(self.store, self.store.paths.config, self.pipe.study)
+
+    def _adjudicator_task(self, cs: Any, what: str) -> tuple[str | None, Action | None]:
+        from adjud.flow3 import current_round
+
+        f3, me = self._flow3(), self.user["id"]
+        slot = f3.slot_of(cs.case_id, me)
+        rnd = current_round(self.store, cs.case_id)
+        if slot and slot not in rnd.signed:
+            line = (
+                f"{what}: your independent review is open (round {rnd.number})."
+                if slot != "3"
+                else f"{what}: the reviews disagree; you are Adjudicator 3 for the disputed "
+                "fields only."
+            )
+            return line, Action(f"Adjudicate {cs.case_id}", "adjudicate", cs.case_id)
+        if cs.state == State.CEC_MEETING and me == f3.chair() and rnd.meeting is not None:
+            if rnd.meeting["data"]["quorum_met"]:
+                return (
+                    f"{what}: the committee's consensus is recorded and needs your signature.",
+                    Action(f"Sign the consensus for {cs.case_id}", "committee", cs.case_id),
                 )
         return None, None
 
@@ -400,6 +446,58 @@ class Assistant:
             return Reply(f"{case_id}: quality check passed and narrative signed by {who}.")
         if t == "handoff.flow3_ready":
             return Reply(f"{case_id} is **ready for adjudication**. The package is sealed.")
+        if site:
+            return None  # who adjudicates, and how, is not shown to the site (ACC-04)
+        return self._flow34_update(case_id, e, who)
+
+    def _flow34_update(self, case_id: str, e: dict[str, Any], who: str) -> Reply | None:
+        t, d, me = e["type"], e["data"], self.user["id"]
+        adj, coord = self.role == "adjudicator", self.role == "cec_coordinator"
+        act = [Action(f"Adjudicate {case_id}", "adjudicate", case_id)]
+        if t == "adjudication.assigned":
+            if adj:
+                return Reply(f"{case_id}: an independent review is assigned to you.", act)
+            n = f" (round {d['round']})" if d["round"] > 1 else ""
+            return Reply(f"{case_id}: Adjudicators 1 and 2 assigned{n}. The reviews are blind.")
+        if t == "adjudication.reassigned":
+            if adj and d["to"] == me:
+                return Reply(f"{case_id}: a review was reassigned to you.", act)
+            return None if adj else Reply(f"{case_id}: a review was reassigned ({e['reason']}).")
+        if t == "comparison.agreed":
+            return Reply(f"{case_id}: the two reviews agree on every field. Deriving the outcome…")
+        if t == "comparison.disputed":
+            if adj and d.get("adjudicator3") == me:
+                return Reply(f"{case_id}: you are Adjudicator 3 for the disputed fields.", act)
+            n = len(d["disputed"])
+            return Reply(f"{case_id}: the reviews disagree on {n} field{'s' * (n > 1)}; "
+                         "Adjudicator 3 reviews them.")  # fmt: skip
+        if t in ("adj3.unresolved", "comparison.to_committee"):
+            rec = [Action(f"Record the meeting for {case_id}", "committee", case_id)]
+            return Reply(
+                f"{case_id}: some fields are still open; the case goes to the committee.",
+                rec if coord else [],
+            )
+        if t == "adj3.resolved":
+            return Reply(f"{case_id}: Adjudicator 3 resolved every disputed field.")
+        if t == "meeting.recorded":
+            if adj and me == self._flow3().chair() and d["quorum_met"]:
+                return Reply(
+                    f"{case_id}: the committee's consensus is recorded and needs your signature.",
+                    [Action(f"Sign the consensus for {case_id}", "committee", case_id)],
+                )
+            return None if adj else Reply(f"{case_id}: committee meeting recorded.")
+        if t == "consensus.signed":
+            return Reply(f"{case_id}: committee consensus signed by {who}.")
+        if t == "more_data.requested":
+            return Reply(f"{case_id}: more data requested; the site gets a query.")
+        if t == "outcome.derived":
+            pv = " Pharmacovigilance is notified." if d["related"] and not adj else ""
+            rec = [Action(f"Open the case record of {case_id}", "record", case_id)]
+            return Reply(f"{case_id}: **outcome derived** from the signed answers.{pv}", rec)
+        if t == "export.acknowledged":
+            return Reply(f"{case_id} is **closed**: the EDC acknowledged the outcome.")
+        if t == "readjudication.started":
+            return Reply(f"{case_id}: re-adjudication started by {who}: {e.get('reason')}.")
         return None
 
     # -- helpers -----------------------------------------------------------------------------

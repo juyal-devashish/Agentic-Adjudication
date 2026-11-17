@@ -62,10 +62,10 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 .adj-facts dd .adj-quiet { font-weight: 400; display: block; }
 
 /* The rail: eight real steps, each the same width, labels wrap inside their step. */
-.adj-rail { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .3rem;
+.adj-rail { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .3rem;
   list-style: none; padding: 0 !important; margin: 1rem 0 .25rem 0 !important;
   counter-reset: step; }
-@media (max-width: 900px) { .adj-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .adj-rail { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .adj-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .adj-rail li { margin: 0 !important; }
 .adj-rail li { counter-increment: step; font-size: .875rem; line-height: 1.25;
@@ -145,6 +145,9 @@ LIFECYCLE = [
     (State.SUBMITTED, "Submitted"),
     (State.QC_CHECKS, "Quality check"),  # with the narrative since P-39: one stop
     (State.READY_FOR_ADJUDICATION, "Ready for adjudication"),
+    (State.ADJ_REVIEW, "Adjudication"),  # Flows 3 and 4 (P-41)
+    (State.OUTCOME, "Outcome"),
+    (State.CLOSED, "Closed"),
 ]
 # States that sit on another state's step of the rail.
 RAIL_STEP = {
@@ -152,6 +155,10 @@ RAIL_STEP = {
     State.QUERY_OPEN: State.QC_CHECKS,
     State.NARRATIVE: State.QC_CHECKS,  # cases from before P-39
     State.NARRATIVE_REVIEW: State.QC_CHECKS,
+    State.ADJ3_REVIEW: State.ADJ_REVIEW,
+    State.CEC_MEETING: State.ADJ_REVIEW,
+    State.MORE_DATA: State.ADJ_REVIEW,
+    State.EXPORT: State.OUTCOME,
 }
 STATE_WORDS = {
     State.EVENT_CREATED: "Case created",
@@ -165,6 +172,13 @@ STATE_WORDS = {
     State.NARRATIVE: "Narrative being drafted",
     State.NARRATIVE_REVIEW: "Waiting for narrative review",
     State.READY_FOR_ADJUDICATION: "Ready for adjudication",
+    State.ADJ_REVIEW: "Independent reviews",
+    State.ADJ3_REVIEW: "Adjudicator 3 review",
+    State.CEC_MEETING: "Waiting for the committee",
+    State.MORE_DATA: "More data requested",
+    State.OUTCOME: "Outcome being derived",
+    State.EXPORT: "Exporting to the EDC",
+    State.CLOSED: "Closed",
     State.WITHDRAWN: "Withdrawn",
 }
 FLAG_WORDS = {
@@ -283,6 +297,11 @@ SHORT_STATE = {s: label.lower() for s, label in LIFECYCLE} | {
     State.QC_REVIEW: "QC review",
     State.QUERY_OPEN: "query open",
     State.NARRATIVE_REVIEW: "narrative review",
+    State.ADJ_REVIEW: "reviews",
+    State.ADJ3_REVIEW: "adjudicator 3",
+    State.CEC_MEETING: "committee",
+    State.MORE_DATA: "more data",
+    State.EXPORT: "exporting",
     State.WITHDRAWN: "withdrawn",
 }
 
@@ -318,6 +337,7 @@ def case_heading(case_id: str, title: str, facts: list[tuple[str, str]]) -> None
 STATE_INK = {
     State.READY_FOR_ADJUDICATION: "good",
     State.QUERY_OPEN: "bad",
+    State.CLOSED: "good",
     State.WITHDRAWN: "none",
 }
 

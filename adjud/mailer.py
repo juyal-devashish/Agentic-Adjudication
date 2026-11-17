@@ -93,6 +93,8 @@ def recipients(to: str, users: list[dict[str, Any]]) -> list[dict[str, Any]]:
         found = [u for u in users if u.get("role") == "site" and str(u.get("site")) == value]
     elif kind == "role":
         found = [u for u in users if u.get("role") == value]
+    elif kind in ("user", "mailbox"):
+        found = [u for u in users if u.get("id") == to or u.get("id") == value]
     else:
         found = []
     return [u for u in found if u.get("email")]
@@ -176,12 +178,20 @@ class Mailer:
             else ""
         )
 
+    def _mailboxes(self, study: str) -> list[dict[str, Any]]:
+        """Mailboxes that are not users of the app, e.g. pharmacovigilance (P-50)."""
+        path = self.config_dir / study / "study.yaml"
+        cfg = (yaml.safe_load(path.read_text()) or {}) if (study and path.exists()) else {}
+        pv = (cfg.get("adjudication") or {}).get("pharmacovigilance")
+        return [{"id": "mailbox:pharmacovigilance", **pv}] if pv else []
+
     def deliver_pending(self) -> dict[str, int]:
         notes = self.pending()
         counts = {"sent": 0, "failed": 0}
         if not notes:
             return counts
         users = yaml.safe_load((self.config_dir / "users.yaml").read_text())["users"]
+        users += self._mailboxes(notes[0].get("study", ""))
         organisation = self._organisation(notes[0].get("study", ""))
         try:
             client = self.connect(self.settings)

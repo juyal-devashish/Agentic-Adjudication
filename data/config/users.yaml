@@ -32,3 +32,33 @@ users:
     role: data_manager
     email: rahul.mehta@techobserver.com
     password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  # Flows 3 and 4 (plan P-41): the CEC Coordinator is Tech Observer staff; the adjudicators
+  # are external clinicians at hospitals that are not study sites (`affiliated_sites` lists
+  # any site an adjudicator must never be assigned, ASN-03). One of them chairs the committee.
+  - id: cec.sofia
+    name: Sofia Marques
+    role: cec_coordinator
+    email: sofia.marques@techobserver.com
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  - id: adj.okafor
+    name: Dr. Daniel Okafor
+    role: adjudicator
+    chair: true
+    institution: Northgate University Hospital
+    affiliated_sites: []
+    email: daniel.okafor@northgate-uh.example
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  - id: adj.lindqvist
+    name: Dr. Elin Lindqvist
+    role: adjudicator
+    institution: Stavholm Heart Institute
+    affiliated_sites: []
+    email: elin.lindqvist@stavholm-heart.example
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"
+  - id: adj.reyes
+    name: Dr. Marco Reyes
+    role: adjudicator
+    institution: Riverside Cardiology Clinic
+    affiliated_sites: []
+    email: marco.reyes@riverside-cardio.example
+    password_hash: "$2b$10$xbWqwsDICup0SDCEkslCWuLh5HVeJpRndHkPhbIrU8TFmfgktBZ96"

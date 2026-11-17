@@ -79,7 +79,7 @@ with st.sidebar:
     st.caption(site_name(user["site"]) if role == "site" else organisation())
 
     states = pipeline().store.list_case_states()
-    states = [cs for cs in states if Context(user, None).sees(cs.subject)]  # site segregation
+    states = [cs for cs in states if Context(user, None).sees(cs.subject, cs.case_id)]
     st.subheader("Case")
     labels = {cs.case_id: f"{cs.case_id}, {theme.short_state(cs.state)}" for cs in states}
     chosen = st.session_state.get("case_id")
@@ -120,6 +120,9 @@ PAGES = {
     "import": ("views/edc_input.py", "AE import", ":material/move_to_inbox:"),
     "documents": ("views/site_documents.py", "Documents", ":material/description:"),
     "qc": ("views/quality_check.py", "Quality check", ":material/rule:"),
+    "assignments": ("views/assignments.py", "Assignments", ":material/assignment_ind:"),
+    "adjudicate": ("views/adjudication.py", "Adjudication", ":material/gavel:"),
+    "committee": ("views/committee.py", "Committee", ":material/groups:"),
     "record": ("views/results.py", "Case record", ":material/fact_check:"),
 }
 

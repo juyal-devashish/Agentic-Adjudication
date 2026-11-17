@@ -1,4 +1,4 @@
-"""Case states for Flows 1 and 2, the transition table and replay.
+"""Case states for Flows 1 to 4, the transition table and replay.
 
 The current state of a case is never stored as truth: it is computed by replaying the
 case's events through this table. case.json is only a cache of that result.
@@ -27,6 +27,14 @@ class State(StrEnum):
     NARRATIVE = "NARRATIVE"
     NARRATIVE_REVIEW = "NARRATIVE_REVIEW"
     READY_FOR_ADJUDICATION = "READY_FOR_ADJUDICATION"
+    # Flows 3 and 4 (plan P-41 onwards, spec §5.2): people adjudicate, code compares.
+    ADJ_REVIEW = "ADJ_REVIEW"
+    ADJ3_REVIEW = "ADJ3_REVIEW"
+    CEC_MEETING = "CEC_MEETING"
+    MORE_DATA = "MORE_DATA"
+    OUTCOME = "OUTCOME"
+    EXPORT = "EXPORT"
+    CLOSED = "CLOSED"
     WITHDRAWN = "WITHDRAWN"
 
 
@@ -49,6 +57,9 @@ AUTOMATIC_STATES = frozenset(
         State.QC_CHECKS,
         State.NARRATIVE,
         State.READY_FOR_ADJUDICATION,
+        State.MORE_DATA,
+        State.OUTCOME,
+        State.EXPORT,
     }
 )
 
@@ -85,7 +96,11 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "qc.signed_pass": {State.QC_REVIEW: State.NARRATIVE},  # before P-39; still replays
     # P-39: one signature covers the QC pass and the edited narrative
     "quality_check.signed": {State.QC_REVIEW: State.READY_FOR_ADJUDICATION},
-    "query.opened": {State.QC_CHECKS: State.QUERY_OPEN, State.QC_REVIEW: State.QUERY_OPEN},
+    "query.opened": {
+        State.QC_CHECKS: State.QUERY_OPEN,
+        State.QC_REVIEW: State.QUERY_OPEN,
+        State.MORE_DATA: State.QUERY_OPEN,  # more data for the adjudicators (P-47)
+    },
     # Built in the QC round since P-39, after the pass before it (cases on disk replay)
     "dossier.built": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
     "narrative.drafted": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
@@ -93,6 +108,27 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     "narrative.review_needed": {State.NARRATIVE: State.NARRATIVE_REVIEW},
     "narrative.signed": {State.NARRATIVE_REVIEW: State.READY_FOR_ADJUDICATION},
     "handoff.flow3_ready": {State.READY_FOR_ADJUDICATION: SAME},
+    # --- Flow 3a: two blinded reviews, compared by code ---
+    "adjudication.assigned": {State.READY_FOR_ADJUDICATION: State.ADJ_REVIEW},
+    "adjudication.reassigned": {State.ADJ_REVIEW: SAME, State.ADJ3_REVIEW: SAME},
+    "adjudication.draft_saved": {State.ADJ_REVIEW: SAME, State.ADJ3_REVIEW: SAME},
+    "adjudication.signed": {State.ADJ_REVIEW: SAME},
+    "comparison.agreed": {State.ADJ_REVIEW: State.OUTCOME},
+    "comparison.disputed": {State.ADJ_REVIEW: State.ADJ3_REVIEW},
+    "comparison.to_committee": {State.ADJ_REVIEW: State.CEC_MEETING},  # no Adjudicator 3 left
+    # --- Flow 3b: Adjudicator 3 on the disputed fields, then the committee ---
+    "adj3.signed": {State.ADJ3_REVIEW: SAME},
+    "adj3.resolved": {State.ADJ3_REVIEW: State.OUTCOME},
+    "adj3.unresolved": {State.ADJ3_REVIEW: State.CEC_MEETING},
+    "meeting.recorded": {State.CEC_MEETING: SAME},
+    "consensus.signed": {State.CEC_MEETING: State.OUTCOME},
+    "more_data.requested": {State.ADJ_REVIEW: State.MORE_DATA, State.CEC_MEETING: State.MORE_DATA},
+    "committee.resumed": {State.READY_FOR_ADJUDICATION: State.CEC_MEETING},  # Q-06
+    # --- Flow 4: outcome, export, close; re-adjudication opens a new round ---
+    "outcome.derived": {State.OUTCOME: State.EXPORT},
+    "export.sent": {State.EXPORT: SAME},
+    "export.acknowledged": {State.EXPORT: State.CLOSED},
+    "readjudication.started": {State.CLOSED: State.READY_FOR_ADJUDICATION},
     "case.withdrawn": dict.fromkeys(OPEN_STATES, State.WITHDRAWN),
     "source.changed": dict.fromkeys(ALL_STATES, SAME),
     "source.stale_ignored": dict.fromkeys(ALL_STATES, SAME),

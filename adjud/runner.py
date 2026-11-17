@@ -14,12 +14,15 @@ import argparse
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import yaml
 
 from adjud.documents import DocumentProcessor
 from adjud.events import Clock, utc_now
 from adjud.flow2 import Flow2
+from adjud.flow3 import Flow3
+from adjud.flow4 import Flow4
 from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
@@ -45,6 +48,8 @@ class Runner:
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
         self.last_inbox: float | None = None
         self.flow2 = Flow2(self.pipeline.store, self.paths.config, self.study)
+        self.flow3 = Flow3(self.pipeline.store, self.paths.config, self.study)
+        self.flow4 = Flow4(self.pipeline.store, self.paths.config, self.study)
         self.uploads = UploadFolders(self.pipeline.store, self.documents.outbox, self.clock)
         smtp = SmtpSettings.from_env()
         self.mailer = (
@@ -86,6 +91,7 @@ class Runner:
         from adjud.workflow import State
 
         done = 0
+        later = self.flow34_steps()  # chosen now: one step per case per tick
         for cs in self.pipeline.store.list_case_states(State.DEIDENTIFYING):
             try:
                 summary = self.documents.process_case(cs.case_id)
@@ -108,6 +114,7 @@ class Runner:
             except Exception:
                 log.exception("handoff failed for %s", case_id)
         done += self.run_flow2_steps()
+        done += self.run_steps(later)
         return done
 
     def run_flow2_steps(self) -> int:
@@ -126,6 +133,34 @@ class Runner:
         for case_id, step, name in steps:
             try:
                 step(case_id)
+                log.info("%s done for %s", name, case_id)
+                done += 1
+            except Exception:
+                log.exception("%s failed for %s", name, case_id)
+        return done
+
+    def flow34_steps(self) -> list[tuple[str, Any, str]]:
+        """Flows 3 and 4's automatic steps (P-41 onwards): assign the reviews, compare the
+        signed answers, send more-data queries, derive the outcome, export it and take the
+        mock EDC's acknowledgement. Code only; people adjudicate."""
+        from adjud.workflow import State
+
+        store = self.pipeline.store
+        steps = [(cid, self.flow3.start_round, "adjudication start")
+                 for cid in self.flow3.pending_starts()]  # fmt: skip
+        steps += [(cid, self.flow3.compare, "comparison")
+                  for cid in self.flow3.pending_comparisons()]  # fmt: skip
+        steps += [(cs.case_id, self.flow3.send_more_data, "more-data query")
+                  for cs in store.list_case_states(State.MORE_DATA)]  # fmt: skip
+        steps += [(cid, lambda c, s=step: self.flow4.run(c, s), f"outcome {step}")
+                  for cid, step in self.flow4.pending()]  # fmt: skip
+        return steps
+
+    def run_steps(self, steps: list[tuple[str, Any, str]]) -> int:
+        done = 0
+        for case_id, fn, name in steps:
+            try:
+                fn(case_id)
                 log.info("%s done for %s", name, case_id)
                 done += 1
             except Exception:

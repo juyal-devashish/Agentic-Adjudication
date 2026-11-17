@@ -48,6 +48,7 @@ REVIEW_MEANING = (
     "Quality check passed — the documents are complete and fit for adjudication — "
     "and narrative approved — a factual summary for the adjudicators"
 )
+APPROVALS = ("narrative.approved", "narrative.signed", "quality_check.signed")
 QUERY_CODES = {
     "missing_document": "More documents needed",
     "wrong_patient": "A document seems to be about another patient",
@@ -55,7 +56,9 @@ QUERY_CODES = {
     "unreadable": "A page cannot be read",
     "identifiers_left": "An identifier is still visible",
     "other": "Other",
+    "more_data": "More information is needed for the adjudication",  # Flow 3 (P-47)
 }
+QC_QUERY_CODES = [c for c in QUERY_CODES if c != "more_data"]  # the Safety Specialist's
 
 
 class Flow2Refused(Exception):
@@ -401,8 +404,15 @@ class Flow2:
         return template.format_map(values)
 
     def pending_flow3_handoffs(self) -> list[str]:
-        return [cs.case_id for cs in self.store.list_case_states(State.READY_FOR_ADJUDICATION)
-                if _latest(self.store, cs.case_id, "handoff.flow3_ready") is None]  # fmt: skip
+        """READY_FOR_ADJUDICATION cases without a package for their latest approval: the
+        first time, and again after more data went through the Quality Check (P-47)."""
+        out = []
+        for cs in self.store.list_case_states(State.READY_FOR_ADJUDICATION):
+            types = [e["type"] for e in self.store.events(cs.case_id)]
+            approved = max(i for i, t in enumerate(types) if t in APPROVALS)
+            if "handoff.flow3_ready" not in types[approved:]:
+                out.append(cs.case_id)
+        return out
 
     def write_flow3_handoff(self, case_id: str) -> dict[str, Any]:
         """The package for Flow 3 (step 18): the dossier, the approved narrative and the QC
@@ -437,7 +447,8 @@ class Flow2:
             },
         }  # fmt: skip
         content = json_bytes(manifest)
-        rel = "handoff/flow3_manifest.json"
+        n = _rounds(self.store, case_id, "handoff.flow3_ready") + 1
+        rel = "handoff/flow3_manifest.json" if n == 1 else f"handoff/flow3_manifest_v{n}.json"
         path = self.store.case_dir(case_id) / rel
         if path.exists():
             if path.read_bytes() != content:

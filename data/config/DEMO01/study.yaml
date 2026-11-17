@@ -51,3 +51,12 @@ narrative:                   # plan step 17; checked by code in the narrative ga
     placebo, active arm, treatment arm, allocation, randomised to, randomized to, unblind]
 edc_pull:                    # "Pull data from EDC" demo stand-in (plan step 21)
   exclude_ae_id_prefixes: ["H-"]   # history kept in the mock EDC for earlier-event lookups
+adjudication:                # Flows 3 and 4 (plan P-41 to P-53)
+  form: mi_v1                # forms/<form>.yaml; fixed for the round
+  quorum: 3                  # committee attendees needed before the Chair can sign
+  related:                   # Flow 4 "related?" (Q-07, P-50): notify pharmacovigilance
+    field: related_to_study_drug
+    value: related
+  pharmacovigilance:         # a mailbox, not a user of the app
+    name: Pharmacovigilance team
+    email: pharmacovigilance@techobserver.com
