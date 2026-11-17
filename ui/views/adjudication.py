@@ -109,9 +109,9 @@ for f in (form.field(i) for i in ids):
         continue
     k = f"{key}_{f.id}"
     if f.type == "enum":
-        opts = list(f.options)
+        opts = f.values
         index = opts.index(draft[f.id]) if draft.get(f.id) in opts else None
-        answers[f.id] = st.radio(f.label, opts, index=index, format_func=f.options.get, key=k)
+        answers[f.id] = st.radio(f.label, opts, index=index, format_func=f.label_of, key=k)
     elif f.type == "date":
         value = date.fromisoformat(draft[f.id]) if draft.get(f.id) else None
         picked = st.date_input(f.label, value=value, key=k, format="YYYY-MM-DD")

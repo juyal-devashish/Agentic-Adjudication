@@ -108,6 +108,7 @@ def test_agreement_goes_straight_to_outcome_export_and_close(assigned):
     assert note["link"] == f"/adjudicate?role=adjudicator&user={a1}&case={cid}"
     form = store.get_json(cid, current_round(store, cid).form["path"])
     assert form["form_id"] == "MI" and form["version"] == 1  # fixed for the round (ADJ-01)
+    assert [v for v, _ in form["fields"][0]["options"]] == ["yes", "no", "insufficient_data"]
 
     f3.save_draft(cid, a1, {"event_confirmed": "yes"})
     assert f3.draft(cid, a1) == {"event_confirmed": "yes"} and f3.draft(cid, a2) == {}

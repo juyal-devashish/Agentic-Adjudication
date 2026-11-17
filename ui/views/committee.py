@@ -91,9 +91,9 @@ if ctx.role == "cec_coordinator":
             if f.type == "enum":
                 decisions[f.id] = st.radio(
                     f"Decision: {f.label}",
-                    list(f.options),
+                    f.values,
                     index=None,
-                    format_func=f.options.get,
+                    format_func=f.label_of,
                     key=f"dec_{cid}_{f.id}",
                 )
             elif f.type == "date":

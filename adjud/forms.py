@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class FormRefused(Exception):
@@ -24,10 +24,24 @@ class FormField(BaseModel):
     id: str
     label: str
     type: Literal["enum", "date", "text"]
-    options: dict[str, str] = {}
+    # (value, label) pairs, in the form's order: a list, because the round's stored copy
+    # is canonical JSON with sorted keys, which would reorder a mapping.
+    options: list[tuple[str, str]] = []
     comparator: str | dict[str, int] = "exact"
     required: bool = True
     show_if: dict[str, str] | None = None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _pairs(cls, v: Any) -> Any:
+        return list(v.items()) if isinstance(v, dict) else v
+
+    @property
+    def values(self) -> list[str]:
+        return [v for v, _ in self.options]
+
+    def label_of(self, value: str) -> str:
+        return dict(self.options).get(value, value)
 
     @property
     def compared(self) -> bool:
@@ -40,7 +54,7 @@ class FormField(BaseModel):
         """An answer as a person reads it: 'type_1' -> 'Type 1'; a hidden field -> '-'."""
         if value is None or value == "":
             return "-"
-        return self.options.get(value, str(value))
+        return dict(self.options).get(value, str(value))
 
     def agree(self, a: Any, b: Any) -> bool:
         """Whether two answers agree under this field's comparator (ADJ-06). Two hidden
@@ -97,7 +111,7 @@ class Form(BaseModel):
                     raise FormRefused(f"answer '{f.label}'")
                 out[f.id] = None
                 continue
-            if f.type == "enum" and value not in f.options:
+            if f.type == "enum" and value not in f.values:
                 raise FormRefused(f"'{value}' is not an option for '{f.label}'")
             if f.type == "date":
                 try:
