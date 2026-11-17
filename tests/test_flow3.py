@@ -228,13 +228,19 @@ def test_more_data_goes_back_through_flow_1_and_qc_then_to_the_same_reviewers(as
     a1, a2 = holders(store, cid)
     f3.sign_review(cid, a1, "demo", answers())
     with pytest.raises(Flow3Refused, match="say what"):
-        f3.request_more_data(cid, a2, " ")
-    f3.request_more_data(cid, a2, "Please send the angiography report.")
+        f3.request_more_data(cid, a2, "demo", " ")
+    with pytest.raises(SignatureRefused):  # no query reaches the site unsigned (ADR 0001)
+        f3.request_more_data(cid, a2, "wrong", "Please send the angiography report.")
+    f3.request_more_data(cid, a2, "demo", "Please send the angiography report.")
+    asked = next(e for e in store.events(cid) if e["type"] == "more_data.requested")
+    assert asked["signature"]["signer"] == runner.flow3.users()[a2]["name"]
     assert state(store, cid) == State.MORE_DATA
     runner.run_case_steps()
     assert state(store, cid) == State.QUERY_OPEN
     query = next(e for e in reversed(store.events(cid)) if e["type"] == "query.opened")
-    assert query["data"] == {"codes": ["more_data"], "text": "Please send the angiography report."}
+    assert query["data"]["codes"] == ["more_data"]
+    assert query["data"]["text"] == "Please send the angiography report."
+    assert query["data"]["request"] == asked["data"]["request"]  # traced to the signature
     assert ("query_opened", "site:101") in templates(store)
 
     upload(store, cid, [("angio.pdf", pdf("ANGIOGRAPHY REPORT\nOccluded artery."))], SITE)
@@ -258,8 +264,8 @@ def test_more_data_from_the_committee_returns_to_the_committee(assigned):
     runner.run_case_steps()
     assert state(store, cid) == State.CEC_MEETING
     with pytest.raises(SignatureRefused):
-        f3.request_more_data(cid, a1, "x")  # only the Coordinator asks for the committee
-    f3.request_more_data(cid, COORD, "The committee needs the troponin values.")
+        f3.request_more_data(cid, a1, "demo", "x")  # only the Coordinator, for the committee
+    f3.request_more_data(cid, COORD, "demo", "The committee needs the troponin values.")
     runner.run_case_steps()
     upload(store, cid, [("lab.pdf", pdf("LABORATORY RESULTS\nTroponin T 2410 ng/L."))], SITE)
     through_qc(runner, store, cid)

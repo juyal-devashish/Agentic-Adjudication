@@ -146,9 +146,17 @@ if slot in ("1", "2") and store.state(cid).state == State.ADJ_REVIEW:
             "de-identification and the Quality Check, then both reviews start again."
         )
         need = st.text_area("What is needed", key=f"{key}_more")
-        if st.button("Ask the site for more data"):
+        pw = st.text_input(
+            f"Password for {ctx.user['name']} (demo password: demo)",
+            type="password",
+            key=f"{key}_more_pw",
+        )
+        if st.button("Sign and ask the site for more data"):
             try:
-                flow3.request_more_data(cid, ctx.actor, need)
+                flow3.request_more_data(cid, ctx.actor, pw, need)
                 st.rerun()
+            except SignatureRefused as exc:
+                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                st.error(f"Not sent: {msg}.")
             except Flow3Refused as exc:
                 st.error(f"Not sent: {exc}.")

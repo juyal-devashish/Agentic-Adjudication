@@ -131,8 +131,8 @@ def next_step(
             State.SUBMITTED: "Signed and submitted. Nothing more is needed from you.",
             State.QC_CHECKS: "Signed and submitted. Your documents are being checked.",
             State.QC_REVIEW: "Signed and submitted. Your documents are being checked.",
-            State.QUERY_OPEN: "The quality check found a problem. Read the query below, then "
-            "upload the missing or corrected documents.",
+            State.QUERY_OPEN: "A query is open. Read it below, then upload the missing or "
+            "corrected documents.",
             State.NARRATIVE: "Your documents passed the quality check. Nothing more is needed.",
             State.NARRATIVE_REVIEW: "Your documents passed the quality check. Nothing more is "
             "needed.",

@@ -147,3 +147,38 @@ def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     at = as_user(me, "views/assistant.py")
     assert f"Adjudicate {cid}" in [b.label for b in at.button]
     assert "independent review is open" in text(at)
+
+
+def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewing):
+    """The adjudicator signs the request on the page; the site sees an anonymous query
+    from the adjudication; after the site answers, the Quality Check shows where it came
+    from (P-47, ADR 0001, ACC-04)."""
+    runner, store, cid = reviewing
+    a1 = current_round(store, cid).holders["1"]
+    at = as_user(a1, "views/adjudication.py", cid)
+    next(t for t in at.text_area if t.label == "What is needed").input("The angiography report.")
+    pw = [t for t in at.text_input if t.label.startswith("Password")]
+    pw[-1].input("demo")
+    next(b for b in at.button if b.label == "Sign and ask the site for more data").click().run()
+    assert not at.exception, at.exception
+    assert store.state(cid).state == State.MORE_DATA
+    runner.run_case_steps()
+    assert store.state(cid).state == State.QUERY_OPEN
+
+    at = as_user(SITE, "views/site_documents.py", cid)
+    shown = "\n".join(w.value for w in at.warning)
+    assert "Query from the adjudication" in shown and "The angiography report." in shown
+    assert USERS[a1]["name"] not in shown + text(at)
+    at = as_user(SITE, "views/assistant.py")
+    assert "more information is needed for the adjudication" in text(at)
+
+    upload(store, cid, [("angio.pdf", pdf("ANGIOGRAPHY REPORT\nOccluded artery."))], SITE)
+    runner.run_case_steps()
+    from adjud.review import submit
+
+    submit(store, cid, SITE, "demo", store.paths.config)
+    runner.run_case_steps()
+    runner.run_case_steps()
+    assert store.state(cid).state == State.QC_REVIEW
+    at = as_user("ss.anna", "views/quality_check.py", cid)
+    assert any("the adjudication (a signed request for more data)" in i.value for i in at.info)

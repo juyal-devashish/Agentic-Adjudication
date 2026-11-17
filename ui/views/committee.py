@@ -121,10 +121,18 @@ if ctx.role == "cec_coordinator":
     )
     with st.expander("Ask the site for more data"):
         need = st.text_area("What the committee needs", key=f"more_{cid}")
-        if st.button("Send the request"):
+        pw = st.text_input(
+            f"Password for {ctx.user['name']} (demo password: demo)",
+            type="password",
+            key=f"more_pw_{cid}",
+        )
+        if st.button("Sign and send the request"):
             try:
-                flow3.request_more_data(cid, ctx.actor, need)
+                flow3.request_more_data(cid, ctx.actor, pw, need)
                 st.rerun()
+            except SignatureRefused as exc:
+                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                st.error(f"Not sent: {msg}.")
             except Flow3Refused as exc:
                 st.error(f"Not sent: {exc}.")
 

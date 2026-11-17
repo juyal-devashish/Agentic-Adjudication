@@ -311,6 +311,8 @@ else:
 
 
 def by_whom(e: dict) -> str:
+    if e["actor"] == "system:cec":  # from a signed more-data request (P-47)
+        return "the adjudication (a signed request for more data)"
     if e["actor"].startswith("system:"):
         return "the automatic check"
     if e["actor"].startswith("agent:"):

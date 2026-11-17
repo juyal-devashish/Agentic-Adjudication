@@ -18,7 +18,8 @@ Human actions:
     sign_review         an assigned adjudicator signs their answers (Adjudicator 1, 2 or 3)
     save_draft          an unsigned draft, seen only by its author (ASN-07)
     reassign            the CEC Coordinator moves an open review to someone else, with a reason
-    request_more_data   an adjudicator (in review) or the Coordinator (for the committee)
+    request_more_data   an adjudicator (in review) or the Coordinator (for the committee),
+                        signed: no query reaches the site without a person's signature
     record_meeting      the Coordinator records the committee meeting
     sign_consensus      the Chair signs the committee's decisions
 
@@ -47,6 +48,7 @@ SYSTEM_CEC = "system:cec"
 REVIEW_MEANING = "Adjudication assessment"
 ADJ3_MEANING = "Adjudication assessment of the disputed fields"
 CONSENSUS_MEANING = "Committee consensus"
+MORE_DATA_MEANING = "More data requested for adjudication — a query is sent to the site"
 SLOTS = ("1", "2")
 
 
@@ -324,11 +326,13 @@ class Flow3:
         return "adj3.unresolved"
 
     def send_more_data(self, case_id: str) -> None:
-        """MORE_DATA → a query to the site, without saying who asked (ACC-04)."""
+        """MORE_DATA → a query to the site, carrying the signed request it comes from but
+        not who signed it (ACC-04)."""
         asked = next(e for e in reversed(self.store.events(case_id))
                      if e["type"] == "more_data.requested")  # fmt: skip
         self._event(case_id, "query.opened", SYSTEM_CEC,
-                    {"codes": ["more_data"], "text": asked["data"]["text"]})  # fmt: skip
+                    {"codes": ["more_data"], "text": asked["data"]["text"],
+                     "request": asked["data"]["request"]})  # fmt: skip
         subject = self.store.state(case_id).subject or "--"
         self._notify(case_id, f"site:{subject.split('-')[1]}", "query_opened", SYSTEM_CEC)
 
@@ -407,9 +411,10 @@ class Flow3:
                      "answers": {"path": rel, "sha256": sha}},
                     signature=signature)  # fmt: skip
 
-    def request_more_data(self, case_id: str, user_id: str, text: str) -> None:
+    def request_more_data(self, case_id: str, user_id: str, password: str, text: str) -> None:
         """An assigned adjudicator during review, or the Coordinator for the committee
-        (ADJ-05, ADJ-13). The open reviews pause; the site gets a query."""
+        (ADJ-05, ADJ-13), signed: like every query, it reaches the site only on a person's
+        signature (ADR 0001). The open reviews pause; the site gets a query."""
         text = text.strip()
         if not text:
             raise Flow3Refused("say what is needed")
@@ -417,16 +422,22 @@ class Flow3:
         if state == State.ADJ_REVIEW:
             if self.slot_of(case_id, user_id) is None:
                 raise Flow3Refused("only an assigned adjudicator can ask for more data")
-            source = "review"
+            source, user = "review", self._user(user_id, "adjudicator")
         elif state == State.CEC_MEETING:
-            self._user(user_id, "cec_coordinator")
-            source = "committee"
+            source, user = "committee", self._user(user_id, "cec_coordinator")
         else:
             raise Flow3Refused("more data can be asked for during review or by the committee")
         rnd = current_round(self.store, case_id)
+        request = {"from": source, "text": text, "round": rnd.number, "pass": rnd.passes}
+        n = sum(e["type"] == "more_data.requested" for e in self.store.events(case_id)) + 1
+        rel = f"adjudication/round{rnd.number}/more_data_v{n}.json"
+        sha = sha256_bytes(json_bytes(request))  # signed first: a wrong password writes nothing
+        signature = sign(user, password, MORE_DATA_MEANING,
+                         [{"name": "request", "path": rel, "sha256": sha}])  # fmt: skip
+        self.store.put_json_once(case_id, rel, request)
         self._event(case_id, "more_data.requested", user_id,
-                    {"from": source, "text": text, "round": rnd.number,
-                     "pass": rnd.passes})  # fmt: skip
+                    {**request, "request": {"path": rel, "sha256": sha}},
+                    signature=signature)  # fmt: skip
         self._notify(case_id, "role:cec_coordinator", "more_data_requested", user_id)
 
     # -- CEC Coordinator and Chair ------------------------------------------------------------

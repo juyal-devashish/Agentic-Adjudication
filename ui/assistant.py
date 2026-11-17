@@ -436,9 +436,17 @@ class Assistant:
             line = f"{case_id}: the quality check is ready. {self._suggestion_line(case_id)}"
             return Reply(line, [Action(f"Review and sign {case_id}", "qc", case_id)] if ss else [])
         if t == "query.opened":
+            more = "more_data" in e["data"].get("codes", [])
+            if more:
+                who = "the adjudication (more data)"
             if site:
                 return Reply(
-                    f"{case_id}: the Safety Specialist sent you a query.",
+                    f"{case_id}: "
+                    + (
+                        "more information is needed for the adjudication."
+                        if more
+                        else "the Safety Specialist sent you a query."
+                    ),  # fmt: skip
                     [Action(f"Answer the query for {case_id}", "documents", case_id)],
                 )
             return Reply(f"{case_id}: query sent to the site by {who}.")
