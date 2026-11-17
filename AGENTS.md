@@ -11,7 +11,7 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this
 - Read the relevant spec section before changing behavior. If code and spec disagree, flag it; don't silently pick one.
 - Don't start UI polish before the store, workflow and their tests pass. Don't pull in the production stack from spec.md §8.3.
 
-Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, SMTP via `smtplib` (Mailpit or Outlook for the demo), Anthropic Python SDK (version pinned, used only through the gateway). **No database server, no queue broker, no cloud service.**
+Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, SMTP via `smtplib` (Mailpit or Outlook for the demo), Anthropic Python SDK (version pinned, used only through the gateway). **No database server, no queue broker, no cloud service** (one exception: Slack as an opt-in, synthetic-only notification Channel, ADR 0002).
 
 ## Working style
 

@@ -102,6 +102,7 @@ Change any of these by editing this table first.
 | P-51 | Re-adjudication | Only the Coordinator, signed, with a reason, on a closed case. Round n+1 with the same adjudicators (RDJ-06); nothing earlier changes; the old outcome shows as superseded and the new export says it is a correction (RDJ-01 to RDJ-04, Q-08) | User (Q9) |
 | P-52 | Demo data for Flow 3 | The short demo stays. `tools/make_flow3_fixtures.py` writes `agree` and `disputed` answer sets (staged by the reset in `demo_uploads/flow3/`) and can sign a case's open reviews with them as the assigned demo adjudicators | User (Q12) |
 | P-53 | Pages and the Assistant | New pages *Assignments* (Coordinator), *Adjudication* (an adjudicator's form) and *Committee* (Coordinator records, Chair signs); the Case record gains *Adjudication and outcome*. The Assistant lists the new roles' tasks and reports each Flow 3–4 step, blinded as P-45 | User (Q11) |
+| P-54 | Slack | An extra notification Channel next to the outbox and e-mail, opt-in through `NOTIFY_CHANNELS` (unset: as before). One demo channel through an incoming webhook (`SLACK_WEBHOOK_URL`, environment only), all templates, same content and link as e-mail. Delivery Attempts recorded per Channel; 3 tries, one per tick, 10 s timeout; a failure never blocks the workflow or e-mail. Becomes a default candidate only after 5 consecutive full demo runs with 0 failed Slack attempts and a clean `tools.notify_parity` report (ADR 0002). Branch `notify/slack` from `flow3-4` | User |
 
 ## 5. How we work
 
@@ -334,6 +335,17 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [x] Tests (`tests/test_flow3.py`, `tests/test_ui_flow3.py`) and the demo answer sets (`tools/make_flow3_fixtures.py`)
 
 **Done when:** a case goes from ready for adjudication to closed by agreement, through Adjudicator 3, and through the committee; more data comes back through Flow 1 and the Quality Check; a re-adjudication supersedes the old outcome; every final value names the signature it came from; the site sees nothing of it; full suite and kit pass; `verify_log` and `rebuild_state --check` clean.
+
+### Step 28 — Slack alongside e-mail (P-54, ADR 0002) on branch `notify/slack`
+
+- [ ] Delivery Attempts per Channel (`adjud/delivery.py`); e-mail unchanged in behaviour
+- [ ] Slack Channel (`adjud/slack.py`), `NOTIFY_CHANNELS`, runner runs each Channel on its own
+- [ ] The case record shows Slack Delivery Attempts; e-mail pop-ups stay e-mail only
+- [ ] Parity report (`tools/notify_parity.py`)
+- [ ] Docs: `.env.example`, run sheet "Trying Slack", README line
+- [ ] Reliability bar: 5 consecutive full demo runs, 0 failed Slack attempts, clean parity (results recorded here)
+
+**Done when:** with `NOTIFY_CHANNELS` unset nothing changes (full suite and kit pass); with Slack on, every Notification created after the switch is posted once or recorded as failed, e-mail is never held up, and tests use a fake Slack only.
 
 ---
 
