@@ -58,7 +58,41 @@ EVENT_WORDS = {
     "source.stale_ignored": "Older EDC record ignored",
     "case.flagged": "Case flagged",
     "case.withdrawn": "Case withdrawn",
+    # Flows 3 and 4
+    "adjudication.assigned": "Reviews assigned",
+    "adjudication.reassigned": "Review reassigned",
+    "adjudication.draft_saved": "Review draft saved",
+    "adjudication.signed": "Review signed",
+    "comparison.agreed": "Reviews compared: all fields agree",
+    "comparison.disputed": "Reviews compared: disputed fields to Adjudicator 3",
+    "comparison.to_committee": "Reviews compared: disputed fields to the committee",
+    "adj3.signed": "Adjudicator 3 review signed",
+    "adj3.resolved": "Adjudicator 3 resolved the disputed fields",
+    "adj3.unresolved": "Open fields to the committee",
+    "meeting.recorded": "Committee meeting recorded",
+    "consensus.signed": "Committee consensus signed",
+    "more_data.requested": "More data requested",
+    "committee.resumed": "Back to the committee with the new data",
+    "outcome.derived": "Outcome derived",
+    "export.sent": "Outcome exported to the EDC",
+    "export.acknowledged": "EDC acknowledged the outcome; case closed",
+    "readjudication.started": "Re-adjudication started",
 }
+# What a site never sees (ACC-04): who adjudicates and how.
+
+
+def event_words(e: dict) -> str:
+    """What an event means; a Slack Delivery Attempt (P-54) says so, with its reason."""
+    if e["type"].startswith("notification.") and e["data"].get("channel") == "slack":
+        if e["type"] == "notification.sent":
+            return "Notification posted to Slack"
+        return f"Slack message failed: {e['data'].get('error', 'unknown')}"
+    return EVENT_WORDS.get(e["type"], e["type"])
+
+
+FLOW34_EVENTS = {t for t in EVENT_WORDS if t.split(".")[0] in (
+    "adjudication", "comparison", "adj3", "meeting", "consensus", "more_data", "committee",
+    "outcome", "export", "readjudication")}  # fmt: skip
 
 
 # Automatic steps in the audit trail, in words (people are named from users.yaml).
@@ -69,7 +103,11 @@ ACTOR_WORDS = {
     "system:narrative": "Automatic: narrative draft",
     "system:dossier": "Automatic: dossier",
     "system:mailer": "Automatic: e-mail",
+    "system:slack": "Automatic: Slack",
     "system:upload-folder": "Automatic: upload folder",
+    "system:cec": "Automatic: adjudication workflow",
+    "system:outcome": "Automatic: outcome and export",
+    "system:edc-mock": "EDC (mock)",
 }
 
 
@@ -87,6 +125,10 @@ def recipient(to: str) -> str:
     kind, _, value = to.partition(":")
     if kind == "site":
         return site_name(value)
+    if kind == "user":
+        return {u["id"]: u["name"] for u in users()}.get(value, value)
+    if kind == "mailbox":
+        return "Pharmacovigilance team" if value == "pharmacovigilance" else value
     return value.replace("_", " ").title() if kind == "role" else to
 
 
@@ -182,6 +224,7 @@ case_header(ctx, "views/results.py")
 theme.toc(
     [
         ("package", "Package for adjudication"),
+        ("adjudication", "Adjudication and outcome"),
         ("audit-trail", "Audit trail"),
         ("source-data", "Source data"),
         ("notifications", "Notifications"),
@@ -206,6 +249,113 @@ else:
         st.download_button(
             f"Download {name}{pages}", store.get_file(cid, d["path"]), file_name=name, key=d["path"]
         )
+
+
+def visible_note(n: dict) -> bool:
+    """Flows 3–4 e-mails to a person: not shown to the site (ACC-04), and to an adjudicator
+    only when addressed to them."""
+    to = n["to"]
+    if not to.startswith(("user:", "mailbox:")):
+        return True
+    if ctx.role == "site":
+        return False
+    return ctx.role != "adjudicator" or to == f"user:{ctx.actor}"
+
+
+def show_adjudication(case_id: str) -> None:
+    """Rounds, reviews and the outcome with where each value came from (OUT-01, RDJ-05).
+    The site sees none of it (ACC-04); an adjudicator sees the comparison and the outcome
+    only once the reviews are closed (ACC-02)."""
+    from adjud.flow3 import current_round
+    from adjud.flow4 import outcomes
+    from adjud.workflow import State
+
+    if ctx.role == "site":
+        st.write(
+            "Adjudication is done by an independent committee. Its details are not shown to sites."
+        )
+        return
+    rnd = current_round(store, case_id)
+    if rnd is None:
+        st.write("Not started yet. Reviews are assigned once the case is ready for adjudication.")
+        return
+    names = {u["id"]: u["name"] for u in users()}
+    state = store.state(case_id).state
+    reviewing = state in (
+        State.ADJ_REVIEW,
+        State.ADJ3_REVIEW,
+        State.MORE_DATA,
+        State.QUERY_OPEN,
+        State.CEC_MEETING,
+    )
+    who_ = ", ".join(
+        f"Adjudicator {s}: {names.get(u, u)}" + (" (signed)" if s in rnd.signed else "")
+        for s, u in sorted(rnd.holders.items())
+    )
+    st.write(
+        f"Round {rnd.number}" + (f", review {rnd.passes}" if rnd.passes > 1 else "") + f". {who_}."
+    )
+    found = outcomes(store, case_id)
+    if ctx.role == "adjudicator" and reviewing:
+        theme.quiet("The other reviews and the outcome are shown once the reviews are closed.")
+        return
+    if not found:
+        theme.quiet("No outcome yet.")
+        return
+    how = {
+        "agreed": "Both reviews agree",
+        "adjudicator_3": "Adjudicator 3 matched a review",
+        "committee": "Committee consensus",
+    }
+    for o in reversed(found):
+        outcome = store.get_json(case_id, o["outcome"]["path"])
+        label = f"Outcome of round {o['round']}" + (" (superseded)" if o["superseded"] else "")
+        box = st.expander(label, expanded=not o["superseded"])
+        with box:
+            rows = [
+                {
+                    "Question": v["label"],
+                    "Final answer": v["words"],
+                    "Decided by": how[v["how"]],
+                    "Signed by": "; ".join(f"{x['role']}: {x['signer']}" for x in v["sources"]),
+                }
+                for v in outcome["values"].values()
+            ]
+            st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+            if outcome["related"]:
+                st.html(
+                    f"<p>{theme.status('Related to the study drug', 'bad')}: "
+                    "pharmacovigilance was e-mailed (no clinical content).</p>"
+                )
+            sent = [
+                e
+                for e in store.events(case_id)
+                if e["type"] == "export.sent" and e["data"]["round"] == o["round"]
+            ]
+            name = f"{case_id}_round{o['round']}.csv"
+            acked = [
+                e
+                for e in store.events(case_id)
+                if e["type"] == "export.acknowledged" and e["data"]["ack"]["file"] == name
+            ]
+            if sent:
+                corr = (
+                    " as a correction of the earlier export"
+                    if sent[0]["data"]["correction"]
+                    else ""
+                )
+                ack = "; not acknowledged yet"
+                if acked:
+                    a = acked[0]
+                    ack = (
+                        f"; acknowledged by the {a['data']['ack']['receiver']} on "
+                        f"{theme.date_words(a['at'])}"
+                    )
+                st.write(f"Exported to the EDC{corr} ({sent[0]['data']['to']}){ack}.")
+            theme.quiet(
+                f"Derivation {outcome['derivation']}, form {outcome['form']['id']} "
+                f"version {outcome['form']['version']}."
+            )
 
 
 def narrative_edit(case_id: str) -> None:
@@ -254,6 +404,10 @@ if flow3:
     )
     narrative_edit(cid)
 
+# --- adjudication and outcome (Flows 3 and 4) ---------------------------------------------------
+st.header("Adjudication and outcome", anchor="adjudication")
+show_adjudication(cid)
+
 # --- audit trail -------------------------------------------------------------------------------
 st.header("Audit trail", anchor="audit-trail")
 report = verify_case_log(store.case_dir(cid))
@@ -268,6 +422,9 @@ else:
         "what was written:</p><ul>" + "".join(f"<li>{p}</li>" for p in report.problems) + "</ul>"
     )
 events = store.events(cid)
+if ctx.role == "site":
+    events = [e for e in events if e["type"] not in FLOW34_EVENTS
+              and not str(e["data"].get("to", "")).startswith(("user:", "mailbox:"))]  # fmt: skip
 names = {u["id"]: u["name"] for u in users()}
 # Most entries are automatic steps; a reviewer often wants only what people did
 # (uploads, corrections, signatures). The seal check above always covers every entry.
@@ -282,7 +439,7 @@ st.dataframe(
             {
                 "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
                 "Who": who(e["actor"], names),
-                "What": EVENT_WORDS.get(e["type"], e["type"]),
+                "What": event_words(e),
                 "Reason": e.get("reason") or "",
             }
             for e in shown
@@ -369,14 +526,17 @@ with tabs[3]:
 # --- notifications -----------------------------------------------------------------------------
 st.header("Notifications", anchor="notifications")
 notes = [json.loads(f.read_text()) for f in sorted(paths().outbox.glob("*.json"))]
-mine = [n for n in notes if n.get("case_id") == cid]
-emailed: dict[str, str] = {}  # notification id -> last delivery status
+mine = [n for n in notes if n.get("case_id") == cid and visible_note(n)]
+# notification id -> last status, per Channel (lines without one are e-mail; P-54)
+emailed: dict[str, str] = {}
+slacked: dict[str, str] = {}
 delivery = paths().outbox / "delivery.jsonl"
 if delivery.exists():
     for line in delivery.read_text().splitlines():
         if line.strip():
             d = json.loads(line)
-            emailed[d["id"]] = d["status"]
+            (slacked if d.get("channel") == "slack" else emailed)[d["id"]] = d["status"]
+STATUS_WORDS = {"sent": "Sent", "failed": "Failed"}
 if mine:
     st.write("Messages carry no clinical content: only the case number, the task and a link.")
     st.dataframe(
@@ -386,8 +546,11 @@ if mine:
                     "When (UTC)": f"{theme.date_words(n['created_at'])} {n['created_at'][11:16]}",
                     "To": recipient(n["to"]),
                     "Message": n["subject"],
-                    "E-mail": {"sent": "Sent", "failed": "Failed"}.get(
-                        emailed.get(n["id"], ""), "Not sent"
+                    "E-mail": STATUS_WORDS.get(emailed.get(n["id"], ""), "Not sent"),
+                    **(
+                        {"Slack": STATUS_WORDS.get(slacked.get(n["id"], ""), "Not posted")}
+                        if slacked
+                        else {}
                     ),
                 }
                 for n in mine
@@ -452,7 +615,7 @@ with st.expander("Technical details"):
         pd.DataFrame(
             [
                 {"When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
-                 "What": EVENT_WORDS.get(e["type"], e["type"]), "Seal": e["hash"][7:15]}
+                 "What": event_words(e), "Seal": e["hash"][7:15]}
                 for e in events
             ]
         ),

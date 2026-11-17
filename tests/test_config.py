@@ -32,7 +32,12 @@ def test_users_are_the_kits_with_a_data_manager_and_bcrypt_hashes():
         else {k: u[k] for k in ("id", "role")}
         for u in kit
     ]
+    # P-41: Flows 3 and 4 add a CEC Coordinator and three adjudicators (one is the Chair).
+    expected += [{"id": "cec.sofia", "role": "cec_coordinator"},
+                 *({"id": a, "role": "adjudicator"}
+                   for a in ("adj.okafor", "adj.lindqvist", "adj.reyes"))]  # fmt: skip
     assert [{k: u[k] for k in ("id", "role")} for u in ours] == expected
+    assert [u["id"] for u in ours if u.get("chair")] == ["adj.okafor"]
     for u in ours:
         assert bcrypt.checkpw(b"demo", u["password_hash"].encode())
 

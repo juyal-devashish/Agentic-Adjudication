@@ -53,6 +53,11 @@ class DataPaths:
         return self.root / "outbox"
 
     @property
+    def edc_exports(self) -> Path:
+        """Outcome files for the EDC (Flow 4, P-50); the mock EDC reads them from here."""
+        return self.root / "exports" / "edc"
+
+    @property
     def ai(self) -> Path:
         return self.root / "ai"
 

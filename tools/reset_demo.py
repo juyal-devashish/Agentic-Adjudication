@@ -26,7 +26,7 @@ import shutil
 from pathlib import Path
 
 from adjud.paths import DataPaths
-from tools import make_flow2_fixtures
+from tools import make_flow2_fixtures, make_flow3_fixtures
 
 RUNTIME = (
     "cases",
@@ -38,6 +38,7 @@ RUNTIME = (
     "edc_mock",
     "demo_uploads",
     "uploads",
+    "exports",  # outcome files for the EDC (Flow 4)
 )  # data/ai/usage.jsonl is kept: AI spend is tracked across demo resets
 KIT = Path(__file__).resolve().parents[1] / "data" / "flow1-testkit"
 # The short demo: a clean case (AE-001), an unsure agent on a poor scan (AE-005), missing
@@ -81,6 +82,7 @@ def reset(paths: DataPaths, *, preload: bool = False, only: tuple[str, ...] | No
             if folder.name.split("_")[-1] in only:
                 shutil.copytree(folder, staging / "documents" / folder.name)
     make_flow2_fixtures.make(staging / "flow2")  # Flow 2 QC scenarios (plan step 14)
+    make_flow3_fixtures.make(staging / "flow3")  # Flow 3 answer sets (plan P-52)
     if preload:
         shutil.copy(staging / "inbox_files" / initial.name if only else initial, paths.inbox)
 

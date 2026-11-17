@@ -3,10 +3,11 @@
 The outbox (`outbox/*.json`, written by `adjud.notify.Outbox`) stays the record of what
 was queued. When SMTP is configured, the runner calls `Mailer.deliver_pending()` every
 tick: each notification is e-mailed to the people behind its recipient (`site:101` → that
-site's users, `role:safety_specialist` → everyone with that role), and the result goes to
-the case log as `notification.sent` or `notification.failed`, plus one line in
-`outbox/delivery.jsonl` (append-only). A notification is tried at most `MAX_ATTEMPTS`
-times, once per tick, so a broken server never causes a storm of retries.
+site's users, `role:safety_specialist` → everyone with that role), and the result is a Delivery
+Attempt through the `email` Channel (`adjud.delivery`): a `notification.sent` or
+`notification.failed` event plus one line in `outbox/delivery.jsonl`. A notification is
+tried at most `MAX_ATTEMPTS` times, once per tick, so a broken server never causes a
+storm of retries. Other Channels' attempts (e.g. Slack, P-54) never count here.
 
 Configuration, from the environment only (never written to data/ or the repository):
 
@@ -19,8 +20,6 @@ Messages carry no clinical content: case ID, task and link only.
 
 from __future__ import annotations
 
-import json
-import logging
 import os
 import smtplib
 from collections.abc import Callable, Mapping
@@ -32,12 +31,12 @@ from typing import Any, Protocol
 
 import yaml
 
-from adjud.events import Clock, EventDraft, format_time, utc_now
+from adjud.delivery import EMAIL, MAX_ATTEMPTS, DeliveryLog, directory, people
+from adjud.events import Clock, utc_now
 from adjud.store import FileCaseStore
 
-log = logging.getLogger("adjud.mailer")
 ACTOR = "system:mailer"
-MAX_ATTEMPTS = 3
+__all__ = ["MAX_ATTEMPTS", "Mailer", "SmtpSettings", "compose", "connect", "recipients"]
 
 
 @dataclass(frozen=True)
@@ -88,14 +87,7 @@ def connect(s: SmtpSettings) -> SmtpClient:
 
 def recipients(to: str, users: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The users behind a notification recipient, who have an e-mail address."""
-    kind, _, value = to.partition(":")
-    if kind == "site":
-        found = [u for u in users if u.get("role") == "site" and str(u.get("site")) == value]
-    elif kind == "role":
-        found = [u for u in users if u.get("role") == value]
-    else:
-        found = []
-    return [u for u in found if u.get("email")]
+    return [u for u in people(to, users) if u.get("email")]
 
 
 def compose(
@@ -140,32 +132,19 @@ class Mailer:
     connect: Callable[[SmtpSettings], SmtpClient] = connect
     clock: Clock = field(default=utc_now)
 
-    @property
-    def outbox(self) -> Path:
-        return self.store.paths.outbox
+    def __post_init__(self) -> None:
+        self.log = DeliveryLog(self.store, self.clock)
 
     @property
     def delivery_log(self) -> Path:
-        return self.outbox / "delivery.jsonl"
+        return self.log.path
 
     def attempts(self) -> dict[str, list[str]]:
-        """Notification id -> statuses so far ("sent" / "failed"), from the delivery log."""
-        out: dict[str, list[str]] = {}
-        if self.delivery_log.exists():
-            for line in self.delivery_log.read_text().splitlines():
-                if line.strip():
-                    d = json.loads(line)
-                    out.setdefault(d["id"], []).append(d["status"])
-        return out
+        """Notification id -> e-mail statuses so far ("sent" / "failed")."""
+        return self.log.attempts(EMAIL)
 
     def pending(self) -> list[dict[str, Any]]:
-        done = self.attempts()
-        notes = [json.loads(p.read_text()) for p in sorted(self.outbox.glob("*.json"))]
-        return [
-            n
-            for n in notes
-            if "sent" not in done.get(n["id"], []) and len(done.get(n["id"], [])) < MAX_ATTEMPTS
-        ]
+        return self.log.pending(EMAIL)
 
     def _organisation(self, study: str) -> str:
         """Who signs the e-mails: `organisation` in the study's study.yaml, if set."""
@@ -181,7 +160,7 @@ class Mailer:
         counts = {"sent": 0, "failed": 0}
         if not notes:
             return counts
-        users = yaml.safe_load((self.config_dir / "users.yaml").read_text())["users"]
+        users = directory(self.config_dir, notes[0].get("study", ""))
         organisation = self._organisation(notes[0].get("study", ""))
         try:
             client = self.connect(self.settings)
@@ -214,19 +193,4 @@ class Mailer:
         return counts
 
     def _record(self, note: dict[str, Any], status: str, to: list[str], error: str | None) -> None:
-        line = {"id": note["id"], "status": status, "to": to, "at": format_time(self.clock())}
-        if error:
-            line["error"] = error
-        self.outbox.mkdir(parents=True, exist_ok=True)
-        with self.delivery_log.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(line) + "\n")
-        if note.get("case_id"):
-            data = {"id": note["id"], "to": note["to"], "users": to}
-            if error:
-                data["error"] = error
-            self.store.append_event(
-                note["case_id"],
-                EventDraft(type=f"notification.{status}", actor=ACTOR, data=data),
-            )
-        if status == "failed":
-            log.warning("e-mail for notification %s failed: %s", note["id"], error)
+        self.log.record(note, EMAIL, ACTOR, status, to, error)

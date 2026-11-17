@@ -76,7 +76,8 @@ SIGNED_STATES = {
 query = query_of(store, cid)
 if query:
     reasons = ", ".join(QUERY_CODES[c].lower() for c in query["codes"])
-    st.warning(f"Query from the quality check: {reasons}. {query['text']}")
+    source = "the adjudication" if "more_data" in query["codes"] else "the quality check"
+    st.warning(f"Query from {source}: {reasons}. {query['text']}")
 
 # --- upload ---------------------------------------------------------------------------------
 can_upload = is_site and cs.state in (

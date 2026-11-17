@@ -14,19 +14,33 @@ import argparse
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import yaml
 
+from adjud.delivery import EMAIL, SLACK, Deliverer, DeliveryLog, channels_from_env
 from adjud.documents import DocumentProcessor
-from adjud.events import Clock, utc_now
+from adjud.events import Clock, format_time, utc_now
 from adjud.flow2 import Flow2
+from adjud.flow3 import Flow3
+from adjud.flow4 import Flow4
 from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
+from adjud.slack import ACTOR as SLACK_ACTOR
+from adjud.slack import SlackChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
+
+
+def slack_since(delivery: DeliveryLog, clock: Clock) -> str:
+    """When Slack was switched on: the first Notification it tried, if any (so a runner
+    restart does not skip what was queued meanwhile); otherwise now."""
+    notes = {n["id"]: n["created_at"] for n in delivery.notes()}
+    tried = [notes[i] for i in delivery.attempts(SLACK) if i in notes]
+    return min(tried) if tried else format_time(clock())
 
 
 @dataclass
@@ -45,11 +59,33 @@ class Runner:
         self.documents = DocumentProcessor(self.pipeline.store, self.paths.config, self.study)
         self.last_inbox: float | None = None
         self.flow2 = Flow2(self.pipeline.store, self.paths.config, self.study)
+        self.flow3 = Flow3(self.pipeline.store, self.paths.config, self.study)
+        self.flow4 = Flow4(self.pipeline.store, self.paths.config, self.study)
         self.uploads = UploadFolders(self.pipeline.store, self.documents.outbox, self.clock)
+        channels = channels_from_env()  # None: as before P-54, e-mail when SMTP is set
         smtp = SmtpSettings.from_env()
+        if channels is not None and EMAIL in channels and smtp is None:
+            log.warning("NOTIFY_CHANNELS lists smtp, but SMTP_HOST is not set: e-mail off")
+        if channels is not None and EMAIL not in channels:
+            smtp = None
         self.mailer = (
             Mailer(self.pipeline.store, self.paths.config, smtp, clock=self.clock) if smtp else None
         )
+        self.slack: Deliverer | None = None
+        if channels is not None and SLACK in channels:
+            settings = SlackSettings.from_env()
+            if settings is None:
+                log.warning("NOTIFY_CHANNELS lists slack, but SLACK_WEBHOOK_URL is not set: off")
+            else:  # Slack posts what is queued from when it was first switched on (P-54)
+                self.slack = Deliverer(
+                    self.pipeline.store,
+                    self.paths.config,
+                    SlackChannel(settings),
+                    SLACK_ACTOR,
+                    since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
+                    clock=self.clock,
+                )
+                log.info("Slack on: notifications queued from now on are posted too")
 
     def send_mail(self) -> None:
         """E-mail queued notifications when SMTP is configured (plan P-29)."""
@@ -58,6 +94,19 @@ class Runner:
         counts = self.mailer.deliver_pending()
         if counts["sent"] or counts["failed"]:
             log.info("e-mail: %d sent, %d failed", counts["sent"], counts["failed"])
+
+    def send_slack(self) -> None:
+        """Post queued notifications to Slack when it is switched on (P-54). Runs after
+        e-mail, and nothing that goes wrong here reaches the e-mail or the workflow."""
+        if self.slack is None:
+            return
+        try:
+            counts = self.slack.deliver_pending()
+        except Exception:
+            log.exception("Slack delivery failed this tick; e-mail and cases are unaffected")
+            return
+        if counts["sent"] or counts["failed"]:
+            log.info("Slack: %d sent, %d failed", counts["sent"], counts["failed"])
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -86,6 +135,7 @@ class Runner:
         from adjud.workflow import State
 
         done = 0
+        later = self.flow34_steps()  # chosen now: one step per case per tick
         for cs in self.pipeline.store.list_case_states(State.DEIDENTIFYING):
             try:
                 summary = self.documents.process_case(cs.case_id)
@@ -108,6 +158,7 @@ class Runner:
             except Exception:
                 log.exception("handoff failed for %s", case_id)
         done += self.run_flow2_steps()
+        done += self.run_steps(later)
         return done
 
     def run_flow2_steps(self) -> int:
@@ -132,11 +183,40 @@ class Runner:
                 log.exception("%s failed for %s", name, case_id)
         return done
 
+    def flow34_steps(self) -> list[tuple[str, Any, str]]:
+        """Flows 3 and 4's automatic steps (P-41 onwards): assign the reviews, compare the
+        signed answers, send more-data queries, derive the outcome, export it and take the
+        mock EDC's acknowledgement. Code only; people adjudicate."""
+        from adjud.workflow import State
+
+        store = self.pipeline.store
+        steps = [(cid, self.flow3.start_round, "adjudication start")
+                 for cid in self.flow3.pending_starts()]  # fmt: skip
+        steps += [(cid, self.flow3.compare, "comparison")
+                  for cid in self.flow3.pending_comparisons()]  # fmt: skip
+        steps += [(cs.case_id, self.flow3.send_more_data, "more-data query")
+                  for cs in store.list_case_states(State.MORE_DATA)]  # fmt: skip
+        steps += [(cid, lambda c, s=step: self.flow4.run(c, s), f"outcome {step}")
+                  for cid, step in self.flow4.pending()]  # fmt: skip
+        return steps
+
+    def run_steps(self, steps: list[tuple[str, Any, str]]) -> int:
+        done = 0
+        for case_id, fn, name in steps:
+            try:
+                fn(case_id)
+                log.info("%s done for %s", name, case_id)
+                done += 1
+            except Exception:
+                log.exception("%s failed for %s", name, case_id)
+        return done
+
     def run_once(self) -> None:
         self.import_inbox()
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
+        self.send_slack()
 
     def tick(self, now: float) -> None:
         """One loop iteration at monotonic time `now`. The inbox is checked every
@@ -150,6 +230,7 @@ class Runner:
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
+        self.send_slack()
 
     def run_forever(self) -> None:
         while True:

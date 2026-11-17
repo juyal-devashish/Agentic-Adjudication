@@ -1,0 +1,37 @@
+# Adjudication form for myocardial infarction events (spec §11.4, plan P-43). The version
+# is fixed for the whole round (ADJ-01). Comparators (ADJ-06): exact, date_tolerance_days,
+# none (free text, never compared). `show_if` hides a field unless another field has a value.
+form_id: MI
+version: 1
+title: Myocardial infarction adjudication
+fields:
+  - id: event_confirmed
+    label: Is the event confirmed as a myocardial infarction?
+    type: enum
+    options: {"yes": "Yes", "no": "No", "insufficient_data": "Insufficient data"}
+    comparator: exact
+    required: true
+  - id: mi_type
+    label: MI type (Fourth Universal Definition)
+    type: enum
+    options: {type_1: "Type 1", type_2: "Type 2", type_3: "Type 3", type_4: "Type 4", type_5: "Type 5"}
+    comparator: exact
+    required: true
+    show_if: {event_confirmed: "yes"}
+  - id: event_date
+    label: Date of the event
+    type: date
+    comparator: {date_tolerance_days: 1}
+    required: true
+    show_if: {event_confirmed: "yes"}
+  - id: related_to_study_drug
+    label: Related to the study drug?
+    type: enum
+    options: {related: "Related", not_related: "Not related", unable_to_assess: "Unable to assess"}
+    comparator: exact
+    required: true
+  - id: rationale
+    label: Rationale
+    type: text
+    comparator: none
+    required: true

@@ -12,6 +12,14 @@
 
 </div>
 
+## How it works, in one page
+
+**[See the diagram: who does each step →](https://claude.ai/artifact/9ewxNaSGeizjJe7mRJWyxG)**
+
+- **The problem:** in a clinical trial, a panel of doctors confirms serious events such as heart attacks and strokes. Getting each case ready for them takes days of manual work.
+- **What this does:** it prepares each case (collects the records, hides patient details, checks the package, drafts a summary) and then runs the doctors' review.
+- **Who does what:** AI does the reading and writing. Code checks every AI answer before it is used. People approve every decision, and the doctors' medical review uses no AI.
+
 > [!WARNING]
 > **Synthetic data only.** Every patient, identifier, hospital and drug in this repository is invented. This is a proof of concept. It is not validated, makes no 21 CFR Part 11 or EU Annex 11 claim, and has no real authentication. Never use it with real patient data.
 
@@ -37,7 +45,7 @@ An AI answer never moves a case on its own. It must match its schema, every quot
 
 ## Product vision
 
-The full module covers four flows. This repository implements **Flows 1 and 2** end to end.
+The full module covers four flows. `main` implements all four end to end; **Flows 3 and 4** are plan P-41 to P-53.
 
 ```mermaid
 flowchart LR
@@ -64,16 +72,14 @@ flowchart LR
     F2 -- flow3_manifest.json --> F3
     F3 --> F4
     F4 --> EDC
-    style F3 stroke-dasharray: 5 5
-    style F4 stroke-dasharray: 5 5
 ```
 
 | | Flow | Status |
 |---|---|---|
 | 1 | **Intake:** rule-based case creation, document collection, de-identification, site sign-off | ✅ Built, demonstrated, passes its acceptance kit |
 | 2 | **Quality check and narrative:** QC checks and agents, prepared for the Safety Specialist's signature, site queries, dossier, cited narrative | ✅ Built, evaluated live on the Claude API |
-| 3 | **Adjudication:** blinded reviews, disagreement and consensus | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.5–6.6 |
-| 4 | **Outcome:** derived outcome, EDC export, re-adjudication | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.7–6.8 |
+| 3 | **Adjudication:** round-robin assignment, two blind reviews compared by code, Adjudicator 3 on disputed fields, committee consensus signed by the Chair, more data back through Flows 1–2 | ✅ Built; no AI (P-49) |
+| 4 | **Outcome:** each value traced to its signature, pharmacovigilance e-mail if related, CSV export acknowledged by a mock EDC, close, re-adjudication | ✅ Built |
 
 ## How a case moves
 
@@ -207,6 +213,7 @@ The roles are simulated in the sidebar: data manager, site user and Safety Speci
 | Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned `claude-opus-5-5`; minimum gate confidence 0.8 |
 | Agent switches | `ai.functions` | `document_type`, `qc_suggestion`, `narrative` (`event_match` retired by P-39); `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
 | E-mail | `SMTP_*` in `.env` | `docker compose --profile mail up` starts Mailpit on http://localhost:8025 |
+| Slack (on trial, alongside e-mail) | `NOTIFY_CHANNELS=smtp,slack` and `SLACK_WEBHOOK_URL` in `.env` | One demo channel; see the run sheet's *Trying Slack* and ADR 0002 |
 | Upload folders | `ADJUD_UPLOAD_DIR` | One folder per case waiting for documents |
 | Study rules and policies | `data/config/DEMO01/*.yaml` | Eligibility, de-identification policy, document checklist, forbidden narrative wording |
 
@@ -290,7 +297,7 @@ uv run python -m tools.ai_eval --mode replay                           # free dr
 | Document | Contents |
 |---|---|
 | [docs/demo-guide.md](docs/demo-guide.md) | One-page run sheet for the end-to-end demo with live AI |
-| [docs/process.md](docs/process.md) | Every step of Flows 1 and 2: trigger, component, actor, AI use |
+| [docs/process.md](docs/process.md) | Every step of Flows 1 to 4: trigger, component, actor, AI use |
 | [docs/plan-mvp.md](docs/plan-mvp.md) | Build plan, autonomy model, decisions log, measured results |
 | [docs/mvp-spec.md](docs/mvp-spec.md) | Storage design, Flow 2 states, AI rules |
 | [docs/spec.md](docs/spec.md) | Full module specification (Flows 1–4), requirements and production architecture |

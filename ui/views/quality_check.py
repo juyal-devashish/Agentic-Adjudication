@@ -17,7 +17,7 @@ from common import case_header, case_list, context, paths, pipeline
 from preview import show_file
 
 from adjud.dossier import latest_dossier
-from adjud.flow2 import QUERY_CODES, Flow2, Flow2Refused
+from adjud.flow2 import QC_QUERY_CODES, QUERY_CODES, Flow2, Flow2Refused
 from adjud.handoff import latest_manifest_ref
 from adjud.signatures import SignatureRefused
 from adjud.workflow import State
@@ -192,7 +192,7 @@ def review_and_sign(latest: dict) -> None:
     with st.form(f"qc_sign_{cid}_{latest['round']}"):
         codes, message, reason = [], "", ""
         if decision == "query":
-            codes = st.multiselect("Query reasons", list(QUERY_CODES),
+            codes = st.multiselect("Query reasons", QC_QUERY_CODES,
                                    default=latest.get("query_codes") or [],
                                    format_func=QUERY_CODES.get)  # fmt: skip
             message = st.text_area(
@@ -311,6 +311,8 @@ else:
 
 
 def by_whom(e: dict) -> str:
+    if e["actor"] == "system:cec":  # from a signed more-data request (P-47)
+        return "the adjudication (a signed request for more data)"
     if e["actor"].startswith("system:"):
         return "the automatic check"
     if e["actor"].startswith("agent:"):

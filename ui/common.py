@@ -51,10 +51,17 @@ class Context:
     def actor(self) -> str:
         return self.user["id"]
 
-    def sees(self, subject: str | None) -> bool:
+    def sees(self, subject: str | None, case_id: str | None = None) -> bool:
         """Site segregation: a site user sees only subjects of their own site (subject IDs
-        are <study>-<site>-<number>, e.g. DEMO01-101-0001 -> site 101). Shown, not enforced: roles
-        are simulated."""
+        are <study>-<site>-<number>, e.g. DEMO01-101-0001 -> site 101). An adjudicator sees
+        only the cases assigned to them (ACC-02). Shown, not enforced: roles are simulated."""
+        if self.role == "adjudicator":
+            from adjud.flow3 import assigned_cases
+
+            chair = bool(self.user.get("chair"))  # the Chair also sees committee cases
+            return case_id is not None and case_id in assigned_cases(
+                pipeline().store, self.actor, chair
+            )
         if self.role != "site":
             return True
         parts = (subject or "").split("-")
@@ -153,7 +160,7 @@ def case_list(ctx: Context, intro: str) -> None:
     import pandas as pd
     import theme
 
-    states = [cs for cs in pipeline().store.list_case_states() if ctx.sees(cs.subject)]
+    states = [cs for cs in pipeline().store.list_case_states() if ctx.sees(cs.subject, cs.case_id)]
     if ctx.role == "site":
         theme.quiet(f"Only cases of {site_name(ctx.user['site'])} are shown.")
     if not states:

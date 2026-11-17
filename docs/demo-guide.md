@@ -1,4 +1,4 @@
-# Demo run sheet: Flows 1 and 2 with AI
+# Demo run sheet: Flows 1 to 4
 
 Synthetic data only. This shows the mechanics; it is not validated, and roles are simulated (switch them in the sidebar).
 
@@ -49,6 +49,29 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - **Low confidence gets no suggestion.** As *Tom Hollis* (site 102), upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0002 and sign. The AI is not sure about the poor-quality scan, or about the event term, so nothing is pre-selected and the Not sure findings say why. Dr. Weber decides.
    - **More documents needed.** As *Priya Nair* (site 101), upload `data/demo_uploads/documents/DEMO01-101-0005_AE-006/` into DEMO01-0003 and sign. The AI types the untitled letter as a clinic letter, so the discharge summary and ECG are missing; the AI Suggestion also says lab results would help (advice only). The query is suggested and pre-filled: choose **Send a query to the site** and sign. The narrative draft is dropped; a new one follows the site's answer.
    - With AI off, the page says there is no AI Suggestion and the narrative starts from the template; it can only be signed once the template's [bracketed] instruction is replaced.
-7. **Not built:** a live EDC connection, real logins, DICOM redaction, Flows 3 and 4, and anything for real patient data.
+7. **Flows 3 and 4: adjudication and outcome** (P-41 to P-53). No AI takes part: code assigns, compares and exports; people adjudicate and sign.
+   - New people (password `demo`): *Sofia Marques* (CEC Coordinator) and three adjudicators, *Dr. Daniel Okafor* (the committee's Chair), *Dr. Elin Lindqvist* and *Dr. Marco Reyes*. Pick the role *Adjudicator* or *CEC Coordinator* in the sidebar.
+   - Within a runner tick of the Quality Check signature, two adjudicators are assigned by round-robin and e-mailed. Each sees only their own cases; the Assistant offers **Adjudicate DEMO01-0001**.
+   - As each adjudicator, fill the form on *Adjudication* and sign. Neither sees the other's answers. If they agree, the outcome is derived, exported to `data/exports/edc/`, acknowledged by the mock EDC, and the case closes. The Case record's *Adjudication and outcome* shows each final answer and who signed it.
+   - **Disagreement without filling three forms:** `uv run python -m tools.make_flow3_fixtures --apply disputed --case DEMO01-0002` signs the open reviews; run it again for Adjudicator 3 after the runner's comparison. One field is still open, so as *Sofia Marques* record the meeting on *Committee*, then as *Dr. Okafor* sign the consensus.
+   - Show blinding: as *Priya Nair* the case record says only that adjudication is independent; no names or answers.
+   - Optional: as *Sofia Marques*, on *Assignments*, reassign an open review with a reason, or re-adjudicate a closed case. The old outcome shows as superseded and the new export is a correction.
+8. **Not built:** a live EDC connection, real logins, DICOM redaction, due dates and reminders for adjudicators, and anything for real patient data.
 
 Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
+
+## Trying Slack (P-54, ADR 0002)
+
+Slack runs alongside e-mail, never instead of it, until it meets the reliability bar. Synthetic data only.
+
+1. **Set up once.**
+   - Create a separate free Slack workspace for the demo, never the company's, with a channel such as `#adjudication-demo`. Keep yourself its only member: it shows every recipient's notices, including who adjudicates which case.
+   - Create a Slack app *from scratch* in that workspace, turn on **Incoming Webhooks**, add one for the channel and copy its URL.
+2. **Switch it on.** In `.env`, set `NOTIFY_CHANNELS=outbox,smtp,slack` and `SLACK_WEBHOOK_URL=<the URL>`. The URL is a secret: never commit it or paste it into chat. Restart the runner. Only notices queued from then on are posted; a later restart keeps that starting point, and a demo reset clears it.
+3. **One reliability run.**
+   - `tools.reset_demo --preload`, restart the runner, then follow this run sheet through all four flows: an agreed case, a disputed case through the committee, one more-data request and one re-adjudication.
+   - When the runner has caught up, run `uv run python -m tools.notify_parity`. **CLEAN** means every notice was posted exactly once, with no failed attempt and as many e-mails as Slack posts.
+   - Record the date and the report in the plan's step 28.
+4. **The bar.** Five clean runs in a row with 0 failed Slack attempts. Meeting it only allows a new decision on making Slack a default; e-mail stays.
+
+A failed post shows on the Case record as *Slack message failed* with its reason, and it is retried twice on the next ticks. E-mail and the case carry on regardless.
