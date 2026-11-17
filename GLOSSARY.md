@@ -89,3 +89,17 @@ _Avoid_: overwritten, cancelled outcome
 **Re-adjudication**:
 A new Round on a closed case, started by the CEC Coordinator with a reason.
 _Avoid_: reopening, re-review
+
+## Notifications
+
+**Notification**:
+One notice to one recipient about one case and task, holding no clinical content. Every Notification is kept in the outbox for good.
+_Avoid_: alert, message (for the notice itself)
+
+**Channel**:
+A route that delivers Notifications to people: e-mail, Slack on trial, Teams later. The outbox is the record, not a Channel.
+_Avoid_: transport, provider
+
+**Delivery Attempt**:
+One try at delivering one Notification through one Channel, recorded as sent or failed with the reason.
+_Avoid_: send (as a noun), retry (for the first try)
