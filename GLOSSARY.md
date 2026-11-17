@@ -21,11 +21,11 @@ One part of the AI Suggestion with its own status (OK, problem, not sure): eithe
 _Avoid_: result, flag
 
 **Required Document**:
-A document type the study's checklist demands for this kind of event. Only a missing Required Document can make the Suggested Outcome a Site Query; a document the AI says "would help" cannot.
+A document type the study's checklist demands for this kind of event. A missing Required Document makes the Suggested Outcome a Site Query; a document the AI says "would help" never does.
 _Avoid_: mandatory document, missing document (for a "would help" one)
 
 **Suggested Outcome**:
-The pass or query pre-selected for the Safety Specialist, derived from the Checks and Findings. There is none when anything is not sure.
+The pass or query pre-selected for the Safety Specialist, derived from the Checks and Findings. There is none when a Check, or the Finding on the event term or onset date, is not sure.
 _Avoid_: proposal, recommendation, decision
 
 **Site Query**:

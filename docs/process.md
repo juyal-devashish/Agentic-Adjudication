@@ -23,11 +23,11 @@ Synthetic data only. Nothing here is validated or Part 11 / Annex 11 compliant; 
 | 11 | Site review and signature | Files verified | Documents page, `adjud/review.py` | **Site**: checks pages, keeps a wrongly blacked-out item (with a reason), drags a box over anything missed, signs | None |
 | 12 | Handoff to Flow 2 | Site signed | `adjud/handoff.py` | Code: `flow2_manifest.json` with redacted files and hashes, never originals | None |
 | 13 | Quality checks | Manifest written | `adjud/qc.py` | Code: readable, no identifiers left, document types, required documents, same patient, subject ID and onset date | None |
-| 14 | What code cannot tell | A check is unknown | `adjud/flow2.py` | *Agent*: document type of an untitled letter; whether the documents describe this event | *AI-2 and event match*, through `adjud/ai/gateway.py`; each answer passes `adjud/ai/gates.py` (quotes found on the page, confidence, allowed values) or goes to a person |
-| 15 | QC decision | Checks done | `adjud/flow2.py` | Code proposes: all passed → pass; a failure → query, with its reasons; otherwise no proposal. The **Safety Specialist** decides and signs every case: pass, or a **query to the site** (back to step 7). A check that failed in code can only end in a query | Uses only gated agent answers, as a proposal |
-| 16 | Dossier | QC passed | `adjud/dossier.py` | Code: cover, EDC summary, documents in checklist order, subject ID on every page, hashed | None |
-| 17 | Narrative | Dossier built | `adjud/flow2.py` | *Agent* writes facts-only statements, each quoting a dossier page; code checks every quote and the wording. The **Safety Specialist** checks the draft against the dossier, edits it and signs, on every case | *AI-4*, gated; with AI off a template is filled and a person completes it |
-| 18 | Handoff to Flow 3 | Narrative signed | `adjud/flow2.py` | Code: `flow3_manifest.json` (dossier, narrative, QC results, hashes); Safety Specialist notified | None |
+| 14 | AI Suggestion | Every QC round | `adjud/flow2.py`, `adjud/suggestion.py` | *Agent*: document type of an untitled letter; then, on every case, which documents would help and a field-by-field match with the EDC (event term, onset, end, outcome, seriousness), with reasoning and quotes | *AI-2 and `qc_suggestion`*, through `adjud/ai/gateway.py`; code checks each finding (quotes found on the page, confidence, allowed values) and marks the rest *not sure* |
+| 15 | Dossier | Same QC round | `adjud/dossier.py` | Code: cover, EDC summary, documents in checklist order, subject ID on every page, hashed; a new version each round | None |
+| 16 | Narrative draft | Same QC round | `adjud/flow2.py` | *Agent* writes facts-only statements, each quoting a dossier page; code checks every quote and the wording | *AI-4*, gated; with AI off the study template is filled in |
+| 17 | Quality Check (one stop, P-39) | Round prepared | Quality check page, `adjud/flow2.py` | Code suggests the outcome: a failed check, missing required document or verified mismatch → query; all clear → pass; event term or onset not sure → none. The **Safety Specialist** reviews the checks, the AI Suggestion, the documents and the narrative, and signs once: the **pass with the narrative as edited**, or a **query to the site** (back to step 7). A check that failed in code can only end in a query; passing against an AI-found problem needs a reason | Uses only gated findings, as a suggestion ([ADR 0001](adr/0001-ai-is-decision-support-at-quality-check.md)) |
+| 18 | Handoff to Flow 3 | Pass and narrative signed | `adjud/flow2.py` | Code: `flow3_manifest.json` (dossier, narrative, QC results, hashes); Safety Specialist notified | None |
 
 Every step appends a hash-chained event to the case's `events.jsonl`; `tools/verify_log` detects any edited event or changed file.
 
@@ -35,7 +35,7 @@ Every step appends a hash-chained event to the case's `events.jsonl`; `tools/ver
 
 - **Site:** uploads, reviews the redacted pages and signs the submission. The signature stays human.
 - **Data manager:** imports or pulls the AE records.
-- **Safety Specialist:** on every case, twice (P-37): signs the QC pass or sends the query, then checks, edits and signs the narrative. Both screens arrive pre-filled by code and the agents.
+- **Safety Specialist:** on every case, once (P-37, P-39): reviews the checks, the AI Suggestion and the narrative draft together, then signs the pass with the narrative as edited, or sends the query. The screen arrives pre-filled by code and the agents.
 
 ## AI and the API
 
