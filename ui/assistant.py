@@ -136,12 +136,12 @@ class Assistant:
     # -- answers -----------------------------------------------------------------------------
 
     def greeting(self) -> Reply:
-        first = (
-            self.user["name"].split()[-1]
-            if self.role == "safety_specialist"
-            else (self.user["name"].split()[0])
+        name = self.user["name"]
+        hello = (
+            f"Hello Dr. {name.split()[-1]}. "
+            if name.startswith("Dr. ")
+            else f"Hello {name.split()[0]}. "
         )
-        hello = f"Hello {'Dr. ' if self.role == 'safety_specialist' else ''}{first}. "
         tasks = self.tasks()
         return Reply(hello + tasks.text + "\n\nType **/help** to see what I can do.", tasks.actions)
 

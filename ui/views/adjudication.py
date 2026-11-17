@@ -84,8 +84,9 @@ if slot is None or slot in rnd.signed:
     )
     st.dataframe(
         [
-            {"Question": form.field(f).label, "Your answer": form.field(f).words(v)}
-            for f, v in answers.items()
+            {"Question": f.label, "Your answer": f.words(answers[f.id])}
+            for f in form.fields
+            if f.id in answers
         ],
         hide_index=True,
         width="stretch",
