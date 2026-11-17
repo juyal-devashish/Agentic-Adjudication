@@ -193,10 +193,10 @@ def test_11_tamper_detected_and_state_rebuilt(demo):
 def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
     """The Flows 1+2 demo (README): a site drops one ZIP; code and the recorded agent
     answers do the work between the people's steps, and the case reaches adjudication
-    with exactly three signatures in its audit trail: the site's submission, the Safety
-    Specialist's QC pass and the narrative the AI drafted and the Safety Specialist signed
-    (P-37). A case whose letter has no title is typed by the agent, but the recorded live
-    answer is unsure (confidence 0.6), so the Safety Specialist gets no proposal."""
+    with exactly two signatures in its audit trail: the site's submission, and the Safety
+    Specialist's one Quality Check signature over the QC pass and the AI-drafted narrative
+    (P-37, P-39). A case whose letter has no title is typed by the agent, but the recorded
+    live answer is unsure (confidence 0.7), so the Safety Specialist gets no suggestion."""
     import io
     import zipfile
 
@@ -237,19 +237,20 @@ def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
         runner.run_case_steps()
     (ae001, site), (ae005, _) = cases.items()
     assert store.state(ae001).state == State.QC_REVIEW  # every case waits for a person
-    assert store.get_json(ae001, "qc/checks_v1.json")["proposal"] == "pass"
-    flow2 = runner.flow2
-    flow2.sign_qc_pass(ae001, "ss.anna", "demo")
-    runner.run_case_steps()  # dossier + AI narrative draft
-    assert store.state(ae001).state == State.NARRATIVE_REVIEW
-    draft = next(e for e in store.events(ae001) if e["type"] == "narrative.drafted")
-    assert draft["data"]["source"] == "ai"
-    text = store.get_file(ae001, draft["data"]["draft"]["path"]).decode()
-    flow2.sign_narrative(ae001, "ss.anna", "demo", text)
+    review = store.get_json(ae001, "qc/checks_v1.json")
+    assert review["proposal"] == "pass" and review["suggestion"]["status"] == "ok"
+    assert review["narrative"]["source"] == "ai"  # drafted before the review (P-39)
+    text = store.get_file(ae001, review["narrative"]["draft"]["path"]).decode()
+    edited = text + "\nThe patient was discharged home."
+    runner.flow2.sign_qc_pass(ae001, "ss.anna", "demo", edited)
     runner.run_case_steps()  # Flow 3 handoff
     assert store.state(ae001).state == State.READY_FOR_ADJUDICATION
     signed = [e["type"] for e in store.events(ae001) if e.get("signature")]
-    assert signed == ["submission.signed", "qc.signed_pass", "narrative.signed"]
+    assert signed == ["submission.signed", "quality_check.signed"]
+    passed = next(e for e in store.events(ae001) if e["type"] == "quality_check.signed")
+    assert passed["data"]["edited"]  # the edited narrative, not the draft, goes forward
+    package = store.get_json(ae001, "handoff/flow3_manifest.json")
+    assert package["narrative"]["path"] == passed["data"]["narrative"]["path"]
     people = {e["actor"] for e in store.events(ae001)} - {"system:upload-folder"}
     assert {a for a in people if not a.startswith("system:")} == {site, "ss.anna"}
     assert store.state(ae005).state == State.QC_REVIEW
@@ -258,7 +259,9 @@ def test_flows_1_and_2_demo_in_replay_mode(tmp_path, monkeypatch):
 
 def test_the_short_demo_has_three_cases_and_keeps_its_recorded_ai(tmp_path, monkeypatch):
     """`tools.reset_demo` without --all: three cases and one record that is not eligible,
-    and the recorded agent answers still match although the case numbers changed."""
+    and the recorded agent answers still match although the case numbers changed. The
+    three demo stories (P-39): AE-001 a suggested pass, AE-005 nothing pre-selected (the
+    AI is not sure), AE-006 a suggested query for the missing required documents."""
     from adjud.documents import upload
     from adjud.paths import DataPaths
     from adjud.review import submit
@@ -281,20 +284,22 @@ def test_the_short_demo_has_three_cases_and_keeps_its_recorded_ai(tmp_path, monk
     pipe, store = runner.pipeline, runner.pipeline.store
     assert sorted(store.list_cases()) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
     assert pipe.case_for("DEMO01|DEMO01-102-0004|AE-005") == "DEMO01-0002"
-    for folder, site in (("DEMO01-101-0001_AE-001", "101"), ("DEMO01-102-0004_AE-005", "102")):
+    for folder in staged:
         subject, ae = folder.split("_")
-        cid = pipe.case_for(f"DEMO01|{subject}|{ae}")
+        cid, site = pipe.case_for(f"DEMO01|{subject}|{ae}"), f"site{subject[7:10]}.coord"
         files = sorted((KIT / "documents" / folder).iterdir())
-        upload(store, cid, [(f.name, f.read_bytes()) for f in files], f"site{site}.coord")
+        upload(store, cid, [(f.name, f.read_bytes()) for f in files], site)
         runner.run_case_steps()
-        submit(store, cid, f"site{site}.coord", "demo", paths.config)
+        submit(store, cid, site, "demo", paths.config)
     for _ in range(2):
         runner.run_case_steps()
-    assert store.get_json("DEMO01-0001", "qc/checks_v1.json")["proposal"] == "pass"
+    clean = store.get_json("DEMO01-0001", "qc/checks_v1.json")
+    assert clean["proposal"] == "pass" and clean["suggestion"]["label"] == "AI"  # recorded
+    assert clean["narrative"]["source"] == "ai" and clean["narrative"]["simulated"] is False
     unsure = store.get_json("DEMO01-0002", "qc/checks_v1.json")
-    assert unsure["proposal"] == "unclear" and unsure["ai"][0]["label"] == "AI"  # recorded
-    runner.flow2.sign_qc_pass("DEMO01-0001", "ss.anna", "demo")
-    runner.run_case_steps()
-    assert store.state("DEMO01-0001").state == State.NARRATIVE_REVIEW
-    drafted = next(e for e in store.events("DEMO01-0001") if e["type"] == "narrative.drafted")
-    assert drafted["data"]["source"] == "ai" and drafted["data"]["simulated"] is False
+    assert unsure["proposal"] == "unclear" and unsure["ai"][0]["label"] == "AI"
+    more = store.get_json("DEMO01-0003", "qc/checks_v1.json")
+    assert more["proposal"] == "query" and more["query_codes"] == ["missing_document"]
+    assert more["suggestion"]["would_help"]  # the AI's advice, beside code's required list
+    for cid in ("DEMO01-0001", "DEMO01-0002", "DEMO01-0003"):
+        assert store.state(cid).state == State.QC_REVIEW  # one stop, a person decides

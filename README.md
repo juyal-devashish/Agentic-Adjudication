@@ -50,8 +50,8 @@ flowchart LR
     end
     subgraph F2 [Flow 2 · QC and narrative]
         direction TB
-        B1[Quality checks + agents] --> B2[Hashed dossier]
-        B2 --> B3[Cited narrative]
+        B1[Quality checks + AI Suggestion] --> B2[Hashed dossier<br/>and cited narrative draft]
+        B2 --> B3[One review and signature<br/>by the Safety Specialist]
     end
     subgraph F3 [Flow 3 · Adjudication]
         direction TB
@@ -92,15 +92,11 @@ sequenceDiagram
     S->>R: One ZIP in the case's upload folder
     R->>R: Remove identifiers, then verify the output from scratch
     S->>R: Review pages, draw boxes over misses, sign
-    R->>R: Quality checks
-    R->>AG: Only what code cannot decide
-    AG->>G: Answer with quotes and confidence
-    G-->>SS: Checks and answers as a proposal: pass, query, or unclear
-    SS->>R: Sign the QC pass, or sign a query to the site
-    R->>AG: Write the narrative from the dossier
-    AG->>G: Statements, each quoting a dossier page
-    G-->>SS: Draft, with every quote checked
-    SS->>R: Check, edit and sign the narrative
+    R->>R: Quality checks and the dossier
+    R->>AG: AI Suggestion (documents needed, match with the EDC) and the narrative
+    AG->>G: Findings and statements, each with quotes and confidence
+    G-->>SS: One review: checks, findings, suggested outcome, narrative draft
+    SS->>R: One signature: the pass with the narrative as edited, or a query to the site
     R->>R: Hashed package for adjudication
 ```
 
@@ -122,10 +118,10 @@ The step-by-step table, with the trigger, component and actor for each step, is 
 
 **Quality check and narrative (Flow 2)**
 - Six deterministic checks: readable, no identifiers left, document types, required documents by event type, same patient, and subject ID and onset date.
-- **Agents only on what code cannot decide:** the type of a letter with no title, and whether the documents describe this event.
-- **Proposed queries** for clear failures, for example a missing ECG, another patient's document, an unreadable scan or a different event: pre-filled for the Safety Specialist, who signs every QC decision. A check that failed in code can only end in a query.
+- An **AI Suggestion** on every case, ready before the Safety Specialist looks: which required documents are missing and which others would help, and a field-by-field match of the documents with the EDC (event term, onset, end, outcome, seriousness), each with its reasoning and quotes that code verifies. An agent also types letters with no title.
+- A **suggested outcome**, worked out by code, not AI: a query for a failed check, a missing required document or a verified mismatch, pre-filled for the Safety Specialist; a pass when all is clear; none when the event itself is not sure. A check that failed in code can only end in a query; an AI-found problem can be overruled with a reason. See [ADR 0001](docs/adr/0001-ai-is-decision-support-at-quality-check.md).
 - A **dossier** in PDF form: cover, EDC summary, then the documents in checklist order, with the subject ID on every page, bookmarks, a page map and a SHA-256.
-- A **narrative agent** drafts facts-only statements, each quoting a dossier page. Code checks that every quote is found and no forbidden wording (causality, relatedness, allocation) is used; the Safety Specialist checks, edits and signs the narrative on every case.
+- A **narrative agent** drafts facts-only statements, each quoting a dossier page, before the review. Code checks that every quote is found and no forbidden wording (causality, relatedness, allocation) is used. The Safety Specialist edits it at the same stop and signs it with the QC pass; the Case record shows what changed from the draft.
 - A versioned, hashed **Flow 3 handoff manifest**. It never lists anything from `documents/original/`.
 
 **Platform**
@@ -136,7 +132,7 @@ The step-by-step table, with the trigger, component and actor for each step, is 
 
 ## Screenshots
 
-| Site review: redacted pages, draw a box, sign | Quality check: checks, dossier, AI-written narrative |
+| Site review: redacted pages, draw a box, sign | Quality check: checks, AI Suggestion with verified quotes, suggested outcome |
 |---|---|
 | ![Site review](docs/images/site-review.png) | ![Quality check](docs/images/quality-check.png) |
 
@@ -205,7 +201,7 @@ The roles are simulated in the sidebar: data manager, site user and Safety Speci
 | AI mode | `ai.mode` in `data/config/DEMO01/study.yaml`, or `ADJUD_AI_MODE` in `.env` | `off` (default), `replay` (recorded answers, no API calls) or `live` |
 | API key | `ANTHROPIC_API_KEY` in the environment or `.env` | Environment only, never in config or logs. `live` without a key falls back to `off` and says so |
 | Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned `claude-opus-5-5`; minimum gate confidence 0.8 |
-| Agent switches | `ai.functions` | `document_type`, `event_match`, `narrative`; `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
+| Agent switches | `ai.functions` | `document_type`, `qc_suggestion`, `narrative` (`event_match` retired by P-39); `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
 | E-mail | `SMTP_*` in `.env` | `docker compose --profile mail up` starts Mailpit on http://localhost:8025 |
 | Upload folders | `ADJUD_UPLOAD_DIR` | One folder per case waiting for documents |
 | Study rules and policies | `data/config/DEMO01/*.yaml` | Eligibility, de-identification policy, document checklist, forbidden narrative wording |

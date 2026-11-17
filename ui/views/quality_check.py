@@ -1,8 +1,9 @@
-"""Quality check (Flow 2, plan steps 13–17): the Safety Specialist's exception desk.
+"""Quality check (Flow 2, P-37, P-39): the Safety Specialist's one review stop.
 
-The runner and its agents do the routine work; this page shows what they found and lets
-the Safety Specialist decide the cases they could not: pass the quality check, send a
-query to the site, and complete and sign the narrative.
+Before the Safety Specialist looks, code has run the checks, the AI has prepared its
+Suggestion, the dossier is built and the narrative drafted. Here the Safety Specialist
+reviews it all and signs once: the pass together with the narrative as edited, or a
+Site Query. The AI supports the review; it never decides (ADR 0001).
 """
 
 from __future__ import annotations
@@ -39,6 +40,191 @@ is_ss = ctx.role == "safety_specialist"
 
 def when(e: dict) -> str:
     return f"{theme.date_words(e['at'])} {e['at'][11:16]} UTC"
+
+
+FIELD_RESULT = {
+    "match": ("Matches", "good"),
+    "mismatch": ("Doesn't match", "bad"),
+    "not_found": ("Not in the documents", "none"),
+    "not_sure": ("Not sure", "wait"),
+}
+DOC_RESULT = {"ok": ("Complete", "good"), "problem": ("Missing", "bad"),
+              "not_sure": ("Not sure", "wait")}  # fmt: skip
+
+
+def quotes(evidence: list[dict]) -> str:
+    return " ".join(f"{c['file']} p. {c['page']}: “{c['quote']}”" for c in evidence)
+
+
+def show_suggestion(sg: dict) -> None:
+    """The AI Suggestion (P-39): the AI's findings and its reasons, never a decision."""
+    st.subheader("AI Suggestion")
+    if sg.get("status") != "ok":
+        st.write(f"No AI Suggestion this round ({sg.get('note') or 'AI is off'}). Review the "
+                 "checks and the documents yourself.")  # fmt: skip
+    else:
+        theme.quiet(f"Prepared by {sg['label']}. Code checked every quote against its page; "
+                    "a finding it could not verify, or one the AI was unsure of, shows as "
+                    "Not sure.")  # fmt: skip
+        if sg.get("summary"):
+            st.write(sg["summary"])
+    docs = sg.get("documents")
+    if docs:
+        word, ink = DOC_RESULT[docs["status"]]
+        st.html(
+            f"<p><b>Documents</b>: {theme.status(word, ink)}. Required for this event: "
+            f"{html.escape(', '.join(docs['required']))}."
+            + (f" {html.escape(docs['detail'])}." if docs.get("detail") else "")
+            + "</p>"
+        )
+        if docs.get("would_help"):
+            items = "".join(f"<li>{html.escape(d['label'])}: {html.escape(d['reason'])}</li>"
+                            for d in docs["would_help"])  # fmt: skip
+            st.html(f"<p>Would also help (advice, not required):</p><ul>{items}</ul>")
+    if sg.get("fields"):
+        st.html("<p><b>Match with the EDC</b></p>" + match_table(sg["fields"]))
+
+
+def match_table(fields: list[dict]) -> str:
+    """Field by field: the EDC value (from the snapshot), what the documents say, the
+    result and the AI's reason with the quotes code verified, or why it is not sure."""
+    rows = []
+    for f in fields:
+        word, ink = FIELD_RESULT[f["status"]]
+        cites = "".join(
+            f"<br>{html.escape(c['file'])} p. {c['page']}: <q>{html.escape(c['quote'])}</q>"
+            for c in f["evidence"]
+        )
+        problems = (f"<br>Not used: {html.escape('; '.join(f['problems']))}"
+                    if f["problems"] else "")  # fmt: skip
+        rows.append(  # data-label: the column name, shown beside each cell on a phone
+            f"<tr><td data-label='Field'><b>{html.escape(f['label'])}</b></td>"
+            f"<td data-label='EDC'>{html.escape(f['edc_value'] or '(empty)')}</td>"
+            f"<td data-label='Documents'>{html.escape(f['document_value'] or '')}</td>"
+            f"<td data-label='Result'>{theme.status(word, ink)}</td>"
+            f"<td data-label='Why' class='why'>{html.escape(f['reason'])}{cites}{problems}</td>"
+            "</tr>"
+        )
+    head = "".join(f"<th>{h}</th>" for h in ("Field", "EDC", "Documents", "Result", "Why"))
+    return (f"<table class='adj-match'><thead><tr>{head}</tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table>")  # fmt: skip
+
+
+def show_agent_answers(latest: dict) -> None:
+    proposals = [a for a in latest.get("ai", []) if a["status"] != "unavailable"]
+    if not proposals:
+        return
+    st.subheader("What the AI proposed")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Question": f"{a['task']} of {a['about']}",
+                    "Source": a["label"],
+                    "Answer": a["answer"] or a["note"],
+                    "Accepted": "Yes"
+                    if a["gate"] and a["gate"]["passed"]
+                    else "No: " + "; ".join((a["gate"] or {}).get("reasons", [a["note"]])),
+                }
+                for a in proposals
+            ]
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def draft_note(nar: dict) -> str:
+    if nar["source"] == "template":
+        why = f" ({'; '.join(nar['reasons'])})" if nar.get("reasons") else ""
+        return f"Drafted from the study template{why}. Complete it from the dossier."
+    label = nar.get("label") or ("Simulated AI" if nar.get("simulated") else "AI")
+    if nar.get("reasons"):
+        return f"Drafted by {label}. Code found problems: {'; '.join(nar['reasons'])}."
+    return (f"Drafted by {label}. Every quote was found on the dossier page it cites. Check "
+            "the facts against the dossier and edit if needed.")  # fmt: skip
+
+
+def review_and_sign(latest: dict) -> None:
+    """One stop, one signature (P-39): pass with the narrative as edited, or a Site Query."""
+    nar = latest["narrative"]
+    draft = store.get_file(cid, nar["draft"]["path"]).decode()
+    st.header("Narrative")
+    st.write(draft_note(nar))
+    st.caption("Every statement must come from the dossier. No opinion on cause, no "
+               "adjudication wording, nothing that reveals allocation.")  # fmt: skip
+    if not is_ss:
+        theme.frozen_text(draft, "Narrative draft")
+        st.write("Waiting for the Safety Specialist to decide.")
+        return
+    st.header("Your decision")
+    blocked = latest.get("failed_by_code") or []
+    options = ["query"] if blocked else ["pass", "query"]
+    if blocked:
+        st.caption("A check failed, so this round can only end in a query to the site.")
+    suggested_query = latest.get("proposal") == "query"
+    # The decision sits outside the form so the fields for it appear as soon as it is
+    # chosen (widgets inside a form do not redraw the page until submitted).
+    decision = st.radio(
+        "Your decision",
+        options,
+        index=options.index("query") if suggested_query or blocked else 0,
+        format_func={
+            "pass": "Pass: the documents are complete and fit for adjudication; sign the "
+            "narrative with it",
+            "query": "Send a query to the site",
+        }.get,
+        key=f"qc_decision_{cid}_{latest['round']}",
+        label_visibility="collapsed",
+    )
+    # The narrative box sits outside the form too, so an edit survives switching the
+    # decision to "query" and back: its text is kept under its own key while hidden.
+    box, kept = f"narrative_{cid}_{latest['round']}", f"narrative_kept_{cid}_{latest['round']}"
+    text = ""
+    if decision == "query":
+        with st.expander("Narrative draft (dropped if you send the query)"):
+            theme.frozen_text(draft, "Narrative draft")
+    else:
+        if box not in st.session_state:
+            st.session_state[box] = st.session_state.get(kept, draft)
+        text = st.text_area("Narrative", height=320, key=box)
+        st.session_state[kept] = text
+    with st.form(f"qc_sign_{cid}_{latest['round']}"):
+        codes, message, reason = [], "", ""
+        if decision == "query":
+            codes = st.multiselect("Query reasons", list(QUERY_CODES),
+                                   default=latest.get("query_codes") or [],
+                                   format_func=QUERY_CODES.get)  # fmt: skip
+            message = st.text_area(
+                "Message to the site",
+                " ".join(f"{r.rstrip('.')}." for r in latest.get("reasons", []))
+                if suggested_query
+                else "",
+            )
+        else:
+            reason = st.text_input(
+                "Why you pass despite the suggested query (required)"
+                if suggested_query
+                else "Note for the audit trail (optional)"
+            )
+        password = st.text_input(
+            f"Password for {ctx.user['name']} (demo password: demo)", type="password"
+        )
+        label = "Sign the pass and the narrative" if decision == "pass" else "Sign the query"
+        if st.form_submit_button(label, type="primary"):
+            try:
+                if decision == "pass":
+                    flow2.sign_qc_pass(cid, ctx.actor, password, text, reason)
+                    st.toast("Quality check passed and narrative signed")
+                else:
+                    flow2.open_query(cid, codes, message, user_id=ctx.actor, password=password)
+                    st.toast("Query sent to the site")
+                st.rerun()
+            except SignatureRefused as exc:
+                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                st.error(f"Not signed: {msg}. Try again.")
+            except Flow2Refused as exc:
+                st.error(f"Not signed: {exc}.")
 
 
 # --- quality check ----------------------------------------------------------------------------
@@ -92,47 +278,29 @@ else:
                 "Details": st.column_config.TextColumn(width="large"),
             },
         )
-    proposals = [a for a in latest.get("ai", []) if a["status"] != "unavailable"]
-    if proposals:
-        st.subheader("What the AI proposed")
-        st.write(
-            "Agents answer only what the checks could not. Code accepts an answer only if "
-            "it is confident enough and every quote is found on the page it names."
-        )
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Question": f"{a['task']} of {a['about']}",
-                        "Source": a["label"],
-                        "Answer": a["answer"] or a["note"],
-                        "Accepted": "Yes"
-                        if a["gate"] and a["gate"]["passed"]
-                        else "No: " + "; ".join((a["gate"] or {}).get("reasons", [a["note"]])),
-                    }
-                    for a in proposals
-                ]
-            ),
-            hide_index=True,
-            width="stretch",
-        )
-    # The checks and agents propose; the Safety Specialist decides every case (P-37).
-    # Rounds from before P-37 carry a decision instead of a proposal.
+    suggestion = latest.get("suggestion")
+    if suggestion is not None:
+        show_suggestion(suggestion)
+    else:  # rounds from before P-39: the agents' answers to what code could not tell
+        show_agent_answers(latest)
+    # The checks and the AI suggest; the Safety Specialist decides every case (P-37, ADR
+    # 0001). Rounds from before P-37 carry a decision instead of a proposal.
     proposal = latest.get("proposal")
     if proposal:
         word, ink = {
             "pass": ("pass the quality check", "good"),
             "query": ("send a query to the site", "bad"),
-            "unclear": ("none, the checks and the AI could not decide", "wait"),
+            "unclear": ("none, something is not sure", "wait"),
         }[proposal]
-        st.html(f"<p>Proposed by the checks and the AI: {theme.status(word, ink)}</p>")
+        st.html(f"<p><b>Suggested outcome</b>: {theme.status(word, ink)}</p>")
+        theme.quiet("Worked out by code from the checks and the AI Suggestion. You decide.")
     if latest.get("reasons"):
         items = "".join(f"<li>{html.escape(r)}</li>" for r in latest["reasons"])
-        st.html(f"<p>Findings:</p><ul>{items}</ul>")
+        st.html(f"<ul>{items}</ul>")
     ref = latest_manifest_ref(store, cid)
     documents = store.get_json(cid, ref["path"])["documents"] if ref else []
     if documents:
-        with st.expander("Documents as submitted", expanded=state == State.QC_REVIEW):
+        with st.expander("Documents as submitted"):
             names = [d["source_name"] for d in documents]
             pick = st.selectbox("Document", names, key=f"qc_doc_{cid}")
             doc = documents[names.index(pick)]
@@ -156,69 +324,15 @@ for e in [e for e in events if e["type"] == "query.opened"]:
     reasons = ", ".join(QUERY_CODES[c].lower() for c in d["codes"])
     st.info(f"Query sent {when(e)} by {by}: {reasons}. {d['text']}")
 
-if state == State.QC_REVIEW:
-    if not is_ss:
-        st.write("Waiting for the Safety Specialist to decide.")
-    else:
-        # Pre-filled from the proposal; a check that failed in code allows only a query.
-        blocked = latest.get("failed_by_code") or []
-        options = ["query"] if blocked else ["pass", "query"]
-        if blocked:
-            st.caption("A check failed, so this round can only end in a query to the site.")
-        drafted = latest.get("proposal") == "query"
-        # The decision sits outside the form so the query fields appear only once "Send a
-        # query" is chosen (widgets inside a form do not redraw the page until submitted).
-        decision = st.radio(
-            "Your decision",
-            options,
-            index=options.index("query") if drafted or blocked else 0,
-            format_func={
-                "pass": "The documents are complete and fit for adjudication",
-                "query": "Send a query to the site",
-            }.get,
-            key=f"qc_decision_{cid}_{latest['round']}",
-        )
-        with st.form(f"qc_sign_{cid}_{latest['round']}"):
-            codes, text, reason = [], "", ""
-            if decision == "query":
-                codes = st.multiselect(
-                    "Query reasons",
-                    list(QUERY_CODES),
-                    default=latest.get("query_codes") or [],
-                    format_func=QUERY_CODES.get,
-                )
-                text = st.text_area(
-                    "Message to the site",
-                    " ".join(f"{r}." for r in latest.get("reasons", [])) if drafted else "",
-                )
-            else:
-                reason = st.text_input("Note for the audit trail (optional)")
-            password = st.text_input(
-                f"Password for {ctx.user['name']} (demo password: demo)", type="password"
-            )
-            if st.form_submit_button("Sign decision", type="primary"):
-                try:
-                    if decision == "pass":
-                        flow2.sign_qc_pass(cid, ctx.actor, password, reason)
-                        st.toast("Quality check passed and signed")
-                    else:
-                        flow2.open_query(cid, codes, text, user_id=ctx.actor, password=password)
-                        st.toast("Query sent to the site")
-                    st.rerun()
-                except SignatureRefused as exc:
-                    msg = "the password is wrong" if "password" in str(exc) else str(exc)
-                    st.error(f"Not signed: {msg}. Try again.")
-                except Flow2Refused as exc:
-                    st.error(f"Not signed: {exc}.")
-
 # --- dossier ---------------------------------------------------------------------------------
 dossier = latest_dossier(store, cid)
 if dossier:
     st.header("Dossier")
     pages = "; ".join(f"{d['name']} from page {d['first_page']}" for d in dossier["page_map"])
     st.write(
-        f"Version {dossier['version']}, built when the quality check passed: cover, EDC "
-        f"summary, then {pages}. Every page carries the subject ID and case number."
+        f"Version {dossier['version']}, built for this quality check: cover, EDC summary, "
+        f"then {pages}. Every page carries the subject ID and case number. A signed pass "
+        "fixes this version for the adjudicators."
     )
     st.download_button(
         "Download the dossier (PDF)",
@@ -229,9 +343,18 @@ if dossier:
     with st.expander("Technical details"):
         st.write(f"SHA-256 {dossier['dossier']['sha256'].removeprefix('sha256:')}")
 
+# --- the one review stop (P-39) ---------------------------------------------------------------
+if state == State.QC_REVIEW and latest.get("narrative"):
+    review_and_sign(latest)
+    st.stop()
+
 # --- narrative --------------------------------------------------------------------------------
 st.header("Narrative")
-signed = [e for e in events if e["type"] in ("narrative.signed", "narrative.approved")]
+signed = [
+    e
+    for e in events
+    if e["type"] in ("narrative.signed", "narrative.approved", "quality_check.signed")
+]
 drafts = [e for e in events if e["type"] == "narrative.drafted"]
 if signed:
     e = signed[-1]
@@ -243,6 +366,11 @@ if signed:
         label = "Simulated AI" if e["data"].get("simulated") else "AI"
         by = (f"code, without a person: {label} wrote it and every statement was found on "
               "the dossier page it cites")  # fmt: skip
+    if e["type"] == "quality_check.signed":
+        st.success(f"Quality check passed and narrative signed by {by}, {when(e)}."
+                   + (f" Note: {e['reason']}" if e.get("reason") else ""))  # fmt: skip
+        if e["data"].get("edited"):
+            theme.quiet("Edited from the draft; the Case record shows what changed.")
     st.write(f"Approved by {by}, {when(e)}. This version is frozen for the adjudicators.")
     text = store.get_file(cid, e["data"]["narrative"]["path"]).decode()
     theme.frozen_text(text, "Narrative")
@@ -284,4 +412,4 @@ elif state == State.NARRATIVE_REVIEW and drafts:
                 except Flow2Refused as exc:
                     st.error(f"Not signed: {exc}.")
 else:
-    st.write("The narrative is drafted once the quality check has passed.")
+    st.write("The narrative is drafted with the quality check, before the review.")

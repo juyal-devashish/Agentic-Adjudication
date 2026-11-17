@@ -72,8 +72,10 @@ def test_flow2_end_to_end_with_ai_off(submitted):
     proposal = store.get_json(cid, "qc/checks_v1.json")
     assert proposal["proposal"] == "query" and proposal["query_codes"] == ["missing_document"]
     assert "qc_review_needed" in templates(store)
+    assert proposal["narrative"]["source"] == "template"  # drafted before the review (P-39)
+    assert proposal["suggestion"]["status"] == "unavailable"  # AI is off: no AI Suggestion
     with pytest.raises(Flow2Refused, match="send a query"):  # a clear failure is never passed
-        flow2.sign_qc_pass(cid, SS, "demo")
+        flow2.sign_qc_pass(cid, SS, "demo", "Some narrative.")
     flow2.open_query(cid, proposal["query_codes"], " ".join(proposal["reasons"]),
                      user_id=SS, password="demo")  # fmt: skip
     assert state(store, cid) == State.QUERY_OPEN
@@ -100,26 +102,30 @@ def test_flow2_end_to_end_with_ai_off(submitted):
         flow2.open_query(cid, ["other"], "x", user_id=SS, password="wrong")
     with pytest.raises(Flow2Refused, match="reason"):
         flow2.open_query(cid, [], "x", user_id=SS, password="demo")
-    with pytest.raises(SignatureRefused, match="Safety Specialist"):
-        flow2.sign_qc_pass(cid, SITE, "demo")
-    flow2.sign_qc_pass(cid, SS, "demo", "Both documents present")
-    assert state(store, cid) == State.NARRATIVE
-    runner.run_case_steps()  # template draft
-    assert state(store, cid) == State.NARRATIVE_REVIEW
-    draft = store.get_file(cid, "narrative/draft_v1.md").decode()
+    # One stop (P-39): the narrative was drafted in this round, from dossier version 2
+    review = store.get_json(cid, "qc/checks_v2.json")
+    assert review["proposal"] == "unclear" and review["dossier"]["version"] == 2
+    draft = store.get_file(cid, review["narrative"]["draft"]["path"]).decode()
     assert "Myocardial infarction with onset on 2026-03-14" in draft
     assert "ecg.pdf" in draft and "summary.pdf" in draft
-
-    with pytest.raises(Flow2Refused, match="instruction"):  # the template note is still there
-        flow2.sign_narrative(cid, SS, "demo", draft.replace("[Add", "Chest pain. [Add"))
-    assert state(store, cid) == State.NARRATIVE_REVIEW
     completed = re.sub(r"\[Add[^\]]*\]", "Chest pain treated with a stent.", draft)
-    flow2.sign_narrative(cid, SS, "demo", completed)
+    with pytest.raises(SignatureRefused, match="Safety Specialist"):
+        flow2.sign_qc_pass(cid, SITE, "demo", completed)
+    with pytest.raises(Flow2Refused, match="instruction"):  # the template note is still there
+        flow2.sign_qc_pass(cid, SS, "demo", draft.replace("[Add", "Chest pain. [Add"))
+    assert state(store, cid) == State.QC_REVIEW
+    flow2.sign_qc_pass(cid, SS, "demo", completed, "Both documents present")
     assert state(store, cid) == State.READY_FOR_ADJUDICATION
-    signed = next(e for e in store.events(cid) if e["type"] == "narrative.signed")
+    signed = next(e for e in store.events(cid) if e["type"] == "quality_check.signed")
     assert signed["data"]["edited"] and signed["signature"]["signer"] == "Dr. Anna Weber"
+    assert signed["data"]["draft"] == review["narrative"]["draft"]  # the draft it started from
+    assert signed["reason"] == "Both documents present"
+    assert store.get_file(cid, signed["data"]["narrative"]["path"]).decode().strip() == (
+        completed.strip()
+    )
+    assert "narrative_review_needed" not in templates(store)  # one e-mail per round
     with pytest.raises(Flow2Refused):  # frozen once signed
-        flow2.sign_narrative(cid, SS, "demo", "other text")
+        flow2.sign_qc_pass(cid, SS, "demo", "other text")
 
     assert all(r.ok for r in verify_all(store.paths))
     assert not any(r.changed for r in rebuild_all(store.paths, write=False))

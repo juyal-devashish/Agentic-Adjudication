@@ -143,8 +143,8 @@ def next_step(
         State.SUBMITTED: "Signed by the site. The quality check starts automatically.",
         State.QC_CHECKS: "The quality check is running.",
         State.QC_REVIEW: (
-            "The checks and the AI have prepared the quality check. Review it, then pass it "
-            "or send a query."
+            "The checks, the AI Suggestion and the narrative draft are ready. Review them, "
+            "then sign the pass with the narrative, or send a query."
             if role == "safety_specialist"
             else "Waiting for the Safety Specialist to review the quality check."
         ),

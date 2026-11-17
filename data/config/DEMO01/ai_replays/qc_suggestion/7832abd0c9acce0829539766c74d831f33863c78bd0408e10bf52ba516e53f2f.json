@@ -1,0 +1,147 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "discharge_summary_nov2025.pdf",
+        "pages": 1,
+        "type": "discharge_summary"
+      },
+      {
+        "file": "ecg_report.pdf",
+        "pages": 1,
+        "type": "ecg_report"
+      }
+    ],
+    "missing_required_types": [],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.6,
+        "document_value": "Discharge summary: Fractured neck of femur; ECG: ST elevation consistent with acute anterior infarct",
+        "evidence": [
+          {
+            "file": "discharge_summary_nov2025.pdf",
+            "page": 1,
+            "quote": "Diagnosis: Fractured neck of femur"
+          },
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "ST elevation in V1-V4, consistent with an acute anterior"
+          }
+        ],
+        "field": "ae_term",
+        "reason": "The ECG describes an acute anterior infarct, but the only discharge summary gives a different diagnosis (fractured neck of femur), and both documents are dated November 2025, not March 2026.",
+        "status": "mismatch"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "02/11/2025",
+        "evidence": [
+          {
+            "file": "ecg_report.pdf",
+            "page": 1,
+            "quote": "Recorded: 02/11/2025 19:10"
+          },
+          {
+            "file": "discharge_summary_nov2025.pdf",
+            "page": 1,
+            "quote": "Admitted on 02/11/2025."
+          }
+        ],
+        "field": "onset_date",
+        "reason": "Both documents are dated 02/11/2025, about four months before the EDC onset date of 2026-03-14.",
+        "status": "mismatch"
+      },
+      {
+        "confidence": 0.8,
+        "document_value": "",
+        "evidence": [],
+        "field": "end_date",
+        "reason": "Neither document gives a resolution or discharge date for an event around 2026-03-21.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.6,
+        "document_value": "",
+        "evidence": [],
+        "field": "outcome",
+        "reason": "The only outcome is a stable discharge home after a November 2025 femur fracture admission, so the documents give no outcome for the March 2026 event.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.6,
+        "document_value": "",
+        "evidence": [],
+        "field": "serious",
+        "reason": "The documented hospitalisation is from November 2025 for a femur fracture, and no hospitalisation for the March 2026 myocardial infarction is documented.",
+        "status": "not_found"
+      }
+    ],
+    "summary": "Both required document types are present, but both are dated 02/11/2025, about four months before the EDC onset date of 2026-03-14. The discharge summary gives a different diagnosis (fractured neck of femur). The ECG from the same date describes ST elevation consistent with an acute anterior infarct. Neither document covers the March 2026 event, its hospitalisation, its end date of 2026-03-21 or its recovered outcome, so the documents may belong to a different episode.",
+    "would_help": [
+      {
+        "document_type": "lab_results",
+        "reason": "Cardiac biomarker results from March 2026 would help confirm the reported event and its dates."
+      },
+      {
+        "document_type": "clinic_letter",
+        "reason": "A letter covering the March 2026 admission would help document the onset, the hospitalisation and the recovery recorded in the EDC."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "discharge_summary_nov2025.pdf",
+        "page": 1
+      },
+      "result_sha256": "f16de856a585916af522b12d4a7c6194ccf22e32e2171cfeccb4eb34c6328dac",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "ecg_report.pdf",
+        "page": 1
+      },
+      "result_sha256": "27fa6a519e53f94f382c1b38aba4488fc7f2dd266f8b3117e246cf81ffc31a76",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5652,
+    "output_tokens": 1576
+  },
+  "cost_usd": 0.054128
+}

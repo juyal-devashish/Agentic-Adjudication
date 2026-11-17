@@ -1,0 +1,147 @@
+{
+  "simulated": false,
+  "function": "qc_suggestion",
+  "model": "claude-opus-5-5",
+  "prompt": "qc_suggestion_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Unstable angina",
+      "end_date": "2025-05-14",
+      "onset_date": "2025-05-12",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION"
+    },
+    "allowed_types": [
+      "discharge_summary",
+      "ecg_report",
+      "lab_results",
+      "imaging_report",
+      "autopsy_report",
+      "referral_letter",
+      "clinic_letter",
+      "other"
+    ],
+    "documents": [
+      {
+        "file": "angiography_report_rotated.pdf",
+        "pages": 1,
+        "type": "imaging_report"
+      },
+      {
+        "file": "clinic_letter.pdf",
+        "pages": 1,
+        "type": "clinic_letter"
+      }
+    ],
+    "missing_required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ],
+    "required_types": [
+      "discharge_summary",
+      "ecg_report"
+    ]
+  },
+  "output": {
+    "fields": [
+      {
+        "confidence": 0.95,
+        "document_value": "Unstable angina",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "after her admission with unstable"
+          },
+          {
+            "file": "angiography_report_rotated.pdf",
+            "page": 1,
+            "quote": "Indication: unstable angina."
+          }
+        ],
+        "field": "ae_term",
+        "reason": "Both documents name unstable angina: the clinic letter as the reason for admission and the angiography report as the indication for the procedure.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.9,
+        "document_value": "2025-05-12",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "angina on 12/05/2025."
+          }
+        ],
+        "field": "onset_date",
+        "reason": "The clinic letter gives 12/05/2025 as the date of admission with unstable angina, which matches the EDC onset date.",
+        "status": "match"
+      },
+      {
+        "confidence": 0.8,
+        "document_value": "",
+        "evidence": [],
+        "field": "end_date",
+        "reason": "Neither document gives a discharge date or the date the event resolved.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.7,
+        "document_value": "",
+        "evidence": [],
+        "field": "outcome",
+        "reason": "Neither document says the event resolved; the clinic follow-up on 02/06/2025 does not describe the outcome.",
+        "status": "not_found"
+      },
+      {
+        "confidence": 0.85,
+        "document_value": "Hospital admission",
+        "evidence": [
+          {
+            "file": "clinic_letter.pdf",
+            "page": 1,
+            "quote": "after her admission with unstable"
+          }
+        ],
+        "field": "serious",
+        "reason": "The clinic letter records a hospital admission for the event, which agrees with the hospitalisation criterion in the EDC.",
+        "status": "match"
+      }
+    ],
+    "summary": "Two documents were provided. A coronary angiography report dated 13/05/2025 gives unstable angina as the indication, and a cardiology clinic letter confirms an admission with unstable angina on 12/05/2025, which matches the EDC term, onset date and hospitalisation. Both required documents, the discharge summary and the ECG report, are missing, so the EDC end date (2025-05-14) and the RECOVERED outcome are not supported by any document.",
+    "would_help": [
+      {
+        "document_type": "lab_results",
+        "reason": "Cardiac biomarker results from the admission would help confirm the event term recorded in the EDC."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "file": "angiography_report_rotated.pdf",
+        "page": 1
+      },
+      "result_sha256": "b67bd62df8f056e620522d5dffa8ac5908716fc573128ced05d8a2596e1bf6de",
+      "tool": "read_page_text"
+    },
+    {
+      "error": false,
+      "input": {
+        "file": "clinic_letter.pdf",
+        "page": 1
+      },
+      "result_sha256": "a6cd54ce3fe1b15f6d75744f3a2ea0cd25c7d71ca782ff98f97427e433d9208d",
+      "tool": "read_page_text"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5821,
+    "output_tokens": 1004
+  },
+  "cost_usd": 0.043364
+}

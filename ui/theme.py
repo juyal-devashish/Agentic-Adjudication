@@ -62,7 +62,7 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 .adj-facts dd .adj-quiet { font-weight: 400; display: block; }
 
 /* The rail: eight real steps, each the same width, labels wrap inside their step. */
-.adj-rail { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: .3rem;
+.adj-rail { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .3rem;
   list-style: none; padding: 0 !important; margin: 1rem 0 .25rem 0 !important;
   counter-reset: step; }
 @media (max-width: 900px) { .adj-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -94,6 +94,31 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
   border-radius: 4px; padding: .9rem 1rem; line-height: 1.55; max-width: 80ch;
   color: #1C2833; margin: 0; font-size: 1rem; font-family: inherit; }
 
+/* The AI Suggestion's match with the EDC: a table whose reasons wrap instead of being
+   cut off, as a dataframe cell would cut them. */
+.adj-match { border-collapse: collapse; width: 100%; font-size: .92rem; }
+.adj-match th, .adj-match td { text-align: left; vertical-align: top; padding: .45rem .6rem;
+  border-bottom: 1px solid #D5DDE2; }
+.adj-match th { font-weight: 600; color: #52606D; }
+.adj-match .why { color: #3E4C59; min-width: 24ch; }
+.adj-match td:nth-child(2), .adj-match td:nth-child(4) { white-space: nowrap; }
+.adj-match q { font-style: italic; }
+/* On a phone each field becomes a block with its column names beside the values. */
+@media (max-width: 640px) {
+  .adj-match thead { display: none; }
+  .adj-match tr { display: block; border-bottom: 1px solid #D5DDE2; padding: .4rem 0; }
+  .adj-match td { display: block; border: 0; padding: .15rem 0; white-space: normal !important; }
+  .adj-match td:not(:first-child)::before { content: attr(data-label) ": "; font-weight: 600;
+    color: #52606D; }
+}
+
+/* The Narrative Edit on the Case record: removed and added lines, marked by word and
+   by a left rule, not by colour alone. */
+.adj-diff { padding: .3rem .6rem; margin: .2rem 0; border-left: 3px solid; max-width: 80ch;
+  line-height: 1.5; color: #1C2833; }
+.adj-diff.del { border-color: #A6342B; background: #FBEDEB; text-decoration: line-through; }
+.adj-diff.add { border-color: #23704F; background: #EAF5EF; }
+
 /* E-mail pop-ups (ui/mail_toasts.py): at the bottom right, wide enough that the task and
    case number are never cut off behind "view more". */
 [data-testid="stToastContainer"] { top: auto !important; bottom: 1rem !important; }
@@ -118,15 +143,15 @@ LIFECYCLE = [
     (State.DEIDENTIFYING, "Removing identifiers"),
     (State.AWAITING_SITE_CONFIRMATION, "Site review"),
     (State.SUBMITTED, "Submitted"),
-    (State.QC_CHECKS, "Quality check"),
-    (State.NARRATIVE, "Narrative"),
+    (State.QC_CHECKS, "Quality check"),  # with the narrative since P-39: one stop
     (State.READY_FOR_ADJUDICATION, "Ready for adjudication"),
 ]
 # States that sit on another state's step of the rail.
 RAIL_STEP = {
     State.QC_REVIEW: State.QC_CHECKS,
     State.QUERY_OPEN: State.QC_CHECKS,
-    State.NARRATIVE_REVIEW: State.NARRATIVE,
+    State.NARRATIVE: State.QC_CHECKS,  # cases from before P-39
+    State.NARRATIVE_REVIEW: State.QC_CHECKS,
 }
 STATE_WORDS = {
     State.EVENT_CREATED: "Case created",

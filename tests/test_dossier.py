@@ -1,4 +1,5 @@
-"""The dossier (plan step 16): built once per signed QC pass, hashed, never changed."""
+"""The dossier (plan step 16): built in each QC round before the Safety Specialist's
+review (P-39), hashed, never changed; the signed pass fixes its version."""
 
 from __future__ import annotations
 
@@ -21,13 +22,9 @@ DOCS = KIT / "documents" / "DEMO01-101-0001_AE-001"
 
 
 def through_qc(runner, cid: str) -> None:
-    """Handoff, QC round, then the Safety Specialist signs the pass (P-37)."""
-    from adjud.flow2 import Flow2
-
+    """Handoff, then the QC round, which builds the dossier and drafts the narrative."""
     for _ in range(2):  # handoff + QC start, QC round
         runner.run_case_steps()
-    store = runner.pipeline.store
-    Flow2(store, runner.paths.config).sign_qc_pass(cid, "ss.anna", "demo")
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +44,6 @@ def built(tmp_path_factory):
     runner.run_case_steps()
     submit(store, cid, "site101.coord", "demo", paths.config)
     through_qc(runner, cid)
-    runner.run_case_steps()  # dossier + narrative draft
     return store, cid
 
 
@@ -106,14 +102,13 @@ def test_flow3_handoff_lists_dossier_narrative_and_qc_with_matching_hashes(tmp_p
     upload(store, cid, [(n, (DOCS / n).read_bytes()) for n in files], "site101.coord")
     runner.run_case_steps()
     submit(store, cid, "site101.coord", "demo", paths.config)
-    through_qc(runner, cid)
-    runner.run_case_steps()  # dossier + AI narrative draft
-    assert store.state(cid).state == State.NARRATIVE_REVIEW
+    through_qc(runner, cid)  # dossier + AI narrative draft, before the review (P-39)
+    assert store.state(cid).state == State.QC_REVIEW
     from adjud.flow2 import Flow2
 
     drafted = next(e for e in store.events(cid) if e["type"] == "narrative.drafted")
     text = store.get_file(cid, drafted["data"]["draft"]["path"]).decode()
-    Flow2(store, paths.config).sign_narrative(cid, "ss.anna", "demo", text)
+    Flow2(store, paths.config).sign_qc_pass(cid, "ss.anna", "demo", text)
     runner.run_case_steps()  # Flow 3 handoff
     assert store.state(cid).state == State.READY_FOR_ADJUDICATION
     event = next(e for e in store.events(cid) if e["type"] == "handoff.flow3_ready")
@@ -123,6 +118,7 @@ def test_flow3_handoff_lists_dossier_narrative_and_qc_with_matching_hashes(tmp_p
         assert sha256_bytes((store.case_dir(cid) / ref["path"]).read_bytes()) == ref["sha256"]
     assert "documents/original" not in json.dumps(manifest)
     assert manifest["narrative"]["approved_by"] == "Dr. Anna Weber"  # signed by a person (P-37)
+    assert manifest["qc"]["passed_by"] == "ss.anna"  # the same signature (P-39)
     assert manifest["narrative"]["simulated_ai"] is False  # drafted from a recorded live answer
     notes = [json.loads(p.read_text()) for p in paths.outbox.glob("*.json")]
     assert any(n["template"] == "ready_for_adjudication" and n["case_id"] == cid for n in notes)
@@ -151,8 +147,7 @@ def test_dossier_page_of_a_scan_carries_the_scans_text_for_citations(tmp_path):
     upload(store, cid, [(scan.name, scan.read_bytes())], "site101.coord")
     runner.run_case_steps()
     submit(store, cid, "site101.coord", "demo", paths.config)
-    through_qc(runner, cid)
-    runner.run_case_steps()  # dossier
+    through_qc(runner, cid)  # dossier
     d = latest_dossier(store, cid)
     first = d["page_map"][0]["first_page"]
     text = dossier_page_text(store, cid, first)

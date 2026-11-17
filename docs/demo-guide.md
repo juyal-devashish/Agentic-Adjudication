@@ -12,9 +12,9 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 
 | Record | Case | What it shows |
 |---|---|---|
-| AE-001 Myocardial infarction, site 101 | DEMO01-0001 | The main path: proposal *pass*, AI narrative, two sign-offs |
-| AE-005 Myocardial infarction (fatal), site 102 | DEMO01-0002 | A poor scan the agent is unsure about: no proposal, Dr. Weber decides |
-| AE-006 Unstable angina, site 101 | DEMO01-0003 | No discharge summary or ECG: a query is proposed |
+| AE-001 Myocardial infarction, site 101 | DEMO01-0001 | The main path: the AI Suggestion finds everything matches, suggested *pass*, one signature with the narrative |
+| AE-005 Myocardial infarction (fatal), site 102 | DEMO01-0002 | A poor scan the AI is unsure about: nothing pre-selected, Dr. Weber decides |
+| AE-006 Unstable angina, site 101 | DEMO01-0003 | No discharge summary or ECG: more documents needed, a query is suggested |
 | AE-008 Myocardial infarction, not serious, site 101 | none | Not eligible: the rule it fails is explained |
 
 ## Script (about 15 minutes)
@@ -33,19 +33,19 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - Tick a wrongly removed item and give a reason to undo it.
    - Drag a box over anything missed.
    - Sign with the password `demo`.
-5. **Flow 2.** After the site's signature, code and the agents prepare everything; the Safety Specialist makes the two medical calls (P-37):
-   - Code runs the quality checks, and agents answer what code can't tell, each answer checked by code.
-   - As *Dr. Anna Weber*, follow **Review the quality check**. The page proposes *pass*, with the checks and the documents as submitted. Sign the decision (password `demo`).
-   - The dossier is built and the agent drafts the narrative, every quote checked by code. Allow about 30 seconds with live AI.
-   - Follow **Complete the narrative**: check the draft against the dossier, edit if needed, and sign. The case becomes ready for adjudication.
-   - Show *Case record*: three signatures in the audit trail (site, QC, narrative), the notifications, and the AI calls with their cost.
+5. **Flow 2: one Quality Check stop (P-39).** After the site's signature, code and the AI prepare everything before the Safety Specialist looks. Allow about a minute with live AI.
+   - Code runs the six checks and builds the dossier. The AI writes its **AI Suggestion**: which documents are needed (the checklist's, plus advice on what would help) and a field-by-field match with the EDC, each with its reasoning and the quotes code verified. The AI also drafts the narrative.
+   - As *Dr. Anna Weber*, follow **Review the quality check**. One page shows the checks, the AI Suggestion, the **suggested outcome** (*pass*, worked out by code), the documents, the dossier and the narrative draft.
+   - Say it plainly: this is not adjudication, and the AI decides nothing. It supports her review (ADR 0001). The outcome field shows *Not sure* where the documents say "discharged home" but not "recovered"; that doesn't hold back a pass, because the event itself matches.
+   - Edit the narrative, for example add a sentence, and sign once: **Sign the pass and the narrative** (password `demo`). The case becomes ready for adjudication.
+   - Show *Case record*: two signatures in the audit trail (site, and the Quality Check), *Narrative: what the Safety Specialist changed*, the notifications, and the AI calls with their cost.
 6. **Exceptions.**
    - Optional, after a reset: upload a scenario from `data/demo_uploads/flow2/` into DEMO01-0001 instead of the kit documents, and sign. `missing_document`, `wrong_patient` and `unreadable` arrive at Dr. Weber with a query proposed and pre-filled; a check that failed in code can't be passed, so she sends the query. The site answers by uploading again and signing.
-   - `different_event`: the agent spots that the documents describe an earlier episode and proposes a query, quoting the documents. Dr. Weber decides whether to send it.
+   - `different_event`: the AI Suggestion finds the onset date doesn't match (the documents describe an episode months earlier), quoting the documents, and code suggests a query. Dr. Weber decides; to pass anyway she must give a reason.
    - AE-005's and AE-006's letters have no recognisable title, so they show *Not recognised yet*; leave them for the quality check's agent. Tagging them by hand would skip the agent and change these scenes.
-   - **Low confidence gets no proposal.** As *Tom Hollis* (site 102), upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0002 and sign. The agent is not sure about the poor-quality scan, so Dr. Weber gets the case without a proposal. She passes it, and the agent drafts the narrative for her to sign.
-   - **Missing documents.** As *Priya Nair* (site 101), upload `data/demo_uploads/documents/DEMO01-101-0005_AE-006/` into DEMO01-0003 and sign. The agent types the untitled letter as a clinic letter, so the checks find no discharge summary or ECG and Dr. Weber gets a query proposed and pre-filled. Because the finding rests on an AI answer, she may overrule it; a failure found by code alone can only end in a query.
-   - If Dr. Weber writes a narrative herself, it can only be signed once the template's [bracketed] instruction is replaced.
+   - **Low confidence gets no suggestion.** As *Tom Hollis* (site 102), upload `data/demo_uploads/documents/DEMO01-102-0004_AE-005/` into DEMO01-0002 and sign. The AI is not sure about the poor-quality scan, or about the event term, so nothing is pre-selected and the Not sure findings say why. Dr. Weber decides.
+   - **More documents needed.** As *Priya Nair* (site 101), upload `data/demo_uploads/documents/DEMO01-101-0005_AE-006/` into DEMO01-0003 and sign. The AI types the untitled letter as a clinic letter, so the discharge summary and ECG are missing; the AI Suggestion also says lab results would help (advice only). The query is suggested and pre-filled: choose **Send a query to the site** and sign. The narrative draft is dropped; a new one follows the site's answer.
+   - With AI off, the page says there is no AI Suggestion and the narrative starts from the template; it can only be signed once the template's [bracketed] instruction is replaced.
 7. **Not built:** a live EDC connection, real logins, DICOM redaction, Flows 3 and 4, and anything for real patient data.
 
-Cost on Opus 5.5 is about $0.30 per full demo run. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
+Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.

@@ -34,7 +34,8 @@ KIT = ROOT / "data" / "flow1-testkit"
 SUBJECT = "DEMO01-101-0001"
 # What the QC round proposes to the Safety Specialist, who decides every case (P-37).
 EXPECTED = {
-    "complete": {"proposal": "pass", "codes": []},
+    # AI off: no AI Suggestion, so no suggested outcome (P-39); with it, a pass
+    "complete": {"proposal": "unclear", "codes": [], "with_ai": {"proposal": "pass", "codes": []}},
     "missing_document": {"proposal": "query", "codes": ["missing_document"]},
     "wrong_patient": {"proposal": "query", "codes": ["wrong_patient"]},
     "different_event": {
@@ -124,8 +125,10 @@ def make(out: Path) -> dict[str, dict]:
             "discharge_summary.pdf": _summary(p, **mi),
             "ecg_report.pdf": _ecg(other, trial_id=False),
         },
+        # Own file name: recorded agent answers are keyed on the documents' names and
+        # types, not their text, so this scenario must not share `complete`'s names
         "different_event": {
-            "discharge_summary.pdf": _summary(
+            "discharge_summary_nov2025.pdf": _summary(
                 p,
                 event="Fractured neck of femur",
                 date="02/11/2025",

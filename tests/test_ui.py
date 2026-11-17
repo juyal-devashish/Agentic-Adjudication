@@ -196,7 +196,9 @@ def test_case_record_lists_ai_calls_with_their_source(demo, tmp_path):
     assert any("AI is off for this study" in m.value for m in at.markdown)
 
 
-def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrative(demo):
+def test_quality_check_page_is_one_stop_with_the_narrative_and_one_signature(demo):
+    """P-39 with AI off: the narrative draft (the template) is on the quality check page
+    from the start, and one signature passes QC and signs the narrative as edited."""
     import pymupdf
 
     from adjud.documents import upload
@@ -218,47 +220,53 @@ def test_quality_check_page_lets_the_safety_specialist_pass_and_sign_the_narrati
     upload(store, cid, files, "site101.coord")  # complete, but no subject ID: a person decides
     runner.run_case_steps()
     submit(store, cid, "site101.coord", "demo", demo.config)
-    for _ in range(3):  # handoff, QC start, QC round
+    for _ in range(3):  # handoff, QC start, QC round (dossier and draft included)
         runner.run_case_steps()
 
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
     assert 'aria-current="step">Quality check' in html_text(at)
+    page = html_text(at) + " ".join(m.value for m in at.markdown)
+    assert "No AI Suggestion this round" in page and "Suggested outcome" in page
     doc = next(s for s in at.selectbox if s.label == "Document")  # the submitted files, read-only
     assert doc.options == ["ecg.pdf", "summary.pdf"] and at.get("image")
+    assert any(b.label == "Download the dossier (PDF)" for b in at.get("download_button"))
     # Query fields only once the Safety Specialist chooses to send a query.
     decision = next(r for r in at.radio if r.label == "Your decision")
     assert decision.value == "pass" and not at.multiselect
+    assert any(a.label == "Narrative" for a in at.text_area)  # the draft, ready to edit
     assert not any(a.label == "Message to the site" for a in at.text_area)
+    next(a for a in at.text_area if a.label == "Narrative").input("My edit. [Add").run()
     decision.set_value("query").run()
     assert [m.label for m in at.multiselect] == ["Query reasons"]
     assert any(a.label == "Message to the site" for a in at.text_area)
     next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
     assert not at.multiselect
+    box = next(a for a in at.text_area if a.label == "Narrative")
+    assert box.value == "My edit. [Add"  # the edit survived the switch to query and back
+    box.input(store.get_file(cid, "narrative/draft_v1.md").decode()).run()
+    sign = "Sign the pass and the narrative"
     at.text_input[-1].input("demo")
-    next(b for b in at.button if b.label == "Sign decision").click().run()
-    assert not at.exception, at.exception
-    assert store.state(cid).state.value == "NARRATIVE"
-    assert any("Passed and signed by Dr. Anna Weber" in s.value for s in at.success)
-    assert "Findings:" in html_text(at)
-
-    runner.run_case_steps()  # template draft
-    at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
-    at.text_input[-1].input("demo")
-    next(b for b in at.button if b.label == "Sign narrative").click().run()
+    next(b for b in at.button if b.label == sign).click().run()
     assert not at.exception, at.exception
     assert any("[brackets]" in e.value for e in at.error)  # the template note is still there
-    assert store.state(cid).state.value == "NARRATIVE_REVIEW"
+    assert store.state(cid).state.value == "QC_REVIEW"
 
     box = next(a for a in at.text_area if a.label == "Narrative")
     box.input(box.value.split("[Add")[0] + "Chest pain on admission.")
     at.text_input[-1].input("demo")
-    next(b for b in at.button if b.label == "Sign narrative").click().run()
+    next(b for b in at.button if b.label == sign).click().run()
     assert not at.exception, at.exception
     assert store.state(cid).state.value == "READY_FOR_ADJUDICATION"
     assert 'aria-current="step">Ready for adjudication' in html_text(at)
+    assert any("narrative signed by Dr. Anna Weber" in s.value for s in at.success)
+
+    runner.run_case_steps()  # Flow 3 handoff
+    at = run("views/results.py", role="safety_specialist", case_id=cid)
+    assert not at.exception, at.exception
+    assert "Added: " in html_text(at) and "Chest pain on admission." in html_text(at)
 
 
-def test_quality_check_page_shows_ai_proposals(demo, monkeypatch, tmp_path):
+def test_quality_check_page_shows_the_ai_suggestion(demo, monkeypatch, tmp_path):
     import json
 
     from adjud.documents import upload
@@ -280,14 +288,20 @@ def test_quality_check_page_shows_ai_proposals(demo, monkeypatch, tmp_path):
     for _ in range(2):
         runner.run_case_steps()
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
-    table = next(df.value for df in at.dataframe if "Source" in df.value.columns)
-    assert table.iloc[0]["Source"] == "AI" and table.iloc[0]["Accepted"] == "Yes"
-    # The agent's verdict is a proposal: the query is pre-filled, a person sends it (P-37).
+    assert not at.exception, at.exception
+    page = html_text(at)
+    onset = page[page.index("<b>Onset date</b>") :].split("</tr>")[0]
+    assert "2026-03-14</td>" in onset and "Doesn&#x27;t match" in onset
+    assert "discharge_summary_nov2025.pdf p. 1" in onset  # the quote it rests on
+    # The AI suggests; the query is pre-filled and a person sends it (P-37, ADR 0001).
     assert "send a query to the site" in html_text(at)
     assert next(r for r in at.radio if r.label == "Your decision").value == "query"
     message = next(a for a in at.text_area if a.label.startswith("Message to the site"))
-    assert "fracture" in message.value
+    assert "Onset date: EDC 2026-03-14, documents 02/11/2025." in message.value
+    assert ".." not in message.value
     assert not at.info  # nothing has been sent to the site yet
+    next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
+    assert any(t.label.startswith("Why you pass despite") for t in at.text_input)
 
 
 def test_a_site_sees_only_its_own_subjects_on_every_page(demo):

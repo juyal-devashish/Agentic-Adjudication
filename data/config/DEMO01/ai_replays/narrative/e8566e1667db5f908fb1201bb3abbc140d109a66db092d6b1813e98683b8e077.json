@@ -1,0 +1,106 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Unstable angina",
+      "end_date": "2025-05-14",
+      "onset_date": "2025-05-12",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "angiography_report_rotated.pdf",
+          "pages": 1,
+          "type": "imaging_report"
+        },
+        {
+          "first_page": 4,
+          "name": "clinic_letter.pdf",
+          "pages": 1,
+          "type": "clinic_letter"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Event term: Unstable angina\nOnset: 2025-05-12\nEnd: 2025-05-14",
+        "text": "The EDC records a serious adverse event of unstable angina with onset on 2025-05-12, an end date of 2025-05-14, seriousness criterion hospitalisation, severity severe, and outcome recovered."
+      },
+      {
+        "page": 2,
+        "quote": "condition: Asthma, ongoing: Y, start year: 2010",
+        "text": "The subject is a 59-year-old female whose recorded medical history includes ongoing asthma since 2010."
+      },
+      {
+        "page": 2,
+        "quote": "dose: standard, drug: Ramipril, start date: 2024-11-01",
+        "text": "Ramipril at a standard dose since 2024-11-01 is recorded as a concomitant medication."
+      },
+      {
+        "page": 4,
+        "quote": "past history of Hodgkin lymphoma, treated in 2009, and\nremains in remission.",
+        "text": "The clinic letter reports a past history of Hodgkin lymphoma treated in 2009 that remains in remission."
+      },
+      {
+        "page": 3,
+        "quote": "70% stenosis of the proximal left anterior descending\nartery, TIMI 3 flow.",
+        "text": "Coronary angiography on 13/05/2025, with unstable angina as the indication, showed 70% stenosis of the proximal left anterior descending artery with TIMI 3 flow."
+      },
+      {
+        "page": 3,
+        "quote": "Plan: medical therapy and staged PCI.",
+        "text": "The angiography plan was medical therapy and staged PCI."
+      },
+      {
+        "page": 4,
+        "quote": "I reviewed your patient in clinic on 02/06/2025 after her admission with unstable",
+        "text": "The subject was seen in cardiology clinic on 02/06/2025 after her admission with unstable angina on 12/05/2025, and she continues aspirin 75 mg daily."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "2ba3e3ebcdd03e4b9f1e285afa79b9576239a5e2558697bbeb852af51c646e14",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "6cba989d870a11eb7543638f6be83435ff2507dc457b419397a82d5b126a6b69",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "5b0feb0c2f5a2ce1dac7b8c0df6e0fa72e2d1a777f37edc87a9ea641deb43f9a",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 4991,
+    "output_tokens": 815
+  },
+  "cost_usd": 0.036264
+}

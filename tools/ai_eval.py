@@ -36,12 +36,13 @@ from typing import Any
 from tools.simulate_ai import KIT, REPLAYS, ROOT, _submit_and_check, sign_proposed_passes
 
 HUMAN = ("site", "dm.", "safety")
-# What the replay demo shows for the kit cases (README, tests/test_demo_script.py)
+# The suggested outcome expected with live AI (P-39). In replay only the short demo's
+# cases (AE-001, AE-005, AE-006) have recorded AI Suggestions; the others show "unclear".
 KIT_EXPECTED = {
     "AE-001": "pass",
     "AE-002": "pass",
     "AE-003": "pass",
-    "AE-005": "pass",
+    "AE-005": "unclear",  # the poor scan: the AI is not sure of the event term
     "AE-006": "query",
     "AE-007": "pass",
 }
@@ -97,7 +98,8 @@ def _case_report(store, cid: str, label: str, expected: str) -> dict[str, Any]:
         if c["gate"] is None and c["function"] != "narrative":
             c["gate"] = _qc_gate(store, cid, c)
     approved = next((e["actor"] for e in events if e["type"] in
-                     ("narrative.approved", "narrative.signed")), None)  # fmt: skip
+                     ("narrative.approved", "narrative.signed",
+                      "quality_check.signed")), None)  # fmt: skip
     outcome = decisions[0] if decisions else None
     people = sorted({e["actor"] for e in events if e["actor"].startswith(HUMAN)})
     return {

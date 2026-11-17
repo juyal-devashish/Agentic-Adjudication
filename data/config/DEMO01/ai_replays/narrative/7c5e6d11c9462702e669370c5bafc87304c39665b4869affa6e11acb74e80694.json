@@ -1,0 +1,106 @@
+{
+  "simulated": false,
+  "function": "narrative",
+  "model": "claude-opus-5-5",
+  "prompt": "narrative_v1",
+  "input": {
+    "ae": {
+      "ae_term": "Myocardial infarction",
+      "end_date": "2026-03-21",
+      "onset_date": "2026-03-14",
+      "outcome": "RECOVERED",
+      "serious": "Y",
+      "seriousness_criteria": "HOSPITALISATION",
+      "severity": "SEVERE"
+    },
+    "dossier": {
+      "page_map": [
+        {
+          "first_page": 3,
+          "name": "discharge_summary_nov2025.pdf",
+          "pages": 1,
+          "type": "discharge_summary"
+        },
+        {
+          "first_page": 4,
+          "name": "ecg_report.pdf",
+          "pages": 1,
+          "type": "ecg_report"
+        }
+      ],
+      "version": 1
+    }
+  },
+  "output": {
+    "statements": [
+      {
+        "page": 2,
+        "quote": "Event term: Myocardial infarction\nOnset: 2026-03-14\nEnd: 2026-03-21",
+        "text": "The EDC records a serious adverse event of myocardial infarction with onset on 2026-03-14 and end date 2026-03-21, graded severe, with seriousness criterion hospitalisation and outcome recovered."
+      },
+      {
+        "page": 2,
+        "quote": "condition: Type 2 diabetes mellitus, ongoing: Y, start year: 2018",
+        "text": "The subject is a 70-year-old male with ongoing hypertension since 2012 and ongoing type 2 diabetes mellitus since 2018, whose first study dose was on 2025-03-10."
+      },
+      {
+        "page": 2,
+        "quote": "dose: 75 mg OD, drug: Clopidogrel, end date: 2026-03-14, start date: 2025-06-01",
+        "text": "Concomitant medications include aspirin 75 mg OD from 2025-03-10 and clopidogrel 75 mg OD from 2025-06-01, with an end date of 2026-03-14 recorded for clopidogrel."
+      },
+      {
+        "page": 2,
+        "quote": "ae id: H-001, ae term: Myocardial infarction, days before: 194, match: PT",
+        "text": "Earlier events recorded in the EDC include a myocardial infarction with onset 2025-09-01 and atrial fibrillation with onset 2025-12-01."
+      },
+      {
+        "page": 2,
+        "quote": "collected date: 2026-03-16, test: TROPONIN_T, unit: ng/L, value: 3860",
+        "text": "Troponin T was 1240 ng/L on 2026-03-14 and 3860 ng/L on 2026-03-16, and HbA1c was 58 mmol/mol on 2026-03-04."
+      },
+      {
+        "page": 3,
+        "quote": "Admitted on 02/11/2025. Fell at home; hemiarthroplasty on the day of admission.",
+        "text": "The only discharge summary in the dossier relates to an admission on 02/11/2025 for a fractured neck of femur after a fall at home, treated with hemiarthroplasty on the day of admission."
+      },
+      {
+        "page": 4,
+        "quote": "Recorded: 02/11/2025 19:10",
+        "text": "The only ECG in the dossier was recorded on 02/11/2025, before the EDC onset date, and reports sinus rhythm at 88/min with ST elevation in V1-V4 consistent with an acute anterior infarct, and a QTc of 452 ms."
+      }
+    ]
+  },
+  "tool_calls": [
+    {
+      "error": false,
+      "input": {
+        "page": 2
+      },
+      "result_sha256": "8b568a327a41065e535277f71dd35d162b47ae9ceba1bf13a4a466da27870249",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 3
+      },
+      "result_sha256": "11d97e0994ff33b82c8c0b87b1f805a17180b4e2cfa59ab33a0d86671ea8f9a1",
+      "tool": "read_dossier_page"
+    },
+    {
+      "error": false,
+      "input": {
+        "page": 4
+      },
+      "result_sha256": "c1b37325050df786f01ee47ff71ef9dfe1565def3d693c8db2edb49fe51b1ff1",
+      "tool": "read_dossier_page"
+    }
+  ],
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "input_tokens": 5166,
+    "output_tokens": 1180
+  },
+  "cost_usd": 0.044264
+}
