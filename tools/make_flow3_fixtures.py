@@ -14,7 +14,9 @@ committee's decisions, and the route the case should take:
 `--apply` signs the open reviews of a case with a scenario's answers, as the assigned
 demo adjudicators (password `demo`), so a presenter need not fill every form by hand.
 It acts through the same Flow 3 functions as the pages, one signature per review, and
-only for reviews still open. The committee's meeting is left for the presenter.
+only for reviews still open. Event dates are moved to the case's own onset date (the
+`agree` scenario's second review stays a day later, within the tolerance). The
+committee's meeting is left for the presenter.
 """
 
 from __future__ import annotations
@@ -76,6 +78,12 @@ def apply(case_id: str, scenario: str) -> list[str]:
     rnd = current_round(flow3.store, case_id)
     if rnd is None:
         raise SystemExit(f"{case_id} has no review assigned yet")
+    from datetime import date
+
+    from adjud.intake import IntakePipeline
+
+    pipe = IntakePipeline(paths.root, paths.config, paths.edc_mock, "DEMO01")
+    onset = date.fromisoformat(pipe.latest_snapshot(case_id)["onset_date"][:10])
     data = SCENARIOS[scenario]
     signed = []
     for slot, user in sorted(rnd.holders.items()):
@@ -84,6 +92,9 @@ def apply(case_id: str, scenario: str) -> list[str]:
         answers = data.get(f"adjudicator_{slot}")
         if answers is None:
             continue
+        if "event_date" in answers:  # the same offset from the case's own onset
+            shift = date.fromisoformat(answers["event_date"]) - date(2026, 3, 14)
+            answers = {**answers, "event_date": (onset + shift).isoformat()}
         flow3.sign_review(case_id, user, "demo", answers)
         signed.append(f"Adjudicator {slot}: {flow3.users()[user]['name']}")
     return signed
