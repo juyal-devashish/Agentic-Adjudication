@@ -37,3 +37,17 @@ The project builds **Flows 1 and 2**. Flow 1 is done; Flow 2 and the AI layer ar
 **Measurement is a deliverable.** The kit's `tools/make_synthetic.py` writes seeded fake PHI plus a ground-truth file. `tools/deid_check.py` scores recall, over-redaction, metadata residuals and time per page into `data/metrics/`. Text-layer PDFs must reach 100% removal. Results for scans, spreadsheets and DICOM are reported, not gated, so they can't be tuned toward a target.
 
 **Config drives study behavior.** Everything study-specific lives in `data/config/<STUDY>/`. Eligibility rules are interpreted declaratively from YAML; other files cover which related EDC data to pull, the de-identification policy, AI switches and form definitions.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for juyal-devashish/Agentic-Adjudication (gh CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
