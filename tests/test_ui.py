@@ -286,8 +286,8 @@ def test_quality_check_page_shows_the_ai_suggestion(demo, monkeypatch, tmp_path)
     at = run("views/quality_check.py", role="safety_specialist", case_id=cid)
     assert not at.exception, at.exception
     page = html_text(at)
-    onset = page[page.index("<td>Onset date</td>") :].split("</tr>")[0]
-    assert "<td>2026-03-14</td>" in onset and "Doesn&#x27;t match" in onset
+    onset = page[page.index("<b>Onset date</b>") :].split("</tr>")[0]
+    assert "2026-03-14</td>" in onset and "Doesn&#x27;t match" in onset
     assert "discharge_summary.pdf p. 1" in onset  # the quote it rests on
     # The AI suggests; the query is pre-filled and a person sends it (P-37, ADR 0001).
     assert "send a query to the site" in html_text(at)

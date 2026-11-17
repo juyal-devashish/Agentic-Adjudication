@@ -103,6 +103,14 @@ body, [data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
 .adj-match .why { color: #3E4C59; min-width: 24ch; }
 .adj-match td:nth-child(2), .adj-match td:nth-child(4) { white-space: nowrap; }
 .adj-match q { font-style: italic; }
+/* On a phone each field becomes a block with its column names beside the values. */
+@media (max-width: 640px) {
+  .adj-match thead { display: none; }
+  .adj-match tr { display: block; border-bottom: 1px solid #D5DDE2; padding: .4rem 0; }
+  .adj-match td { display: block; border: 0; padding: .15rem 0; white-space: normal !important; }
+  .adj-match td:not(:first-child)::before { content: attr(data-label) ": "; font-weight: 600;
+    color: #52606D; }
+}
 
 /* The Narrative Edit on the Case record: removed and added lines, marked by word and
    by a left rule, not by colour alone. */

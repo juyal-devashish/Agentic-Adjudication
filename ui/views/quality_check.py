@@ -97,15 +97,17 @@ def match_table(fields: list[dict]) -> str:
         )
         problems = (f"<br>Not used: {html.escape('; '.join(f['problems']))}"
                     if f["problems"] else "")  # fmt: skip
-        rows.append(
-            f"<tr><td>{html.escape(f['label'])}</td>"
-            f"<td>{html.escape(f['edc_value'] or '(empty)')}</td>"
-            f"<td>{html.escape(f['document_value'] or '')}</td>"
-            f"<td>{theme.status(word, ink)}</td>"
-            f"<td class='why'>{html.escape(f['reason'])}{cites}{problems}</td></tr>"
+        rows.append(  # data-label: the column name, shown beside each cell on a phone
+            f"<tr><td data-label='Field'><b>{html.escape(f['label'])}</b></td>"
+            f"<td data-label='EDC'>{html.escape(f['edc_value'] or '(empty)')}</td>"
+            f"<td data-label='Documents'>{html.escape(f['document_value'] or '')}</td>"
+            f"<td data-label='Result'>{theme.status(word, ink)}</td>"
+            f"<td data-label='Why' class='why'>{html.escape(f['reason'])}{cites}{problems}</td>"
+            "</tr>"
         )
     head = "".join(f"<th>{h}</th>" for h in ("Field", "EDC", "Documents", "Result", "Why"))
-    return f"<table class='adj-match'><tr>{head}</tr>{''.join(rows)}</table>"
+    return (f"<table class='adj-match'><thead><tr>{head}</tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table>")  # fmt: skip
 
 
 def show_agent_answers(latest: dict) -> None:
