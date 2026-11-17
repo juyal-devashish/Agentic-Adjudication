@@ -46,6 +46,35 @@ class EventMatchOutput(BaseModel):
     reason: str
 
 
+class FieldFinding(BaseModel):
+    """Does one EDC field agree with the documents? (P-39)"""
+
+    model_config = ConfigDict(extra="forbid")
+    field: str  # ae_term | onset_date | end_date | outcome | serious (checked in code)
+    document_value: str
+    status: str  # match | mismatch | not_found (checked in code)
+    confidence: float
+    reason: str
+    evidence: list[Citation]
+
+
+class HelpfulDocument(BaseModel):
+    """A document the checklist does not require but that would help the review."""
+
+    model_config = ConfigDict(extra="forbid")
+    document_type: str
+    reason: str
+
+
+class QcSuggestionOutput(BaseModel):
+    """The AI Suggestion for the Quality Check (P-39): findings, never a decision."""
+
+    model_config = ConfigDict(extra="forbid")
+    fields: list[FieldFinding]
+    would_help: list[HelpfulDocument]
+    summary: str
+
+
 class Statement(BaseModel):
     """One sentence of the narrative and the dossier page it comes from."""
 
@@ -112,5 +141,9 @@ DOCUMENT_TYPE = AgentFunction("document_type", 1, DocumentTypeOutput)
 EVENT_MATCH = AgentFunction("event_match", 1, EventMatchOutput)
 NARRATIVE = AgentFunction("narrative", 1, NarrativeOutput)
 PHI_DETECTION = AgentFunction("phi_detection", 1, PhiOutput)
-FUNCTIONS = {f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE, PHI_DETECTION)}
+QC_SUGGESTION = AgentFunction("qc_suggestion", 1, QcSuggestionOutput)
+FUNCTIONS = {
+    f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE, PHI_DETECTION, QC_SUGGESTION)
+}
 EVENT_VERDICTS = ("matches", "different_event", "unclear")
+FIELD_STATUSES = ("match", "mismatch", "not_found")
