@@ -59,3 +59,19 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 8. **Not built:** a live EDC connection, real logins, DICOM redaction, due dates and reminders for adjudicators, and anything for real patient data.
 
 Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
+
+## Trying Slack (P-54, ADR 0002)
+
+Slack runs alongside e-mail, never instead of it, until it meets the reliability bar. Synthetic data only.
+
+1. **Set up once.**
+   - Create a separate free Slack workspace for the demo, never the company's, with a channel such as `#adjudication-demo`. Keep yourself its only member: it shows every recipient's notices, including who adjudicates which case.
+   - Create a Slack app *from scratch* in that workspace, turn on **Incoming Webhooks**, add one for the channel and copy its URL.
+2. **Switch it on.** In `.env`, set `NOTIFY_CHANNELS=outbox,smtp,slack` and `SLACK_WEBHOOK_URL=<the URL>`. The URL is a secret: never commit it or paste it into chat. Restart the runner. Only notices queued after the restart are posted.
+3. **One reliability run.**
+   - `tools.reset_demo --preload`, restart the runner, then follow this run sheet through all four flows: an agreed case, a disputed case through the committee, one more-data request and one re-adjudication.
+   - When the runner has caught up, run `uv run python -m tools.notify_parity`. **CLEAN** means every notice was posted exactly once, with no failed attempt and as many e-mails as Slack posts.
+   - Record the date and the report in the plan's step 28.
+4. **The bar.** Five clean runs in a row with 0 failed Slack attempts. Meeting it only allows a new decision on making Slack a default; e-mail stays.
+
+A failed post shows on the Case record as *Slack message failed* with its reason, and it is retried twice on the next ticks. E-mail and the case carry on regardless.

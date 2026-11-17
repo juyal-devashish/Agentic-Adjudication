@@ -100,6 +100,7 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Single kit test case | `uv run python -m pytest -p tests.kit_plugin data/flow1-testkit/tests -k "int04"` |
 | Lint / format | `uv run ruff check .` / `uv run ruff format .` |
 | Verify hash chains and file hashes | `uv run python -m tools.verify_log` |
+| Compare the outbox with what Slack confirmed (P-54 reliability bar) | `uv run python -m tools.notify_parity` |
 | Rebuild all `case.json` from event logs (`--check` to compare only) | `uv run python -m tools.rebuild_state` |
 | Measure de-identification on the kit corpus with the kit's harness and gate (~30 s; real API calls if AI-1 is on: ask first) | `uv run python -m tools.deid_check` |
 | Run only our pipeline over the kit corpus (outputs + per-file reports) | `uv run python -m tools.run_corpus` |

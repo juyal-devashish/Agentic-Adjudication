@@ -338,11 +338,11 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 ### Step 28 — Slack alongside e-mail (P-54, ADR 0002) on branch `notify/slack`
 
-- [ ] Delivery Attempts per Channel (`adjud/delivery.py`); e-mail unchanged in behaviour
-- [ ] Slack Channel (`adjud/slack.py`), `NOTIFY_CHANNELS`, runner runs each Channel on its own
-- [ ] The case record shows Slack Delivery Attempts; e-mail pop-ups stay e-mail only
-- [ ] Parity report (`tools/notify_parity.py`)
-- [ ] Docs: `.env.example`, run sheet "Trying Slack", README line
+- [x] Delivery Attempts per Channel (`adjud/delivery.py`); e-mail unchanged in behaviour
+- [x] Slack Channel (`adjud/slack.py`), `NOTIFY_CHANNELS`, runner runs each Channel on its own
+- [x] The case record shows Slack Delivery Attempts; e-mail pop-ups stay e-mail only
+- [x] Parity report (`tools/notify_parity.py`)
+- [x] Docs: `.env.example`, run sheet "Trying Slack", README line
 - [ ] Reliability bar: 5 consecutive full demo runs, 0 failed Slack attempts, clean parity (results recorded here)
 
 **Done when:** with `NOTIFY_CHANNELS` unset nothing changes (full suite and kit pass); with Slack on, every Notification created after the switch is posted once or recorded as failed, e-mail is never held up, and tests use a fake Slack only.
