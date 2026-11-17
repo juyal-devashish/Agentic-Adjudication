@@ -1,6 +1,6 @@
 # Chat layer: plan for LibreChat, and the options without a new server
 
-**Status:** proposal for discussion, nothing built. **Date:** 2026-11-17.
+**Status:** option A chosen for Friday and built (P-40, `ui/assistant.py`); LibreChat stays the option for after the demo. **Date:** 2026-11-17.
 **Why:** in the demo review of 2026-11-16, management's view was that the demo "looks like conventional software" while they expect an AI-driven workflow. Most people know AI as a chat window (ChatGPT, Claude). The idea agreed there: a **guided chat** in front of the existing app. Users drive the workflow from the chat with slash actions, the chat reports progress, and for every manual step (upload, review, signature) it gives a link into the current app. Teams is blocked by IT and can't be ready by Friday; Slack is out because pharma users are on Teams. LibreChat (open source, MIT licence) was the suggested chat. Sources: the meeting notes, and [research/librechat-workflow-chat.md](research/librechat-workflow-chat.md) for every LibreChat fact below.
 
 ## 1. How it would look with LibreChat
