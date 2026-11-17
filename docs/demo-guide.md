@@ -62,6 +62,8 @@ Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks
 
 ## Trying Slack (P-54, ADR 0002)
 
+The full test plan, with failure drills and the record table, is [slack-test-plan.md](slack-test-plan.md).
+
 Slack runs alongside e-mail, never instead of it, until it meets the reliability bar. Synthetic data only.
 
 1. **Set up once.**
