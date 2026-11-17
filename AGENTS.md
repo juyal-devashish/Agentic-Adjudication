@@ -108,7 +108,7 @@ Python 3.12 managed by `uv` (P-08 in the plan). Tools run as modules from the re
 | Rewrite the simulated replay answers for the demo cases (no API calls) | `uv run python -m tools.simulate_ai` |
 | Run the UI or runner with recorded agent answers | `ADJUD_AI_MODE=replay uv run python -m adjud.runner` |
 
-Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit.
+Before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`, plus the kit cases the change touches. After each plan step, run the whole kit. The committed hook `.githooks/pre-commit` runs the first three automatically once switched on with `git config core.hooksPath .githooks` (once per clone).
 
 Notes:
 - **The test kit (`data/flow1-testkit/`) is the acceptance test. Never edit it to make a test pass.** Its conftest would load the kit's own reference `adjud`; always run it with `-p tests.kit_plugin`, which pins our package. If a kit decision should change, record it in the plan's decisions table first.
