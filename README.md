@@ -12,6 +12,14 @@
 
 </div>
 
+## How it works, in one page
+
+**[See the diagram: who does each step →](https://claude.ai/artifact/9ewxNaSGeizjJe7mRJWyxG)**
+
+- **The problem:** in a clinical trial, a panel of doctors confirms serious events such as heart attacks and strokes. Getting each case ready for them takes days of manual work.
+- **What this does:** it prepares each case (collects the records, hides patient details, checks the package, drafts a summary) and then runs the doctors' review.
+- **Who does what:** AI does the reading and writing. Code checks every AI answer before it is used. People approve every decision, and the doctors' medical review uses no AI.
+
 > [!WARNING]
 > **Synthetic data only.** Every patient, identifier, hospital and drug in this repository is invented. This is a proof of concept. It is not validated, makes no 21 CFR Part 11 or EU Annex 11 claim, and has no real authentication. Never use it with real patient data.
 
