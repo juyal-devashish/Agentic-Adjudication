@@ -1,6 +1,6 @@
-# Clinical event adjudication: Flows 1 and 2
+# Clinical event adjudication: Flows 1 to 4
 
-Getting an adverse event from the trial database to a package an adjudication committee can review: documents collected from the site, identifiers removed, quality-checked and summarised. Adjudication itself (Flow 3 onwards) is not part of this context.
+Getting an adverse event from the trial database to a package an adjudication committee can review (documents collected from the site, identifiers removed, quality-checked and summarised), then adjudicating it and reporting the outcome back to the trial database.
 
 ## Safety review
 
@@ -47,3 +47,45 @@ _Avoid_: AI narrative (for the signed text)
 **Narrative Edit**:
 The difference between the Narrative Draft and the signed Narrative, shown as a comparison of the two.
 _Avoid_: revision, correction
+
+## Adjudication
+
+**Adjudicator**:
+An independent clinician who reviews a case and answers the adjudication form. *Adjudicator 1* and *Adjudicator 2* review every case; *Adjudicator 3* is a third, different person who answers only the Disputed Fields.
+_Avoid_: reviewer (alone), assessor
+
+**Independent Review**:
+One adjudicator's signed answers to the adjudication form, given without seeing anyone else's.
+_Avoid_: assessment (alone), vote
+
+**Disputed Field**:
+A question on the form where the two Independent Reviews do not agree under that question's comparison rule (for example, dates more than a day apart).
+_Avoid_: conflict, discrepancy
+
+**Committee**:
+The group of adjudicators that decides the fields Adjudicator 3 could not settle. It meets outside the tool; the CEC Coordinator records the meeting, and its Chair signs the Consensus.
+_Avoid_: CEC meeting (for the group itself), panel
+
+**Consensus**:
+The committee's recorded decision on each open field, signed by its Chair.
+_Avoid_: majority, verdict
+
+**More Data Request**:
+An adjudicator's or the committee's request for further documents. It reaches the site as a query; the new documents go through de-identification and the Quality Check before anyone reviews again.
+_Avoid_: query (for the request itself), data clarification
+
+**Round**:
+One adjudication of a case, from assignment to Outcome. Re-adjudication starts the next Round; a More Data Request does not.
+_Avoid_: cycle, iteration
+
+**Outcome**:
+The final answer to each compared question, with where it came from: both reviews agreed, Adjudicator 3 matched one of them, or the Consensus.
+_Avoid_: result, decision (alone), verdict
+
+**Superseded Outcome**:
+An earlier Round's Outcome after a re-adjudication. It stays in the record unchanged, linked to the Outcome that replaced it.
+_Avoid_: overwritten, cancelled outcome
+
+**Re-adjudication**:
+A new Round on a closed case, started by the CEC Coordinator with a reason.
+_Avoid_: reopening, re-review

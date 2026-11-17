@@ -12,13 +12,13 @@ Check the plan's ticked boxes for progress. `adjud/` is our implementation; `dat
 
 ## Which document governs what
 
-The project builds **Flows 1 and 2**. Flow 1 is done; Flow 2 and the AI layer are being built.
+The project builds **Flows 1 and 2** on `main`; **Flows 3 and 4** (adjudication, outcome, export, re-adjudication) are built on branch `flow3-4` (plan P-41 to P-53, step 27).
 
 | Document | Use it for |
 |---|---|
 | [docs/plan-mvp.md](docs/plan-mvp.md) | What to build next: step order, the autonomy model (§2), decisions taken (P-01 onwards), done criteria. Wins over the specs where they differ. Check which boxes are ticked before starting work |
 | Code, `tests/` and [data/flow1-testkit/](data/flow1-testkit/README.md) | Flow 1 behavior (its spec was retired after the demo; see git history before `docs/plan-mvp.md`). The kit holds the acceptance tests, the synthetic corpus with ground truth and the scoring harness |
-| [docs/mvp-spec.md](docs/mvp-spec.md) | Storage design (§4), Flow 2 states (§5.2), requirements MVP-11 to MVP-15 (§8), AI rules (§9). Flow 3–4 content doesn't apply |
+| [docs/mvp-spec.md](docs/mvp-spec.md) | Storage design (§4), Flow 2 states (§5.2), requirements MVP-11 to MVP-15 (§8), AI rules (§9). For Flows 3–4 the plan's P-41 to P-53 and spec.md §6.5–6.8 apply |
 | [docs/spec.md](docs/spec.md) | Flow 2 requirements (§6.3 QC-, §6.4 NAR-), background and requirement IDs. Don't build its production stack |
 | [docs/ui-design-plan.md](docs/ui-design-plan.md) | The UI's visual system and copy rules |
 
