@@ -1,0 +1,11 @@
+#!/bin/sh
+# The pre-commit checks from AGENTS.md: lint, formatting, then the full test suite.
+# Switch it on once per clone: git config core.hooksPath .githooks
+# Skip it in an emergency with: git commit --no-verify
+set -e
+echo "pre-commit: ruff check"
+uv run ruff check .
+echo "pre-commit: ruff format --check"
+uv run ruff format --check .
+echo "pre-commit: pytest"
+uv run pytest -q
