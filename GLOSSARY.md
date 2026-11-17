@@ -103,3 +103,7 @@ _Avoid_: transport, provider
 **Delivery Attempt**:
 One try at delivering one Notification through one Channel, recorded as sent or failed with the reason.
 _Avoid_: send (as a noun), retry (for the first try)
+
+**Clinical Content**:
+Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, identifiers found in them, query text, the Narrative, AI-written text about the case, and adjudication answers. Never sent to Slack or put in a notification. Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content.
+_Avoid_: PHI (for this broader idea), medical data, sensitive data
