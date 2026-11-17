@@ -37,7 +37,7 @@ An AI answer never moves a case on its own. It must match its schema, every quot
 
 ## Product vision
 
-The full module covers four flows. This repository implements **Flows 1 and 2** end to end.
+The full module covers four flows. `main` implements **Flows 1 and 2** end to end; branch `flow3-4` adds **Flows 3 and 4** (plan P-41 to P-53).
 
 ```mermaid
 flowchart LR
@@ -64,16 +64,14 @@ flowchart LR
     F2 -- flow3_manifest.json --> F3
     F3 --> F4
     F4 --> EDC
-    style F3 stroke-dasharray: 5 5
-    style F4 stroke-dasharray: 5 5
 ```
 
 | | Flow | Status |
 |---|---|---|
 | 1 | **Intake:** rule-based case creation, document collection, de-identification, site sign-off | ✅ Built, demonstrated, passes its acceptance kit |
 | 2 | **Quality check and narrative:** QC checks and agents, prepared for the Safety Specialist's signature, site queries, dossier, cited narrative | ✅ Built, evaluated live on the Claude API |
-| 3 | **Adjudication:** blinded reviews, disagreement and consensus | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.5–6.6 |
-| 4 | **Outcome:** derived outcome, EDC export, re-adjudication | 🔜 Specified in [docs/spec.md](docs/spec.md) §6.7–6.8 |
+| 3 | **Adjudication:** round-robin assignment, two blind reviews compared by code, Adjudicator 3 on disputed fields, committee consensus signed by the Chair, more data back through Flows 1–2 | ✅ Built on branch `flow3-4`; no AI (P-49) |
+| 4 | **Outcome:** each value traced to its signature, pharmacovigilance e-mail if related, CSV export acknowledged by a mock EDC, close, re-adjudication | ✅ Built on branch `flow3-4` |
 
 ## How a case moves
 
