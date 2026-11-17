@@ -326,3 +326,22 @@ def test_readjudication_opens_a_new_round_and_supersedes_the_old_outcome(assigne
     assert (store.paths.edc_exports / f"{cid}_round1.csv").exists()
     assert all(r.ok for r in verify_all(store.paths))
     assert not any(r.changed for r in rebuild_all(store.paths, write=False))
+
+
+def test_the_demo_answer_sets_take_their_routes(assigned, monkeypatch):
+    """tools/make_flow3_fixtures.py (P-52): `disputed` goes through Adjudicator 3 to the
+    committee, signed as the assigned demo adjudicators; reset stages the files."""
+    from tools import make_flow3_fixtures as fx
+
+    runner, store, cid = assigned
+    monkeypatch.setenv("ADJUD_DATA_DIR", str(store.paths.root))
+    assert (store.paths.root / "demo_uploads" / "flow3" / "disputed.yaml").exists()
+    assert len(fx.apply(cid, "disputed")) == 2
+    runner.run_case_steps()
+    assert state(store, cid) == State.ADJ3_REVIEW
+    assert current_round(store, cid).disputed == ["mi_type", "related_to_study_drug"]
+    assert len(fx.apply(cid, "disputed")) == 1  # Adjudicator 3
+    runner.run_case_steps()
+    assert state(store, cid) == State.CEC_MEETING
+    assert runner.flow3.committee_fields(cid) == ["related_to_study_drug"]
+    assert fx.apply(cid, "disputed") == []  # nothing open: the committee is the presenter's
