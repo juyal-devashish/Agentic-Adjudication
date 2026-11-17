@@ -82,28 +82,30 @@ def show_suggestion(sg: dict) -> None:
                             for d in docs["would_help"])  # fmt: skip
             st.html(f"<p>Would also help (advice, not required):</p><ul>{items}</ul>")
     if sg.get("fields"):
-        st.html("<p><b>Match with the EDC</b></p>")
-        rows = [
-            {
-                "Field": f["label"],
-                "EDC": f["edc_value"] or "(empty)",
-                "Documents": f["document_value"] or "",
-                "Result": FIELD_RESULT[f["status"]][0],
-                "Why": " ".join(
-                    x for x in (f["reason"], quotes(f["evidence"]), "; ".join(f["problems"])) if x
-                ),  # fmt: skip
-            }
-            for f in sg["fields"]
-        ]
-        inks = {w: theme.STATUS_INK[i] for w, i in FIELD_RESULT.values()}
-        st.dataframe(
-            pd.DataFrame(rows).style.map(
-                lambda v: f"color: {inks.get(v, 'inherit')}; font-weight: 600", subset=["Result"]
-            ),
-            hide_index=True,
-            width="stretch",
-            column_config={"Why": st.column_config.TextColumn(width="large")},
+        st.html("<p><b>Match with the EDC</b></p>" + match_table(sg["fields"]))
+
+
+def match_table(fields: list[dict]) -> str:
+    """Field by field: the EDC value (from the snapshot), what the documents say, the
+    result and the AI's reason with the quotes code verified, or why it is not sure."""
+    rows = []
+    for f in fields:
+        word, ink = FIELD_RESULT[f["status"]]
+        cites = "".join(
+            f"<br>{html.escape(c['file'])} p. {c['page']}: <q>{html.escape(c['quote'])}</q>"
+            for c in f["evidence"]
         )
+        problems = (f"<br>Not used: {html.escape('; '.join(f['problems']))}"
+                    if f["problems"] else "")  # fmt: skip
+        rows.append(
+            f"<tr><td>{html.escape(f['label'])}</td>"
+            f"<td>{html.escape(f['edc_value'] or '(empty)')}</td>"
+            f"<td>{html.escape(f['document_value'] or '')}</td>"
+            f"<td>{theme.status(word, ink)}</td>"
+            f"<td class='why'>{html.escape(f['reason'])}{cites}{problems}</td></tr>"
+        )
+    head = "".join(f"<th>{h}</th>" for h in ("Field", "EDC", "Documents", "Result", "Why"))
+    return f"<table class='adj-match'><tr>{head}</tr>{''.join(rows)}</table>"
 
 
 def show_agent_answers(latest: dict) -> None:
@@ -287,7 +289,7 @@ else:
     ref = latest_manifest_ref(store, cid)
     documents = store.get_json(cid, ref["path"])["documents"] if ref else []
     if documents:
-        with st.expander("Documents as submitted", expanded=state == State.QC_REVIEW):
+        with st.expander("Documents as submitted"):
             names = [d["source_name"] for d in documents]
             pick = st.selectbox("Document", names, key=f"qc_doc_{cid}")
             doc = documents[names.index(pick)]
