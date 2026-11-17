@@ -79,6 +79,17 @@ EVENT_WORDS = {
     "readjudication.started": "Re-adjudication started",
 }
 # What a site never sees (ACC-04): who adjudicates and how.
+
+
+def event_words(e: dict) -> str:
+    """What an event means; a Slack Delivery Attempt (P-54) says so, with its reason."""
+    if e["type"].startswith("notification.") and e["data"].get("channel") == "slack":
+        if e["type"] == "notification.sent":
+            return "Notification posted to Slack"
+        return f"Slack message failed: {e['data'].get('error', 'unknown')}"
+    return EVENT_WORDS.get(e["type"], e["type"])
+
+
 FLOW34_EVENTS = {t for t in EVENT_WORDS if t.split(".")[0] in (
     "adjudication", "comparison", "adj3", "meeting", "consensus", "more_data", "committee",
     "outcome", "export", "readjudication")}  # fmt: skip
@@ -92,6 +103,7 @@ ACTOR_WORDS = {
     "system:narrative": "Automatic: narrative draft",
     "system:dossier": "Automatic: dossier",
     "system:mailer": "Automatic: e-mail",
+    "system:slack": "Automatic: Slack",
     "system:upload-folder": "Automatic: upload folder",
     "system:cec": "Automatic: adjudication workflow",
     "system:outcome": "Automatic: outcome and export",
@@ -427,7 +439,7 @@ st.dataframe(
             {
                 "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
                 "Who": who(e["actor"], names),
-                "What": EVENT_WORDS.get(e["type"], e["type"]),
+                "What": event_words(e),
                 "Reason": e.get("reason") or "",
             }
             for e in shown
@@ -515,13 +527,16 @@ with tabs[3]:
 st.header("Notifications", anchor="notifications")
 notes = [json.loads(f.read_text()) for f in sorted(paths().outbox.glob("*.json"))]
 mine = [n for n in notes if n.get("case_id") == cid and visible_note(n)]
-emailed: dict[str, str] = {}  # notification id -> last delivery status
+# notification id -> last status, per Channel (lines without one are e-mail; P-54)
+emailed: dict[str, str] = {}
+slacked: dict[str, str] = {}
 delivery = paths().outbox / "delivery.jsonl"
 if delivery.exists():
     for line in delivery.read_text().splitlines():
         if line.strip():
             d = json.loads(line)
-            emailed[d["id"]] = d["status"]
+            (slacked if d.get("channel") == "slack" else emailed)[d["id"]] = d["status"]
+STATUS_WORDS = {"sent": "Sent", "failed": "Failed"}
 if mine:
     st.write("Messages carry no clinical content: only the case number, the task and a link.")
     st.dataframe(
@@ -531,8 +546,11 @@ if mine:
                     "When (UTC)": f"{theme.date_words(n['created_at'])} {n['created_at'][11:16]}",
                     "To": recipient(n["to"]),
                     "Message": n["subject"],
-                    "E-mail": {"sent": "Sent", "failed": "Failed"}.get(
-                        emailed.get(n["id"], ""), "Not sent"
+                    "E-mail": STATUS_WORDS.get(emailed.get(n["id"], ""), "Not sent"),
+                    **(
+                        {"Slack": STATUS_WORDS.get(slacked.get(n["id"], ""), "Not posted")}
+                        if slacked
+                        else {}
                     ),
                 }
                 for n in mine
@@ -597,7 +615,7 @@ with st.expander("Technical details"):
         pd.DataFrame(
             [
                 {"When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
-                 "What": EVENT_WORDS.get(e["type"], e["type"]), "Seal": e["hash"][7:15]}
+                 "What": event_words(e), "Seal": e["hash"][7:15]}
                 for e in events
             ]
         ),

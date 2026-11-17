@@ -160,3 +160,21 @@ def test_a_slack_crash_never_reaches_the_email_or_the_runner(data, monkeypatch):
 
     monkeypatch.setattr(r.slack, "deliver_pending", boom)
     r.send_slack()  # logged, not raised
+
+
+def test_the_case_record_shows_slack_attempts(data, monkeypatch):
+    from tests.test_ui_flow3 import as_user, tables
+
+    monkeypatch.setenv("ADJUD_DATA_DIR", str(data.root))
+    reset(data, preload=True, only=DEMO_AES)
+    runner = Runner(data)
+    runner.run_once()
+    log = DeliveryLog(runner.pipeline.store)
+    note = next(n for n in log.notes() if n.get("case_id") == "DEMO01-0001")
+    log.record(note, SLACK, ACTOR, "failed", [], "HTTP 404 no_service")
+    at = as_user("ss.anna", "views/results.py", "DEMO01-0001")
+    assert not at.exception, at.exception
+    shown = tables(at)
+    assert "Slack message failed: HTTP 404 no_service" in shown
+    table = next(d.value for d in at.dataframe if "Slack" in d.value.columns)
+    assert list(table["Slack"]) == ["Failed"] and list(table["E-mail"]) == ["Not sent"]

@@ -53,6 +53,8 @@ def show() -> None:
     cases = set(store.list_cases()) if new else set()
     for line in new:
         entry = json.loads(line)
+        if entry.get("channel", "email") != "email":  # e-mail pop-ups only (P-54)
+            continue
         note = _notification(entry["id"])
         if note is None or not note.get("case_id"):
             continue
