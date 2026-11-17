@@ -102,7 +102,8 @@ Change any of these by editing this table first.
 | P-51 | Re-adjudication | Only the Coordinator, signed, with a reason, on a closed case. Round n+1 with the same adjudicators (RDJ-06); nothing earlier changes; the old outcome shows as superseded and the new export says it is a correction (RDJ-01 to RDJ-04, Q-08) | User (Q9) |
 | P-52 | Demo data for Flow 3 | The short demo stays. `tools/make_flow3_fixtures.py` writes `agree` and `disputed` answer sets (staged by the reset in `demo_uploads/flow3/`) and can sign a case's open reviews with them as the assigned demo adjudicators | User (Q12) |
 | P-53 | Pages and the Assistant | New pages *Assignments* (Coordinator), *Adjudication* (an adjudicator's form) and *Committee* (Coordinator records, Chair signs); the Case record gains *Adjudication and outcome*. The Assistant lists the new roles' tasks and reports each Flow 3–4 step, blinded as P-45 | User (Q11) |
-| P-54 | Slack | An extra notification Channel next to the outbox and e-mail, opt-in through `NOTIFY_CHANNELS` (unset: as before). One demo channel through an incoming webhook (`SLACK_WEBHOOK_URL`, environment only), all templates, same content and link as e-mail. Delivery Attempts recorded per Channel; 3 tries, one per tick, 10 s timeout; a failure never blocks the workflow or e-mail. Becomes a default candidate only after 5 consecutive full demo runs with 0 failed Slack attempts and a clean `tools.notify_parity` report (ADR 0002). Branch `notify/slack` from `flow3-4` | User |
+| P-54 | Slack | *Replaced by P-55; its Delivery Attempt records and parity report are kept.* An extra notification Channel next to the outbox and e-mail, opt-in through `NOTIFY_CHANNELS` (unset: as before). One demo channel through an incoming webhook (`SLACK_WEBHOOK_URL`, environment only), all templates, same content and link as e-mail. Delivery Attempts recorded per Channel; 3 tries, one per tick, 10 s timeout; a failure never blocks the workflow or e-mail. Becomes a default candidate only after 5 consecutive full demo runs with 0 failed Slack attempts and a clean `tools.notify_parity` report (ADR 0002). Branch `notify/slack` from `flow3-4` | User |
+| P-55 | Slack app | Slack is where work starts; the app is where it is read and signed (ADR 0003, supersedes ADR 0002). Clinical Content never leaves the app (ADR 0004). A Bolt app over Socket Mode (`adjud/slack_app/`, its own process; `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`). One command `/adj` (`tasks`, `cases`, `status`, `import`, `pull`, `act-as`, `help`), replies visible only to the caller. App Home per role with Tasks and *Open in the app* buttons. Notices as DMs with an *Open in the app* button, replacing the webhook. Slack actions in a hash-chained `data/slack/actions.jsonl`. Demo: one Slack account Acting As each person. E-mail and every app screen stay. **Friday slice:** app and process, `act-as`/`tasks`/`cases`/`status`/`import`, App Home for every role with the data manager's import button, DMs, the actions log, fake-client tests, manifest, run sheet. **After Friday:** assignments table and Reassign form, `pull`, one-word suggested outcome on App Home, real Slack user mapping, the Assistant-retirement bar | User |
 
 ## 5. How we work
 
@@ -336,7 +337,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 **Done when:** a case goes from ready for adjudication to closed by agreement, through Adjudicator 3, and through the committee; more data comes back through Flow 1 and the Quality Check; a re-adjudication supersedes the old outcome; every final value names the signature it came from; the site sees nothing of it; full suite and kit pass; `verify_log` and `rebuild_state --check` clean.
 
-### Step 28 — Slack alongside e-mail (P-54, ADR 0002)
+### Step 28 — Slack alongside e-mail (P-54, ADR 0002); replaced by step 29
 
 - [x] Delivery Attempts per Channel (`adjud/delivery.py`); e-mail unchanged in behaviour
 - [x] Slack Channel (`adjud/slack.py`), `NOTIFY_CHANNELS`, runner runs each Channel on its own
@@ -346,6 +347,18 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [ ] Reliability bar ([slack-test-plan.md](slack-test-plan.md)): 5 consecutive full demo runs, 0 failed Slack attempts, clean parity (results recorded here)
 
 **Done when:** with `NOTIFY_CHANNELS` unset nothing changes (full suite and kit pass); with Slack on, every Notification created after the switch is posted once or recorded as failed, e-mail is never held up, and tests use a fake Slack only.
+
+### Step 29 — Slack app: where work starts (P-55, ADR 0003, ADR 0004) on branch `feat/slack-workflow`
+
+- [ ] Manifest for the demo workspace (`docs/slack-app-manifest.yaml`)
+- [ ] `adjud/slack_app/`: Socket Mode app, Acting As, the Slack actions log
+- [ ] `/adj act-as`, `tasks`, `cases`, `status`, `import`, `help` (replies visible only to the caller)
+- [ ] App Home per role: Tasks with *Open in the app*; the data manager's *Import queued files*
+- [ ] Notices as DMs with *Open in the app*, replacing the webhook
+- [ ] Tests with a fake Slack client, including a check of every payload against ADR 0004's forbidden list
+- [ ] Run sheet: setting up and showing the Slack app
+
+**Done when:** in the demo workspace, acting as each role, App Home lists that person's Tasks and opens the right page in the app; `/adj import` creates cases and DMs arrive with working buttons; no payload carries Clinical Content; with Slack off nothing changes; full suite and kit pass; `verify_log` covers the Slack actions log.
 
 ---
 
