@@ -107,7 +107,9 @@ class Directory:
     def act_as(self, slack_user: str, person_id: str) -> dict[str, Any]:
         if person_id not in self.by_id:
             raise KeyError(person_id)
-        mapping = {**self.acting(), slack_user: person_id}
+        # Re-inserted at the end, so the last account to choose is the demo presenter.
+        mapping = {k: v for k, v in self.acting().items() if k != slack_user}
+        mapping[slack_user] = person_id
         write_atomic(self.acting_path, json.dumps(mapping, indent=1).encode(), overwrite=True)
         return self.by_id[person_id]
 
@@ -221,14 +223,20 @@ class Workspace:
             query["case"] = case_id
         return f"{self.base_url}/{page}?{urlencode(query)}"
 
+    def waiting_files(self) -> list[Path]:
+        """AE files in the import queue, as process_inbox sees them (no hidden files)."""
+        inbox = self.paths.inbox
+        if not inbox.exists():
+            return []
+        return [f for f in inbox.iterdir() if f.is_file() and not f.name.startswith(".")]
+
     # -- Tasks --------------------------------------------------------------------------------
 
     def tasks(self, person: dict[str, Any]) -> list[Task]:
         out: list[Task] = []
         role = person["role"]
         if role == "data_manager":
-            inbox = self.paths.inbox
-            waiting = [f for f in inbox.glob("*") if f.is_file()] if inbox.exists() else []
+            waiting = self.waiting_files()
             if waiting:
                 n = len(waiting)
                 out.append(Task(None, f"{n} AE file{'s' if n > 1 else ''} waiting to be "
@@ -293,10 +301,11 @@ class Workspace:
         IDs only, and the cases created: no subject or AE IDs (ADR 0004)."""
         if person["role"] != "data_manager":
             raise PermissionError("Importing AE records is the data manager's step.")
-        inbox = self.paths.inbox
-        if not inbox.exists() or not any(f.is_file() for f in inbox.glob("*")):
+        if not self.waiting_files():
             return "There is no AE file waiting in the import queue.", []
-        results = self.pipe.process_inbox(inbox, self.paths.processed, actor=person["id"])
+        results = self.pipe.process_inbox(
+            self.paths.inbox, self.paths.processed, actor=person["id"]
+        )
         outcomes = [o for r in results for o in r.outcomes]
         created = [o["case_id"] for o in outcomes if o.get("outcome") == "created"]
         others = len(outcomes) - len(created)

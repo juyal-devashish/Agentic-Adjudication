@@ -212,15 +212,32 @@ def test_the_bolt_app_registers_every_listener_without_calling_slack(app):
 
 
 def forbidden(ws: Workspace) -> set[str]:
-    """Clinical Content of every case (ADR 0004): AE term, dates, subject and AE IDs, and
-    every line of each case's narrative and query text."""
+    """Clinical Content of every case (ADR 0004): the AE term, dates, subject and AE IDs,
+    seriousness, outcome, severity, relatedness and codes (values of 5+ characters, so a
+    'Y' does not match everything), document names, the AI Suggestion's text, and every
+    line of each case's narrative and query text."""
+    from adjud.documents import documents_of
+
     out: set[str] = set()
     for cid in ws.store.list_cases():
         snap = ws.pipe.latest_snapshot(cid)
         for key in ("ae_term", "onset_date", "end_date", "subject_id", "ae_id"):
             if snap.get(key):
                 out.add(str(snap[key]).lower())
+        for key in ("seriousness_criteria", "outcome", "severity", "relatedness_investigator",
+                    "pt_code", "llt_code", "soc_code"):  # fmt: skip
+            if len(str(snap.get(key) or "")) >= 5:
+                out.add(str(snap[key]).lower())
+        out |= {name.lower() for name in documents_of(ws.store, cid).files}
         for e in ws.store.events(cid):
+            if e["type"] == "qc.checks_completed":
+                sg = ws.store.get_json(cid, e["data"]["results"]["path"]).get("suggestion") or {}
+                out |= {
+                    t.lower()
+                    for t in [sg.get("summary") or ""]
+                    + [f.get("reason") or "" for f in sg.get("fields") or []]
+                    if len(t) > 15
+                }
             if e["type"] == "query.opened" and e["data"].get("text"):
                 out.add(e["data"]["text"].lower())
             if e["type"] == "narrative.drafted":
@@ -259,3 +276,42 @@ def test_no_payload_carries_clinical_content(data):
     text = json.dumps(payloads).lower()
     leaks = sorted(b for b in bad if b in text)
     assert not leaks, leaks
+
+
+def test_every_interaction_is_logged_without_the_typed_text(app, data):
+    h, client = app
+    h.on_home_opened({"user": ME, "tab": "home"}, client)
+    assert actions(data)[-1]["action"] == "home_opened"
+    command(h, client, "DEMO01-101-0001 chest pain")  # nobody acting yet
+    command(h, client, "act-as rahul")
+    command(h, client, "myocardial infarction")
+    logged = (data.root / "slack" / "actions.jsonl").read_text().lower()
+    assert "chest pain" not in logged and "infarction" not in logged and "101-0001" not in logged
+    assert [a["action"] for a in actions(data)][-3:] == ["command:unknown", "act_as",
+                                                         "command:unknown"]  # fmt: skip
+    empty = {"state": {"values": {"who": {"person": {"selected_option": None}}}}}
+    h.on_act_as_submitted(ack, {"user": {"id": ME}}, empty, client)
+    assert actions(data)[-1]["result"] == "refused"
+
+
+def test_hidden_files_in_the_queue_are_not_an_import_task(app, data):
+    h, client = app
+    for f in data.inbox.iterdir():
+        f.unlink()
+    (data.inbox / ".DS_Store").write_text("")
+    command(h, client, "act-as rahul")
+    assert "waiting to be imported" not in command(h, client, "tasks").last
+    assert "no AE file waiting" in command(h, client, "import").last
+
+
+def test_a_failed_import_is_answered_and_logged(app, data, monkeypatch):
+    h, client = app
+    command(h, client, "act-as rahul")
+
+    def taken(*a, **kw):
+        raise FileNotFoundError("the runner moved it")
+
+    monkeypatch.setattr(h.ws.pipe, "process_inbox", taken)
+    assert "did not finish" in command(h, client, "import").last
+    assert actions(data)[-1]["result"] == "failed"
+    assert actions(data)[-1]["reason"] == "FileNotFoundError"

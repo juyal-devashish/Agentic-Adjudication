@@ -18,15 +18,16 @@ Repeat stages 2–4 after any change to `adjud/slack_app/`, `adjud/delivery.py` 
 
 | Covered | Test |
 |---|---|
-| **No payload carries Clinical Content**: every Home, reply and DM, for every person, with a case through the Quality Check into adjudication, checked against each case's AE term, dates, subject and AE IDs, query text and narrative lines | `test_no_payload_carries_clinical_content` |
+| **No payload carries Clinical Content**: every Home, reply and DM, for every person, with a case through the Quality Check into adjudication, checked against each case's AE term, dates, subject and AE IDs, seriousness, outcome, severity, relatedness and codes, document names, AI Suggestion text, query text and narrative lines | `test_no_payload_carries_clinical_content` |
 | Nothing works before choosing whom to act as | `test_nothing_works_before_choosing_whom_to_act_as` |
 | `/adj act-as <name>` and the form; the actions log names the Slack user and the person | `test_act_as_by_name_publishes_that_persons_home`, `test_the_act_as_form_sets_the_person_or_says_what_is_missing` |
 | Import from `/adj` and from the Home button; counts and case IDs only; the case event is as from the app | `test_the_data_manager_imports_from_slack_and_the_log_names_the_cases`, `test_the_import_button_on_app_home_does_the_same` |
 | Only the data manager imports | `test_only_the_data_manager_may_import` |
 | A site sees only its cases; a task opens the right page as the right person | `test_a_site_sees_its_own_cases_and_tasks_open_the_app` |
-| Link clicks logged; Home published on open | `test_link_clicks_and_home_opening_are_handled` |
+| Link clicks, Home opening and refused forms logged; typed command text never logged | `test_link_clicks_and_home_opening_are_handled`, `test_every_interaction_is_logged_without_the_typed_text` |
+| Hidden files are not an import task; a failed import is answered and logged | `test_hidden_files_in_the_queue_are_not_an_import_task`, `test_a_failed_import_is_answered_and_logged` |
 | The Slack actions log is verified; a reset clears it but keeps Acting As | `test_the_slack_actions_log_is_verified_and_survives_a_reset_without_acting_as` |
-| DM content and *Open in the app*; one DM per Slack account | `test_a_dm_names_the_case_task_and_person_and_opens_the_app`, `test_people_sharing_one_slack_account_get_one_dm` |
+| DM content and *Open in the app*; one DM per Slack account; a retry never DMs someone twice; DMs wait for Acting As; the last account to choose is the presenter | `tests/test_slack.py` |
 | Refused, rate-limited, timed-out and odd failures: recorded, retried at most 3 times, e-mail unaffected | `tests/test_slack.py` |
 | The bot token is never written down | `test_the_token_and_odd_errors_are_never_written_down` |
 | Parity report, runner switches, a crash never reaches e-mail | `tests/test_slack.py` |
@@ -56,7 +57,7 @@ From a fresh reset; after each, check the Case record, `data/outbox/delivery.jso
 | Wrong bot token | Change `SLACK_BOT_TOKEN`, restart the runner, import from the app | Each notice: *Slack message failed: Slack invalid_auth*, three tries over three ticks; e-mail *Sent*; cases move on; parity **NOT CLEAN** |
 | Slack unreachable | Wi-Fi off for two ticks, then on | First tick: one ~10 s wait, the rest marked failed without trying; after Wi-Fi returns, the next tick sends them |
 | Given up | Wi-Fi off for 3+ ticks | After 3 tries a notice is no longer tried; it stays in the outbox; parity lists it |
-| Nobody acting yet | Reset, delete `data/slack/acting_as.json`, import from the app | DMs fail with *no Slack user yet: choose someone with /adj act-as*; e-mail as usual |
+| Nobody acting yet | Reset, delete `data/slack/acting_as.json`, import from the app | DMs wait (no try is used up) and go out on the first tick after `/adj act-as`; e-mail as usual |
 | Slack switched off | Empty `NOTIFY_CHANNELS`, restart the runner | No DMs, e-mail exactly as before |
 | Not the data manager | `/adj act-as anna`, `/adj import` | Refused with a reason; logged as refused; no case created |
 

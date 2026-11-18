@@ -112,12 +112,41 @@ def test_only_notifications_queued_after_switching_on_are_sent_once(pipe):  # no
     assert {e["actor"] for e in sent} == {ACTOR}
 
 
-def test_without_a_presenter_the_dm_fails_with_a_reason(pipe):  # noqa: F811
+def test_notices_wait_without_a_try_until_someone_acts_as(pipe):  # noqa: F811
     since = format_time(pipe.clock())
     queue_two(pipe)
-    counts = deliverer(pipe, FakeClient(), since, presenter=None).deliver_pending()
-    assert counts == {"sent": 0, "failed": 2}
-    assert "/adj act-as" in (pipe.store.paths.outbox / "delivery.jsonl").read_text()
+    for _ in range(MAX_ATTEMPTS + 1):  # more ticks than tries: nothing is used up
+        counts = deliverer(pipe, FakeClient(), since, presenter=None).deliver_pending()
+        assert counts == {"sent": 0, "failed": 0}
+    assert DeliveryLog(pipe.store, pipe.clock).attempts(SLACK) == {}
+    client = FakeClient()
+    assert deliverer(pipe, client, since).deliver_pending() == {"sent": 2, "failed": 0}
+
+
+def test_a_retry_never_dms_someone_already_reached(pipe):  # noqa: F811
+    """Real use: two people with their own Slack users; the second post fails once."""
+    since = format_time(pipe.clock())
+    d = directory(pipe)
+    for uid, slack in (("adj.okafor", "U0OKAFOR"), ("adj.reyes", "U0REYES")):
+        d.by_id[uid]["slack_user_id"] = slack
+    Outbox(pipe.store.paths, "DEMO01", clock=pipe.clock).queue(
+        "DEMO01-0001", "role:adjudicator", "committee_needed"
+    )
+    client = FakeClient("ok", slack_error("user_not_found", 404), "ok", "ok")
+    channel = SlackDmChannel(d, SETTINGS, client)
+    for _ in range(2):
+        Deliverer(pipe.store, CONFIG, channel, ACTOR, since, pipe.clock).deliver_pending()
+    # Okafor reached; the presenter (Lindqvist, no own Slack user) fails, so the next tick
+    # retries: Okafor is not DMed again, the presenter and Reyes are.
+    assert [p["channel"] for p in client.posts] == ["U0OKAFOR", PRESENTER, PRESENTER, "U0REYES"]
+
+
+def test_the_last_account_to_choose_is_the_presenter(pipe):  # noqa: F811
+    d = Directory(CONFIG, pipe.store.paths.root / "slack")
+    d.act_as("U1", "dm.dana")
+    d.act_as("U2", "ss.anna")
+    d.act_as("U1", "site101.coord")
+    assert d.slack_user_for("adj.reyes") == "U1"
 
 
 def test_a_refused_post_is_recorded_retried_three_times_and_email_still_goes(pipe):  # noqa: F811

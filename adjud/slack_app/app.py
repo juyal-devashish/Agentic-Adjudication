@@ -22,6 +22,7 @@ from adjud.slack_app.core import SlackActionsLog, Workspace
 
 log = logging.getLogger("adjud.slack_app")
 EPHEMERAL = "ephemeral"
+SUBCOMMANDS = {"help", "act-as", "tasks", "cases", "status", "import"}
 
 
 @dataclass
@@ -52,6 +53,7 @@ class SlackHandlers:
         slack_user = command["user_id"]
         sub, _, rest = (command.get("text") or "").strip().partition(" ")
         sub, rest = sub.lower(), rest.strip()
+        known = sub if sub in SUBCOMMANDS else "unknown"  # typed text never goes in the log
         person = self._who(slack_user)
 
         def reply(content: list[dict[str, Any]] | str, text: str = "Adjudication") -> None:
@@ -67,7 +69,7 @@ class SlackHandlers:
             self._act_as_command(slack_user, rest, command, reply, client)
             return
         if person is None:
-            self._record(slack_user, f"command:{sub}", result="refused", reason="no person")
+            self._record(slack_user, f"command:{known}", result="refused", reason="no person")
             reply("Choose whom you act as first: `/adj act-as` (demo).")
             return
         if sub == "tasks":
@@ -90,7 +92,7 @@ class SlackHandlers:
             reply(self._import(slack_user, person))
             self.publish_home(client, slack_user)
         else:
-            self._record(slack_user, f"command:{sub}", result="refused", reason="unknown")
+            self._record(slack_user, "command:unknown", result="refused", reason="unknown")
             reply([blocks._text("I don't know that one.\n" + blocks.HELP)], "Unknown command")
 
     def _act_as_command(self, slack_user: str, rest: str, command: dict[str, Any],
@@ -118,6 +120,10 @@ class SlackHandlers:
         except PermissionError as exc:
             self._record(slack_user, "import", result="refused", reason="not the data manager")
             return str(exc)
+        except Exception as exc:  # e.g. the runner took the same file: say so, log it
+            log.exception("import from Slack failed")
+            self._record(slack_user, "import", result="failed", reason=type(exc).__name__)
+            return "The import did not finish. Try again, or use AE import in the app."
         self._record(slack_user, "import", cases=created)
         self.notes[slack_user] = summary
         return summary + (" The sites are notified now." if created else "")
@@ -127,6 +133,7 @@ class SlackHandlers:
     def on_home_opened(self, event: dict[str, Any], client: Any) -> None:
         if event.get("tab", "home") != "home":
             return
+        self._record(event["user"], "home_opened")
         self.publish_home(client, event["user"])
 
     # -- buttons -------------------------------------------------------------------------------
@@ -168,6 +175,7 @@ class SlackHandlers:
         chosen = view["state"]["values"]["who"]["person"].get("selected_option") or {}
         person_id = chosen.get("value")
         if person_id not in self.people.by_id:
+            self._record(slack_user, "act_as", result="refused", reason="no person chosen")
             ack(response_action="errors", errors={"who": "Choose a person."})
             return
         ack()

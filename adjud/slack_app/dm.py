@@ -13,10 +13,12 @@ SLACK_BOT_TOKEN (a secret, never logged); APP_BASE_URL for the links.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 from adjud.delivery import SLACK, ChannelError
@@ -78,11 +80,31 @@ class SlackDmChannel:
             if slack_user:
                 targets.setdefault(slack_user, []).append(p)
         if not targets:
-            raise ChannelError("no Slack user yet: choose someone with /adj act-as")
+            raise ChannelError("no Slack user yet: choose someone with /adj act-as", later=True)
         url = f"{self.settings.base_url}{note['link']}" if note.get("link") else None
+        reached = self.reached(note["id"])
         for slack_user, group in targets.items():
+            if slack_user in reached:  # sent on an earlier try that failed for someone else
+                continue
             text, blocks = notice(note, for_whom(note["to"], group, self.directory), url)
             self._post(channel=slack_user, text=text, blocks=blocks)
+            self._mark(note["id"], slack_user)
+
+    @property
+    def sent_path(self) -> Path:
+        return self.directory.slack_dir / "dm_sent.jsonl"
+
+    def reached(self, note_id: str) -> set[str]:
+        """Slack users this notice already reached, so a retry never DMs them again."""
+        if not self.sent_path.exists():
+            return set()
+        lines = (json.loads(ln) for ln in self.sent_path.read_text().splitlines() if ln.strip())
+        return {d["slack_user"] for d in lines if d["note"] == note_id}
+
+    def _mark(self, note_id: str, slack_user: str) -> None:
+        self.sent_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.sent_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"note": note_id, "slack_user": slack_user}) + "\n")
 
     def _post(self, **kwargs: Any) -> None:
         from slack_sdk.errors import SlackApiError

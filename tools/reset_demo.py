@@ -67,7 +67,7 @@ def reset(paths: DataPaths, *, preload: bool = False, only: tuple[str, ...] | No
             shutil.rmtree(target)
     # The Slack actions log goes with the cases it names; Acting As (slack/acting_as.json)
     # is kept, so DMs still reach the presenter after a reset (P-55).
-    for name in ("actions.jsonl", ".actions.jsonl.lock"):
+    for name in ("actions.jsonl", ".actions.jsonl.lock", "dm_sent.jsonl"):
         (paths.root / "slack" / name).unlink(missing_ok=True)
     shutil.copytree(KIT / "edc_mock", paths.edc_mock)
     for name in ("inbox", "processed", "outbox", "cases", "intake"):
