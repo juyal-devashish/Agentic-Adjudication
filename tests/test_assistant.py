@@ -61,6 +61,26 @@ def test_data_manager_imports_from_the_chat_and_is_told_why_not(demo):
     assert any(e.get("actor") == "dm.dana" for e in log)  # imported as the data manager
 
 
+def test_why_names_the_case_when_an_edc_update_downgrades_it(demo):
+    """F1-04 / P-14: a record that stops qualifying stays an open, flagged case, so /why
+    must name the case, not say it is not one. A record that never became a case still does."""
+    from tools.reset_demo import KIT
+
+    at = run(role="data_manager")
+    say(at, "/import")
+    lines = (KIT / "inbox_scenarios" / "03_updates.csv").read_text().splitlines()
+    rows = [lines[0]] + [r for r in lines[1:] if ",AE-006," in r]
+    (demo.inbox / "03_ae006_downgrade.csv").write_text("\n".join(rows) + "\n")
+    say(at, "/import")
+    say(at, "/why AE-006")
+    text = chat(at).rsplit("/why AE-006", 1)[-1]
+    assert "not a case" not in text
+    assert "DEMO01-0003" in text and "flagged" in text and "Serious: No" in text
+    assert any("Open DEMO01-0003" in b.label for b in at.button)
+    say(at, "/why AE-008")
+    assert "so it is not a case" in chat(at).rsplit("/why AE-008", 1)[-1]
+
+
 def test_a_plain_message_about_importing_does_not_import(demo):
     """Only /import (or its starter button) imports; "don't import yet" must not."""
     at = run(role="data_manager")

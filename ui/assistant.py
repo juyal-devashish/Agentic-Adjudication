@@ -360,6 +360,13 @@ class Assistant:
             action = [Action(f"Open {latest.get('case_id')}", "record", latest.get("case_id"))]
             return Reply(text, action)
         rules = "\n".join(f"- Not met: {r}" for r in failed)
+        if case_id := latest.get("case_id"):  # stopped qualifying: flagged, never withdrawn
+            return Reply(
+                f"**{ae}** ({subject}) is case **{case_id}**. Since an update in the EDC it "
+                f"no longer meets the study's rules for adjudication:\n{rules}\n\nThe case "
+                "is flagged for review, not withdrawn.",
+                [Action(f"Open {case_id}", "record", case_id)],
+            )
         return Reply(
             f"**{ae}** ({subject}) does not meet the study's rules for "
             f"adjudication, so it is not a case:\n{rules}\n\nAll other rules "
