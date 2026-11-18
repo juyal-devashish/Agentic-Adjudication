@@ -34,8 +34,15 @@ def pull(pipe: IntakePipeline, actor: str) -> list[ImportResult]:
     writer = csv.DictWriter(out, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
     writer.writerows(rows)
-    name = f"edc_pull_{pipe.clock().strftime('%Y%m%dT%H%M%S')}.csv"
-    write_atomic(Path(paths.inbox) / name, out.getvalue().encode(), overwrite=False)
+    stamp = pipe.clock().strftime("%Y%m%dT%H%M%S")
+    name, n = f"edc_pull_{stamp}.csv", 1
+    while True:  # another pull in the same second may still have its file in the inbox
+        try:
+            write_atomic(Path(paths.inbox) / name, out.getvalue().encode(), overwrite=False)
+            break
+        except FileExistsError:
+            n += 1
+            name = f"edc_pull_{stamp}-{n}.csv"
     # Imports the whole inbox, so files queued before the pull are imported too: report
     # every one, not only the pull's own file, so no case or rejection goes unmentioned.
     return pipe.process_inbox(paths.inbox, paths.processed, actor=actor)

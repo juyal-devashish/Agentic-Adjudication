@@ -208,6 +208,28 @@ def test_edc_pull_reports_the_queued_files_it_imports_too(tmp_path, clock):
     assert any(f.startswith("edc_pull_") for f in by_file)
 
 
+def test_edc_pull_in_the_same_second_as_another_gets_its_own_name(tmp_path):
+    """A second pull while the first one's file is still in the inbox, within the same
+    second, must not crash on the name: it writes edc_pull_<time>-2.csv instead (B42)."""
+    from datetime import UTC, datetime
+
+    from adjud.edc_pull import pull
+
+    data = tmp_path / "data"
+    (data / "edc_mock").mkdir(parents=True)
+    for f in (KIT / "edc_mock").iterdir():
+        (data / "edc_mock" / f.name).write_bytes(f.read_bytes())
+    fixed = datetime(2026, 11, 17, 12, 0, 0, tzinfo=UTC)
+    pipe = IntakePipeline(data, Path(__file__).resolve().parents[1] / "data" / "config",
+                          data / "edc_mock", clock=lambda: fixed)  # fmt: skip
+    pipe.paths.inbox.mkdir(parents=True, exist_ok=True)
+    in_flight = pipe.paths.inbox / "edc_pull_20261117T120000.csv"  # the other pull's file
+    shutil.copy(SCEN / "01_initial.csv", in_flight)
+    results = pull(pipe, "dm.dana")
+    by_file = {r.file: r for r in results}
+    assert by_file["edc_pull_20261117T120000-2.csv"].status == "ACCEPTED"
+
+
 def test_manual_entry_reports_every_problem_at_once(pipe):
     """The reason and the empty fields in one answer, reason first (kit TC-INT-11)."""
     r = pipe.manual_entry({"study_id": "DEMO01"}, "", "dm.dana")
