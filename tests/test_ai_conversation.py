@@ -135,6 +135,34 @@ def test_a_turn_about_a_case_is_saved_with_the_case(case, tmp_path):  # noqa: F8
     assert all(rep.ok for rep in verify_all(store.paths))
 
 
+@pytest.mark.parametrize("mode", ["live", "replay"])
+def test_a_turn_about_a_case_that_is_gone_makes_no_call_and_no_folder(store, tmp_path, mode):
+    """A Slack thread can outlive its case (a demo reset): the turn makes no request, and
+    no orphan folder under cases/ shifts the next case id (the P-57 demo uses -0001)."""
+    client = FakeClient(reply(text("hi")))
+    g = gw(store, tmp_path, client=client, modes={"slack_agent": mode})
+    for cid in ("DEMO01-0001", "not-a-case-id"):
+        r = g.converse(PRIYA.model_copy(update={"case_id": cid}), ASK, Tasks().toolbox())
+        assert r.status == "unavailable" and "no longer exists" in r.note and r.call is None
+    assert client.requests == [] and not g.missing
+    assert not store.paths.cases.exists() or not any(store.paths.cases.iterdir())
+    assert store.new_case_id("DEMO01") == "DEMO01-0001"
+
+
+def test_a_case_removed_during_the_turn_is_recorded_without_the_case(store, tmp_path):
+    """Removed between the check and the record: saved as a turn about no case, so the
+    cost still reaches the ledger and no case folder is created."""
+    client = FakeClient(reply(text("hi")))
+    g = gw(store, tmp_path, client=client)
+    call = g._record("DEMO01-0001", {"function": "slack_agent", "prompt": "slack_agent_v1",
+                                     "mode": "live", "simulated": False, "model": "m",
+                                     "valid": True, "usage": {}, "cost_usd": 0.01})  # fmt: skip
+    assert call["path"].startswith("ai/calls/")
+    (line,) = g.ledger.records()
+    assert line["case_id"] is None and line["cost_usd"] == 0.01
+    assert not store.paths.cases.exists() or not any(store.paths.cases.iterdir())
+
+
 def test_tool_errors_go_back_to_the_agent(store, tmp_path):
     client = FakeClient(
         reply(tool_use("other_site_cases", {}), stop="tool_use"),

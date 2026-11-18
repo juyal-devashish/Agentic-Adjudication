@@ -407,6 +407,10 @@ class Gateway:
         mode = self.cfg.mode_for(fn.name)
         if not self.cfg.enabled(fn.name):
             return AgentReply("off", "unavailable", note="the Agent's AI is off")
+        if context.case_id is not None and not self._case_exists(context.case_id):
+            # a Slack thread can outlive its case (a demo reset): no call, and no folder
+            # that would shift the next case id
+            return AgentReply(mode, "unavailable", note=f"case {context.case_id} no longer exists")
         tools = toolbox.definitions()
         payload = _conversation_input(fn, self.cfg.model, context, messages, tools)
         h = conversation_hash(fn, self.cfg.model, context, messages, tools)
@@ -587,8 +591,14 @@ class Gateway:
         """Save the call record, reference it, and add its cost to the ledger. About a case:
         `cases/<id>/ai/NNNN_<function>.json` and an `ai.called` event. About no case (the
         Slack Agent, P-58): `data/ai/calls/<date>/<time>_<function>_<random>.json`,
-        referenced from the ledger line by its path in the data folder."""
+        referenced from the ledger line by its path in the data folder. A case removed
+        during the call is recorded as about no case: its cost still reaches the ledger,
+        and no case folder is created without a log."""
         if case_id is None:
+            return self._record_without_case(record)
+        if not self._case_exists(case_id):
+            log.warning("AI %s: case %s no longer exists; saved without it", record["function"],
+                        case_id)  # fmt: skip
             return self._record_without_case(record)
         content = json_bytes(record)
         folder = self.store.case_dir(case_id) / "ai"
@@ -623,6 +633,10 @@ class Gateway:
             "cost_usd": record["cost_usd"],
         })  # fmt: skip
         return call
+
+    def _case_exists(self, case_id: str) -> bool:
+        """A case with an event log (a malformed id is no case)."""
+        return case_id in self.store.list_cases()
 
     def _record_without_case(self, record: dict[str, Any]) -> dict[str, str]:
         content = json_bytes(record)
