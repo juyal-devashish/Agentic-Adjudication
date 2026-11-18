@@ -15,7 +15,8 @@ from adjud.ai.gateway import AgentContext, ChatMessage, Gateway, conversation_ha
 from adjud.ai.tools import Tool, Toolbox, ToolError
 from adjud.integrity import verify_all
 from adjud.paths import DataPaths
-from adjud.store import FileCaseStore
+from adjud.store import CaseBusy, FileCaseStore
+from adjud.workflow import TransitionRefused
 from tests.test_ai import FakeClient, case, reply, text, tool_use  # noqa: F401 (fixture)
 
 PRIYA = AgentContext(person="site101.coord", name="Priya Nair", role="site", site="101")
@@ -143,6 +144,34 @@ def test_tool_errors_go_back_to_the_agent(store, tmp_path):
     assert r.ok and r.tool_calls[0]["error"]
     result = client.requests[1]["messages"][2]["content"][0]
     assert result["is_error"] and "not yours to see" in result["content"]
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [CaseBusy("DEMO01-0001"), TransitionRefused("upload.added", "CLOSED"),
+     OSError("/data/cases/DEMO01-0001/documents/original/Smith_John.pdf")],
+)  # fmt: skip
+def test_a_store_error_in_a_tool_is_an_error_for_the_agent(store, tmp_path, exc):
+    """Store errors from an acting tool go back to the model as is_error, naming only the
+    error type (an OSError's text can carry a file name); the call is still saved and
+    costed."""
+
+    def boom(_: dict) -> dict:
+        raise exc
+
+    schema = {"type": "object", "properties": {}, "required": [],
+              "additionalProperties": False}  # fmt: skip
+    box = Toolbox([Tool("import_files", "Import.", schema, boom)])
+    client = FakeClient(
+        reply(tool_use("import_files", {}), stop="tool_use"),
+        reply(text("The import could not be done.")),
+    )
+    r = gw(store, tmp_path, client=client).converse(PRIYA, ASK, box)
+    assert r.ok and r.tool_calls[0]["error"] and len(client.requests) == 2
+    result = client.requests[1]["messages"][2]["content"][0]
+    assert result["is_error"] and type(exc).__name__ in result["content"]
+    assert "Smith" not in result["content"] and "original" not in result["content"]
+    assert r.call and len(Gateway(store, agent_cfg(), tmp_path).ledger.records()) == 1
 
 
 def test_refusal_and_cut_off_answers_are_errors_with_no_text(store, tmp_path):

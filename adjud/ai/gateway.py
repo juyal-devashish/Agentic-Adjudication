@@ -554,7 +554,10 @@ class Gateway:
     def _run_tools(
         uses: list[Any], toolbox: Toolbox, tool_calls: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Run every tool call of one turn; all results go back in a single message."""
+        """Run every tool call of one turn; all results go back in a single message.
+        A tool that fails for any other reason (the store refusing, a busy case, a disk
+        error) is an error result too, so the call is still saved and costed. The model
+        then sees only the error's type: its text may name files."""
         results = []
         for use in uses:
             args = dict(use.input or {})
@@ -562,6 +565,10 @@ class Gateway:
                 content, is_error = toolbox.call(use.name, args), False
             except (ToolError, KeyError, ValueError, TypeError) as exc:
                 content, is_error = f"Error: {exc}", True
+            except Exception as exc:  # noqa: BLE001 - every failure goes back to the model
+                log.warning("AI tool %s failed: %s", use.name, type(exc).__name__)
+                content = f"Error: the tool failed ({type(exc).__name__}); nothing more is known"
+                is_error = True
             tool_calls.append({
                 "tool": use.name, "input": args, "error": is_error,
                 "result_sha256": hashlib.sha256(content.encode()).hexdigest(),
