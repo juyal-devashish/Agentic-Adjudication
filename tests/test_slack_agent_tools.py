@@ -214,3 +214,21 @@ def test_a_seeded_date_of_birth_in_words_or_a_street_without_its_postcode_is_hel
                  "Date of birth 24.07.1955", "lives at 9 Victoria Ridges"):  # fmt: skip
         for cases in (["DEMO01-0001"], []):
             assert gate.check(text, cases).held, (text, cases)
+
+
+def test_counted_categories_are_not_a_label_with_a_value(ws):
+    """Live run: "1 address, 1 date of birth and 1 phone number" in a redaction summary was
+    held, the ADDRESS label reading the rest of the list as an address. A label word
+    counted in lower case ("1 address", "5 hospital names and addresses") is a category,
+    not a label; a real label with a value is still held."""
+    gate = PhiGate.for_workspace(ws)
+    summary = (
+        "On `DEMO01-0001`, 104 identifiers were removed. troponin_results.xlsx: 17 "
+        "patient names, 12 hospital record numbers, 4 other names, 1 address, 1 date "
+        "of birth and 1 phone number. ecg_report.pdf: 2 hospital names and addresses, "
+        "3 next-of-kin names, 2 e-mail addresses and 2 telephone numbers."
+    )
+    assert not gate.check(summary, ["DEMO01-0001"]).held, gate.check(summary, []).found
+    for text in ("Address: 14 Oak Lane, Leeds LS2 9JT", "Patient: Tom Weber",
+                 "Page 1 Patient: Tom Weber", "Tel 07700 900123"):  # fmt: skip
+        assert gate.check(text, []).held, text

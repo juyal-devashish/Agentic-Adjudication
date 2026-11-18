@@ -104,7 +104,7 @@ class PhiGate:
         return Verdict(bool(found), dict(sorted(counts.items())))
 
     def findings(self, text: str, case_ids: Iterable[str] = ()) -> list[Finding]:
-        unit = TextUnit.from_string(text.translate(_MARKS))
+        unit = TextUnit.from_string(_mask_counted(text.translate(_MARKS), self._label_words))
         allowed = [span for term in self.allowed for span in find_all(unit.text, term)]
         found = [piece for f in detect(unit, self.policy, KnownValues(), language="en")
                  for piece in (_subtract(f, allowed, unit.text)
@@ -117,6 +117,11 @@ class PhiGate:
             found += [Finding(m.start(), m.end(), "SEEDED", "seeded", m.group())
                       for m in re.finditer(pattern, unit.text)]  # fmt: skip
         return found
+
+    @property
+    def _label_words(self) -> frozenset[str]:
+        return frozenset(w.casefold() for labels in self.policy.labels.values()
+                         for lab in labels for w in lab.split())  # fmt: skip
 
     def _subjects(self, case_ids: Iterable[str]) -> set[str]:
         cases = set(self.ws.store.list_cases())
@@ -162,6 +167,29 @@ def _more_forms(s: dict[str, Any]) -> list[str]:
     if len(street) >= 6:
         out.append(street)
     return out
+
+
+# a count and the lower-case words after it, up to punctuation: "1 address", "5 hospital
+# names and addresses", "2 e-mail addresses"
+_COUNTED = re.compile(r"(?<![\w.])\d+((?:\s+[a-z][a-z-]*){1,5})")
+
+
+def _mask_counted(text: str, label_words: frozenset[str]) -> str:
+    """Live run: a redaction summary ("... 1 address, 1 date of birth and 1 phone number")
+    was held, the ADDRESS label reading the rest of the list as an address. A label word
+    counted in lower case names a category, not a label: it is blanked out with spaces (same length,
+    so every finding keeps its place) before the detectors run. Capitalised labels
+    ("Address: ...", "Page 1 Patient: ...") and every other detector are untouched."""
+    chars = list(text)
+    for m in _COUNTED.finditer(text):
+        for w in re.finditer(r"[a-z][a-z-]*", m.group(1)):
+            word = w.group()
+            if any(
+                v in label_words for v in (word, word.removesuffix("es"), word.removesuffix("s"))
+            ):
+                start = m.start(1) + w.start()
+                chars[start : start + len(word)] = " " * len(word)
+    return "".join(chars)
 
 
 def _labelled_patient(f: Finding) -> bool:
