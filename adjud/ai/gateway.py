@@ -498,9 +498,6 @@ class Gateway:
         started = time.monotonic()
         try:
             while True:
-                if requests > self.cfg.max_tool_turns:
-                    note = "too many tool turns without an answer"
-                    break
                 requests += 1
                 tools = toolbox.definitions()
                 response = client.messages.create(
@@ -522,6 +519,10 @@ class Gateway:
                 # the whole content goes back, thinking blocks included (preserved thinking)
                 convo.append({"role": "assistant", "content": response.content})
                 uses = [b for b in response.content if b.type == "tool_use"]
+                if uses and requests > self.cfg.max_tool_turns:
+                    # checked before running them: at most max_tool_turns rounds of tools
+                    note = "too many tool turns without an answer"
+                    break
                 if uses:
                     convo.append(
                         {"role": "user", "content": self._run_tools(uses, toolbox, tool_calls)}

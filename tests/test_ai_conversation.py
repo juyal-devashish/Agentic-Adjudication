@@ -210,9 +210,13 @@ def test_refusal_and_cut_off_answers_are_errors_with_no_text(store, tmp_path):
 
 
 def test_too_many_tool_turns_stops(store, tmp_path):
-    client = FakeClient(*[reply(tool_use("my_tasks", {}), stop="tool_use")] * 3)
-    r = gw(store, tmp_path, client=client, max_tool_turns=2).converse(PRIYA, ASK, Tasks().toolbox())
+    """max_tool_turns=2: two rounds of tools run, the third request's tools do not, and
+    the error reply still lists what ran so the caller can say what was done."""
+    tasks = Tasks()
+    client = FakeClient(*[reply(tool_use("import_files", {}), stop="tool_use")] * 5)
+    r = gw(store, tmp_path, client=client, max_tool_turns=2).converse(PRIYA, ASK, tasks.toolbox())
     assert r.status == "error" and "too many" in r.note and len(client.requests) == 3
+    assert tasks.imported == 2 and [c["tool"] for c in r.tool_calls] == ["import_files"] * 2
 
 
 def test_budget_cap_stops_the_agent(store, tmp_path):
