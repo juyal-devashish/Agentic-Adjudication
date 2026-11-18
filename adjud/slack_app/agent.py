@@ -82,6 +82,15 @@ def answers(event: dict[str, Any]) -> bool:
     )
 
 
+@dataclass(frozen=True)
+class Said:
+    """What became of a text the Agent meant to post: the gate's verdict, and whether
+    Slack took the post (`error`: the failure's type, when it did not)."""
+
+    verdict: Verdict
+    error: str | None = None
+
+
 @dataclass
 class SlackAgent:
     ws: Workspace
@@ -154,24 +163,24 @@ class SlackAgent:
             record["done"] = turn.done
         if reply.ok:
             cases = {*filter(None, [case_id]), *looked_at, *self._cases_named(reply.text)}
-            verdict = self._say(client, channel, thread, reply.text, person, about,
+            said = self._say(client, channel, thread, reply.text, person, about,
                                 cases=cases, label=reply.label)  # fmt: skip
-            self._record_said(record, verdict, reply.text, source="ai")
+            self._record_said(record, said, reply.text, source="ai")
             return
         done = done_text(turn.done)
         if done:  # a tool acted, then the turn failed: say what was done, from code
-            verdict = self._say(client, channel, thread, done, person, about,
+            said = self._say(client, channel, thread, done, person, about,
                                 cases=set(filter(None, [about])))  # fmt: skip
-            self._record_said(record, verdict, done, source="code")
+            self._record_said(record, said, done, source="code")
             return
         if event.get("files"):  # without the AI no file is added: say so, and where to
-            verdict = self._say(client, channel, thread, NO_FILES, person, about)
-            self._record_said(record, verdict, NO_FILES, source="code")
+            said = self._say(client, channel, thread, NO_FILES, person, about)
+            self._record_said(record, said, NO_FILES, source="code")
             return
         text, intro, task_blocks = self._fallback(person)
-        verdict = self._say(client, channel, thread, text, person, about, shown=intro,
+        said = self._say(client, channel, thread, text, person, about, shown=intro,
                             extra=task_blocks)  # fmt: skip
-        self._record_said(record, verdict, text, source="code")
+        self._record_said(record, said, text, source="code")
 
     def _turn_of(self, event: dict[str, Any], client: Any,
                  earlier_files: list[dict[str, Any]]) -> Turn:  # fmt: skip
@@ -199,11 +208,15 @@ class SlackAgent:
         except Exception:
             log.exception("answering a failed turn failed too")
 
-    def _record_said(self, record: dict[str, Any], verdict: Verdict, text: str,
+    def _record_said(self, record: dict[str, Any], said: Said, text: str,
                      source: str) -> None:  # fmt: skip
-        if verdict.held:
-            self.conversations.record(**record, source=source, outcome="held",
-                                      held=verdict.summary)  # fmt: skip
+        held = said.verdict.summary if said.verdict.held else None
+        if said.error:  # Slack did not take it: never recorded as posted
+            note = "; ".join(filter(None, [record.get("note"), f"post failed: {said.error}"]))
+            self.conversations.record(**{**record, "note": note}, source=source,
+                                      outcome="failed", held=held)  # fmt: skip
+        elif held is not None:
+            self.conversations.record(**record, source=source, outcome="held", held=held)
         else:
             self.conversations.record(**record, source=source, outcome="posted", reply=text)
 
@@ -228,7 +241,6 @@ class SlackAgent:
         key = person["id"] if person else ""
         if self.greeted.get(slack_user) == key:
             return
-        self.greeted[slack_user] = key
         channel = event.get("channel") or slack_user
         if person is None:
             text = NO_PERSON
@@ -236,10 +248,12 @@ class SlackAgent:
             text = (f"Hi, I'm the adjudication agent. I act as "
                     f"*{self.ws.people.describe(person)}*. Ask me about your tasks and "
                     "cases. Signatures stay in the app.")  # fmt: skip
-        verdict = self._say(client, channel, None, text, person, None)
+        said = self._say(client, channel, None, text, person, None)
+        if not said.error:  # a greeting that did not go out is tried again next time
+            self.greeted[slack_user] = key
         record = {"slack_user": slack_user, "acting_as": key or None, "channel": channel,
                   "thread": "", "kind": "greeting"}  # fmt: skip
-        self._record_said(record, verdict, text, source="code")
+        self._record_said(record, said, text, source="code")
 
     def on_session_event(self, event: dict[str, Any]) -> None:
         """app_context_changed, agent_session_stopped, agent_session_title_changed and
@@ -261,11 +275,11 @@ class SlackAgent:
         label: str | None = None,
         shown: str | None = None,
         extra: list[dict[str, Any]] | None = None,
-    ) -> Verdict:
+    ) -> Said:
         """Post `text` if the PHI gate passes it, else the hold notice; with *Open in the
         app* for this person. `shown` and `extra`: the section text and the blocks after
-        it, when blocks carry part of `text` (the Tasks). Returns the gate's verdict.
-        Never raises."""
+        it, when blocks carry part of `text` (the Tasks). Returns the gate's verdict and
+        whether Slack took the post. Never raises."""
         try:
             verdict = self._gate().check(text, cases or set(filter(None, [case_id])))
         except Exception as exc:  # no gate, no post: the text is held
@@ -282,8 +296,8 @@ class SlackAgent:
                 url, action_id="open_app_agent")]})  # fmt: skip
         out.append(blocks._context(f"{label} · Synthetic data only." if label and not
                                    verdict.held else "Synthetic data only."))  # fmt: skip
-        self._post(client, channel, thread, HOLD_TEXT if verdict.held else text, out)
-        return verdict
+        error = self._post(client, channel, thread, HOLD_TEXT if verdict.held else text, out)
+        return Said(verdict, error)
 
     def _page(self, person: dict[str, Any], case_id: str | None) -> str:
         if case_id:
@@ -297,7 +311,8 @@ class SlackAgent:
 
     @staticmethod
     def _post(client: Any, channel: str, thread: str | None, text: str,
-              out: list[dict[str, Any]]) -> None:  # fmt: skip
+              out: list[dict[str, Any]]) -> str | None:  # fmt: skip
+        """Post; returns None, or the failure's type (never its message)."""
         kwargs: dict[str, Any] = {"channel": channel, "text": text, "blocks": out,
                                   "unfurl_links": False, "unfurl_media": False}  # fmt: skip
         if thread:
@@ -306,6 +321,8 @@ class SlackAgent:
             client.chat_postMessage(**kwargs)
         except Exception as exc:  # recorded by type only; the turn is still logged
             log.warning("posting to Slack failed: %s", type(exc).__name__)
+            return type(exc).__name__
+        return None
 
     @staticmethod
     def _status(client: Any, channel: str, thread: str, status: str) -> None:

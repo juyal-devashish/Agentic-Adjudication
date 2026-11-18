@@ -340,3 +340,27 @@ def test_the_messages_tab_greets_once_per_person(ws, tmp_path):
     assert "thread_ts" not in client.posts[1]
     assert [e["kind"] for e in log_of(ws.paths)] == ["greeting", "greeting"]
 
+
+class DownSlack(FakeSlack):
+    """Slack refuses every post."""
+
+    def chat_postMessage(self, **kwargs):  # noqa: N802 (slack_sdk's name)
+        self.posts.append(kwargs)
+        raise RuntimeError("slack is down")
+
+
+def test_a_post_slack_refused_is_logged_failed_and_a_greeting_is_tried_again(ws, tmp_path):
+    agent = replay_agent(ws, tmp_path)
+    ws.people.act_as(ME, "dm.dana")
+    client = DownSlack()
+    agent.on_message(message("What are my tasks?"), client)
+    entry = log_of(ws.paths)[-1]
+    assert entry["outcome"] == "failed" and "reply" not in entry
+    assert "post failed: RuntimeError" in entry["note"]
+    opened = {"type": "app_home_opened", "user": ME, "tab": "messages", "channel": DM}
+    agent.on_messages_tab(opened, client)
+    agent.on_messages_tab(opened, client)  # not greeted yet: tried again
+    assert [e["outcome"] for e in log_of(ws.paths)[-2:]] == ["failed", "failed"]
+    agent.on_messages_tab(opened, FakeSlack())
+    agent.on_messages_tab(opened, FakeSlack())  # greeted now: once
+    assert [e["outcome"] for e in log_of(ws.paths)[-3:]] == ["failed", "failed", "posted"]
