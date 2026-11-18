@@ -188,3 +188,42 @@ def test_an_adjudicator_is_told_only_what_gave_them_the_case(demo, monkeypatch):
     assert [r.text for r in helper.updates(seen)] == [
         f"{cid}: you are Adjudicator 3 for the disputed fields."
     ]
+
+
+def test_flow3_roles_get_no_ai_suggestion_and_qc_wording_follows_the_state(demo, monkeypatch):
+    """B28: the AI Suggestion and the suggested QC outcome are the Safety Specialist's; the
+    adjudicators and the CEC Coordinator, whose pages show only the dossier and the signed
+    narrative (P-49), are not shown them in the chat. After the signature, /qc no longer
+    says the draft is ready to edit or that the reader decides and signs."""
+    import yaml
+
+    from tests.test_flow3 import SS, through_qc
+
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    from adjud.documents import upload
+    from tests.test_flow3 import pdf
+
+    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain.")),
+                        ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE101["id"])  # fmt: skip
+    through_qc(runner, store, cid)
+    users = {u["id"]: u for u in yaml.safe_load((demo.config / "users.yaml").read_text())["users"]}
+    from adjud.flow3 import current_round
+
+    rnd = current_round(store, cid)
+    for uid in (rnd.holders["1"], rnd.holders["2"], "cec.sofia"):
+        helper = Assistant(users[uid])
+        texts = [helper.handle(f"/qc {cid[-4:]}").text]
+        texts += [r.text for r in helper.updates({})]
+        for text in texts:
+            assert "suggest" not in text.lower(), (uid, text)
+            assert "ready to edit" not in text and "You decide" not in text, (uid, text)
+    text = Assistant(users[SS]).handle(f"/qc {cid[-4:]}").text
+    assert "ready to edit" not in text and "You decide" not in text
+    assert "Quality check passed and narrative signed by" in text

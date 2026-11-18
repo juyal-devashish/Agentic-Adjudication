@@ -273,7 +273,7 @@ class Assistant:
             f"since {theme.date_words(cs.state_since)}.",
             step,
         ]
-        if cs.state == State.QC_REVIEW and self.role != "site":
+        if cs.state == State.QC_REVIEW and self._sees_ai_suggestion():
             lines.append(self._suggestion_line(case_id))
         if cs.state == State.READY_FOR_ADJUDICATION:
             signed = self._latest_event(case_id, "quality_check.signed") or self._latest_event(
@@ -290,6 +290,19 @@ class Assistant:
 
     def quality_check(self, case_id: str) -> Reply:
         if self.role == "site":
+            return Reply(
+                "The quality check is the Safety Specialist's review. I can tell "
+                f"you where the case is: `/status {case_id}`."
+            )
+        signed = self._latest_event(case_id, "quality_check.signed")
+        in_review = self.store.state(case_id).state == State.QC_REVIEW
+        if not self._sees_ai_suggestion():  # adjudication sees only the signed package (P-49)
+            if signed and not in_review:
+                return Reply(
+                    f"The quality check of {case_id} passed and the narrative was signed "
+                    f"by {signed['signature']['signer']}. The dossier and the signed "
+                    "narrative are in the case's package."
+                )
             return Reply(
                 "The quality check is the Safety Specialist's review. I can tell "
                 f"you where the case is: `/status {case_id}`."
@@ -328,14 +341,20 @@ class Assistant:
                 lines.append(f"Would also help (advice only): {helps}.")
         else:
             lines.append(f"No AI Suggestion this round ({sg.get('note') or 'AI is off'}).")
-        lines.append(self._suggestion_line(case_id))
         nar = result.get("narrative") or {}
+        if not in_review:  # the draft is signed and frozen; nothing is left to decide here
+            if signed:
+                lines.append(
+                    f"Quality check passed and narrative signed by {signed['signature']['signer']}."
+                )
+            return Reply("\n\n".join(lines))
+        lines.append(self._suggestion_line(case_id))
         if nar:
             source = "the AI" if nar.get("source") == "ai" else "the study template"
             lines.append(f"The narrative draft, from {source}, is ready to edit.")
         lines.append("You decide and sign; the AI only suggests.")
         actions = []
-        if self.store.state(case_id).state == State.QC_REVIEW and self.role == "safety_specialist":
+        if self.role == "safety_specialist":
             actions.append(Action(f"Review and sign {case_id}", "qc", case_id))
         return Reply("\n\n".join(lines), actions)
 
@@ -452,6 +471,8 @@ class Assistant:
                 )
             return Reply(text + " Waiting for the site's review.")
         if t == "submission.signed":
+            if not self._sees_ai_suggestion():
+                return Reply(f"{case_id}: signed and submitted by {who}.")
             return Reply(
                 f"{case_id}: signed and submitted by {who}. The quality check is "
                 "running: the checks, the AI Suggestion and the narrative draft…"
@@ -459,6 +480,8 @@ class Assistant:
         if t == "qc.review_needed":
             if site:
                 return Reply(f"{case_id}: your documents are with the Safety Specialist.")
+            if not self._sees_ai_suggestion():
+                return Reply(f"{case_id}: the quality check is with the Safety Specialist.")
             line = f"{case_id}: the quality check is ready. {self._suggestion_line(case_id)}"
             return Reply(line, [Action(f"Review and sign {case_id}", "qc", case_id)] if ss else [])
         if t == "query.opened":
@@ -556,6 +579,12 @@ class Assistant:
     def _qc_result(self, case_id: str) -> dict[str, Any] | None:
         e = self._latest(case_id, "qc.checks_completed")
         return self.store.get_json(case_id, e["results"]["path"]) if e else None
+
+    def _sees_ai_suggestion(self) -> bool:
+        """The AI Suggestion and the suggested QC outcome prepare the Safety Specialist's
+        review; the site, the adjudicators and the CEC Coordinator are not shown them
+        (P-49: adjudication works from the dossier and the signed narrative)."""
+        return self.role not in ("site", "adjudicator", "cec_coordinator")
 
     def _suggestion_line(self, case_id: str) -> str:
         result = self._qc_result(case_id)
