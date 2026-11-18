@@ -2,7 +2,7 @@
 
     Gateway(store, cfg, replay_dir).run(case_id, FUNCTION, input, toolbox) -> AiResult
 
-Modes (`study.yaml` → `ai.mode`, plan P-27):
+Modes (`study.yaml` → `ai.mode`, plan P-27; per function `ai.modes`, P-58):
   off     no call; the step continues without AI (people handle the judgement)
   replay  the recorded output for this exact input (function, prompt version, model,
           input) from `<config>/<study>/ai_replays/<function>/<input hash>.json`; outputs
@@ -32,7 +32,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from adjud.ai.config import AiConfig
+from adjud.ai.config import SLACK_AGENT, AiConfig
 from adjud.ai.functions import AgentFunction
 from adjud.ai.tools import Toolbox, ToolError
 from adjud.chain import ChainedLog
@@ -95,13 +95,16 @@ class Gateway:
         cls, store: FileCaseStore, config_dir: Path, study: str = "DEMO01", **kw: Any
     ) -> Gateway:
         """Settings from `<config>/<study>/study.yaml`; replays from its `ai_replays/`.
-        `ADJUD_AI_MODE` in the environment overrides the mode (off / replay / live)."""
+        `ADJUD_AI_MODE` in the environment overrides the master mode (off / replay / live);
+        `ADJUD_AGENT_MODE` overrides the Slack Agent's own mode (P-58)."""
         import yaml
 
         folder = Path(config_dir) / study
         raw = dict((yaml.safe_load((folder / "study.yaml").read_text()) or {}).get("ai") or {})
         if os.environ.get("ADJUD_AI_MODE"):  # operational override, e.g. a replay demo
             raw["mode"] = os.environ["ADJUD_AI_MODE"]
+        if os.environ.get("ADJUD_AGENT_MODE"):  # e.g. the Agent live, QC on replay
+            raw["modes"] = {**(raw.get("modes") or {}), SLACK_AGENT: os.environ["ADJUD_AGENT_MODE"]}
         cfg = AiConfig.model_validate(raw)
         return cls(store, cfg, folder / "ai_replays", **kw)
 
@@ -127,7 +130,7 @@ class Gateway:
         if not self.cfg.enabled(function.name):
             return AiResult(function.name, "off", "unavailable", note="AI is off")
         h = input_hash(function, self.cfg.model, payload)
-        if self.cfg.mode == "replay":
+        if self.cfg.mode_for(function.name) == "replay":
             return self._replay(case_id, function, payload, h)
         if not self.env.get("ANTHROPIC_API_KEY") and self.client is None:
             return AiResult(
