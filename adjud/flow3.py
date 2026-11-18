@@ -537,9 +537,11 @@ class Flow3:
         if self._state(case_id) != State.CEC_MEETING:
             raise Flow3Refused("the case is not waiting for the committee")
         try:
-            held = date.fromisoformat(held_on).isoformat()
+            held = date.fromisoformat(held_on)
         except ValueError as exc:
             raise Flow3Refused("give the meeting date") from exc
+        if held > self.store.clock().astimezone().date():
+            raise Flow3Refused("the meeting date cannot be in the future")
         members = {u for u, v in self.users().items() if v["role"] == "adjudicator"}
         attendees = [a for a in attendees if a in members]
         if not summary.strip():
@@ -550,7 +552,7 @@ class Flow3:
         except FormRefused as exc:
             raise Flow3Refused(str(exc)) from exc
         quorum = int(self.cfg.get("quorum", 3))
-        meeting = {"held_on": held, "attendees": attendees, "quorum": quorum,
+        meeting = {"held_on": held.isoformat(), "attendees": attendees, "quorum": quorum,
                    "quorum_met": len(attendees) >= quorum and self.chair() in attendees,
                    "summary": summary.strip(), "decisions": clean}  # fmt: skip
         n = sum(e["type"] == "meeting.recorded" for e in self.store.events(case_id)) + 1

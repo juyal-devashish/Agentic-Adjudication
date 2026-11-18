@@ -83,7 +83,9 @@ if ctx.role == "cec_coordinator":
     st.header("Record the meeting")
     members = [u for u, v in flow3.users().items() if v["role"] == "adjudicator"]
     with st.form(f"meeting_{cid}"):
-        held = st.date_input("Meeting date", value=date.today(), format="YYYY-MM-DD")
+        held = st.date_input(
+            "Meeting date", value=date.today(), max_value=date.today(), format="YYYY-MM-DD"
+        )
         attendees = st.multiselect("Attendees", members, default=members, format_func=names.get)
         summary = st.text_area("Summary of the discussion")
         decisions = {}

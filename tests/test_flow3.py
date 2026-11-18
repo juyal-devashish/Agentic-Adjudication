@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import json
 import re
+from datetime import timedelta
 from pathlib import Path
 
 import pymupdf
@@ -220,21 +221,21 @@ def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
 
     with pytest.raises(Flow3Refused, match="no meeting"):
         f3.sign_consensus(cid, CHAIR, "demo", shown=None)
-    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=[a1, a2], summary="Short.",
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=[a1, a2], summary="Short.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     with pytest.raises(Flow3Refused, match="quorum"):
         f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
-    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=list(ADJS),
                       summary="The committee reviewed the dossier.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     assert ("consensus_to_sign", f"user:{CHAIR}") in templates(store)
     seen = shown(store, cid)  # B07: a newer record replaces the one on the Chair's screen
-    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=list(ADJS),
                       summary="Again.", decisions={"related_to_study_drug": "related"})  # fmt: skip
     with pytest.raises(Flow3Refused, match="changed"):
         f3.sign_consensus(cid, CHAIR, "demo", shown=seen)
     assert not [e for e in store.events(cid) if e["type"] == "consensus.signed"]
-    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=list(ADJS),
                       summary="The committee reviewed the dossier.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     note = next(json.loads(p.read_text()) for p in store.paths.outbox.glob("*consensus_to_sign*"))
@@ -272,7 +273,7 @@ def test_fields_shown_only_by_an_open_decision_stay_open_with_it(assigned):
     assert state(store, cid) == State.CEC_MEETING
     assert f3.committee_fields(cid) == ["event_confirmed", "mi_type", "event_date"]
     assert "mi_type" not in current_round(store, cid).agreed
-    meeting = {"held_on": "2026-11-18", "attendees": list(ADJS), "summary": "Discussed."}
+    meeting = {"held_on": "2026-11-05", "attendees": list(ADJS), "summary": "Discussed."}
     with pytest.raises(Flow3Refused, match="MI type"):
         f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes"})
     f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes",
@@ -334,11 +335,31 @@ def test_more_data_from_the_committee_returns_to_the_committee(assigned):
     through_qc(runner, store, cid)
     assert state(store, cid) == State.CEC_MEETING  # Q-06: back to the committee
     assert f3.committee_fields(cid) == ["mi_type"]
-    f3.record_meeting(cid, COORD, held_on="2026-11-19", attendees=list(ADJS),
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=list(ADJS),
                       summary="Reviewed with the new results.",
                       decisions={"mi_type": "type_1"})  # fmt: skip
     f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
     assert state(store, cid) == State.OUTCOME
+
+
+def test_a_meeting_cannot_be_dated_in_the_future(assigned):
+    """B30: the record is of a meeting already held (ADJ-10, Q-14)."""
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    f3.sign_review(cid, a1, "demo", answers(related_to_study_drug="related"))
+    f3.sign_review(cid, a2, "demo", answers(related_to_study_drug="not_related"))
+    runner.run_case_steps()
+    f3.sign_review(cid, current_round(store, cid).holders["3"], "demo",
+                   {"related_to_study_drug": "unable_to_assess"})  # fmt: skip
+    runner.run_case_steps()
+    assert state(store, cid) == State.CEC_MEETING
+    tomorrow = (store.clock().astimezone().date() + timedelta(days=1)).isoformat()
+    with pytest.raises(Flow3Refused, match="future"):
+        f3.record_meeting(cid, COORD, held_on=tomorrow, attendees=list(ADJS), summary="x",
+                          decisions={"related_to_study_drug": "not_related"})  # fmt: skip
+    assert state(store, cid) == State.CEC_MEETING
+    assert not [e for e in store.events(cid) if e["type"] == "meeting.recorded"]
 
 
 def test_reassignment_needs_a_reason_and_hides_the_old_draft(assigned, monkeypatch):
@@ -490,7 +511,7 @@ def test_one_consensus_and_one_readjudication_from_two_tabs(assigned, monkeypatc
     f3.sign_review(cid, a3, "demo",
                    {"mi_type": "type_1", "related_to_study_drug": "unable_to_assess"})  # fmt: skip
     runner.run_case_steps()
-    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS), summary="Done.",
+    f3.record_meeting(cid, COORD, held_on="2026-11-05", attendees=list(ADJS), summary="Done.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     seen = shown(store, cid)
     outcome = racing(monkeypatch, lambda: f3.sign_consensus(cid, CHAIR, "demo", shown=seen))
