@@ -17,8 +17,8 @@ The demo can run in its own folder so a reset never touches ./data (P-57):
 
     ADJUD_DATA_DIR=data/demo uv run python -m tools.reset_demo --preload
 
-A folder with no config/ gets a copy of the committed data/config; existing config is
-kept as it is.
+A separate folder's config/ follows the committed data/config: each reset copies what is
+new or changed there, but keeps any file changed in the demo folder (`sync_config`).
 
 data/demo_uploads/ gets copies of the kit's import files (inbox_files/) and source
 documents (one folder per case key), ready to drag into the UI during the demo.
@@ -28,7 +28,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import io
+import json
 import shutil
 from pathlib import Path
 
@@ -48,7 +50,8 @@ RUNTIME = (
     "exports",  # outcome files for the EDC (Flow 4)
 )  # data/ai/usage.jsonl is kept: AI spend is tracked across demo resets
 KIT = Path(__file__).resolve().parents[1] / "data" / "flow1-testkit"
-CONFIG = KIT.parent / "config"  # committed study config, copied into a new demo folder
+CONFIG = KIT.parent / "config"  # committed study config, copied into a demo folder
+COPIED = ".copied.json"  # in a demo folder's config/: each file's hash as copied
 # The short demo: a clean case (AE-001), an unsure agent on a poor scan (AE-005), missing
 # documents (AE-006), and a record that is not eligible because it is not serious (AE-008).
 DEMO_AES = ("AE-001", "AE-005", "AE-006", "AE-008")
@@ -66,10 +69,47 @@ def _rows_for(src: Path, only: tuple[str, ...], *, history: bool) -> str:
     return out.getvalue()
 
 
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sync_config(target: Path) -> list[str]:
+    """Bring the committed config into a separate demo folder's config/ (P-57, P-58).
+    `.copied.json` records each file's hash as copied. A file nobody changed in the demo
+    folder follows the committed one, so a new study.yaml setting (the Agent's mode, the
+    PHI gate's words) reaches the demo; a file changed there is kept, and named. A folder
+    copied before that record existed cannot tell: its differing files are replaced and
+    the old one kept beside it as `<name>.kept`. Returns what to tell the presenter."""
+    record = target / COPIED
+    copied = json.loads(record.read_text()) if record.exists() else None
+    now: dict[str, str] = {}
+    said: list[str] = []
+    for src in sorted(p for p in CONFIG.rglob("*") if p.is_file()):
+        rel = src.relative_to(CONFIG).as_posix()
+        dst = target / rel
+        now[rel] = _sha(src)
+        if dst.exists():
+            have = _sha(dst)
+            if have == now[rel]:
+                continue
+            if copied is not None and copied.get(rel) != have:  # changed in the demo folder
+                now[rel] = copied.get(rel, "")
+                said.append(f"kept the demo folder's own {rel} (it differs from data/config)")
+                continue
+            if copied is None:
+                shutil.copy2(dst, dst.with_name(dst.name + ".kept"))
+                said.append(f"updated {rel} from data/config; the old one is {rel}.kept")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+    record.write_text(json.dumps(now, indent=1, sort_keys=True) + "\n")
+    return said
+
+
 def reset(paths: DataPaths, *, preload: bool = False, only: tuple[str, ...] | None = None) -> None:
     paths.root.mkdir(parents=True, exist_ok=True)
-    if not paths.config.exists():  # a separate demo folder (P-57); never overwritten
-        shutil.copytree(CONFIG, paths.config)
+    if paths.config.resolve() != CONFIG.resolve():  # a separate demo folder (P-57)
+        for line in sync_config(paths.config):
+            print(line)
     for name in RUNTIME:
         target = paths.root / name
         if target.resolve().parent != paths.root.resolve():

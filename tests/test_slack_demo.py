@@ -5,6 +5,7 @@ demo folder copies the committed config and leaves the repo's data alone."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -138,6 +139,26 @@ def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp
     reset(fresh, only=DEMO_AES)
     assert (fresh.config / "users.yaml").read_text() == "users: []\n"
     assert sorted(p.name for p in (ROOT / "data").iterdir()) == before
+
+
+def test_a_demo_folder_copied_earlier_takes_new_committed_settings(tmp_path):
+    """P-58: a demo folder copied before the Agent's settings existed gets them on the next
+    reset; a file the presenter changed there is kept, and an old copy is kept beside."""
+    committed = (ROOT / "data" / "config" / "DEMO01" / "study.yaml").read_bytes()
+    fresh = DataPaths(tmp_path / "demo")
+    reset(fresh, only=DEMO_AES)
+    study = fresh.config / "DEMO01" / "study.yaml"
+    study.write_text("stale: true\n")  # as copied before P-58, with no record of the copy
+    (fresh.config / ".copied.json").unlink()
+    reset(fresh, only=DEMO_AES)
+    assert study.read_bytes() == committed
+    assert study.with_name("study.yaml.kept").read_text() == "stale: true\n"
+    record = json.loads((fresh.config / ".copied.json").read_text())
+    study.write_text("old copy\n")  # as copied, before data/config changed
+    record["DEMO01/study.yaml"] = hashlib.sha256(b"old copy\n").hexdigest()
+    (fresh.config / ".copied.json").write_text(json.dumps(record))
+    reset(fresh, only=DEMO_AES)  # unchanged in the demo folder: it follows data/config
+    assert study.read_bytes() == committed
 
 
 def test_rahul_is_told_in_slack_when_ae_records_wait_and_imports_from_the_dm(tmp_path, monkeypatch):
