@@ -13,6 +13,13 @@ Only these runtime folders under the data dir are removed: cases, intake, inbox,
 processed, outbox, logs, edc_mock, demo_uploads. data/config/, data/flow1-testkit/ and
 data/metrics/ (corpus measurements shown on page 3, not case data) are kept.
 
+The demo can run in its own folder so a reset never touches ./data (P-57):
+
+    ADJUD_DATA_DIR=data/demo uv run python -m tools.reset_demo --preload
+
+A folder with no config/ gets a copy of the committed data/config; existing config is
+kept as it is.
+
 data/demo_uploads/ gets copies of the kit's import files (inbox_files/) and source
 documents (one folder per case key), ready to drag into the UI during the demo.
 """
@@ -41,6 +48,7 @@ RUNTIME = (
     "exports",  # outcome files for the EDC (Flow 4)
 )  # data/ai/usage.jsonl is kept: AI spend is tracked across demo resets
 KIT = Path(__file__).resolve().parents[1] / "data" / "flow1-testkit"
+CONFIG = KIT.parent / "config"  # committed study config, copied into a new demo folder
 # The short demo: a clean case (AE-001), an unsure agent on a poor scan (AE-005), missing
 # documents (AE-006), and a record that is not eligible because it is not serious (AE-008).
 DEMO_AES = ("AE-001", "AE-005", "AE-006", "AE-008")
@@ -59,6 +67,9 @@ def _rows_for(src: Path, only: tuple[str, ...], *, history: bool) -> str:
 
 
 def reset(paths: DataPaths, *, preload: bool = False, only: tuple[str, ...] | None = None) -> None:
+    paths.root.mkdir(parents=True, exist_ok=True)
+    if not paths.config.exists():  # a separate demo folder (P-57); never overwritten
+        shutil.copytree(CONFIG, paths.config)
     for name in RUNTIME:
         target = paths.root / name
         if target.resolve().parent != paths.root.resolve():

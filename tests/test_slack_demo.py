@@ -122,3 +122,20 @@ def test_the_slack_demo_runs_from_the_import_to_the_assignment(tmp_path, monkeyp
 
     sent = json.dumps(client.posts).lower()
     assert not {w for w in forbidden(ws) if w in sent}  # ADR 0004
+
+
+def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp_path):
+    """P-57: the demo runs in its own folder (ADJUD_DATA_DIR=data/demo), so starting over
+    never touches the presenter's ./data. The committed config is copied into a folder
+    that has none; config already there is kept as it is."""
+    before = sorted(p.name for p in (ROOT / "data").iterdir())
+    fresh = DataPaths(tmp_path / "demo")
+    reset(fresh, preload=True, only=DEMO_AES)
+    assert (fresh.config / "users.yaml").read_bytes() == (
+        ROOT / "data" / "config" / "users.yaml"
+    ).read_bytes()
+    assert [p.name for p in fresh.inbox.iterdir()] == ["01_initial.csv"]
+    (fresh.config / "users.yaml").write_text("users: []\n")  # a local change survives
+    reset(fresh, only=DEMO_AES)
+    assert (fresh.config / "users.yaml").read_text() == "users: []\n"
+    assert sorted(p.name for p in (ROOT / "data").iterdir()) == before
