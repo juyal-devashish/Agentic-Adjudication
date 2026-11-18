@@ -48,6 +48,7 @@ SYSTEM_CEC = "system:cec"
 REVIEW_MEANING = "Adjudication assessment"
 ADJ3_MEANING = "Adjudication assessment of the disputed fields"
 CONSENSUS_MEANING = "Committee consensus"
+MEETING_CHANGED = "the meeting record changed since you opened it; review the new record"
 MORE_DATA_MEANING = "More data requested for adjudication — a query is sent to the site"
 SLOTS = ("1", "2")
 
@@ -513,8 +514,10 @@ class Flow3:
         if meeting["quorum_met"]:
             self._notify(case_id, f"user:{self.chair()}", "consensus_to_sign", coordinator_id)
 
-    def sign_consensus(self, case_id: str, user_id: str, password: str) -> None:
-        """The Chair signs the committee's decisions as recorded (ADJ-12)."""
+    def sign_consensus(self, case_id: str, user_id: str, password: str, *,
+                       shown: dict[str, Any] | None) -> None:  # fmt: skip
+        """The Chair signs the committee's decisions as recorded (ADJ-12): `shown` is the
+        meeting record (path and sha256) on his screen, refused if a newer one exists."""
         if user_id != self.chair():
             raise SignatureRefused("only the committee Chair can sign the consensus")
         rnd = current_round(self.store, case_id)
@@ -526,8 +529,17 @@ class Flow3:
             raise Flow3Refused("record the meeting on the updated dossier first")
         if not last["data"]["quorum_met"]:
             raise Flow3Refused("the recorded meeting had no quorum")
-        user = self.users()[user_id]
         ref = last["data"]["meeting"]
+        if ref != shown:
+            raise Flow3Refused(MEETING_CHANGED)
+        user = self.users()[user_id]
         signature = sign(user, password, CONSENSUS_MEANING, [{"name": "meeting", **ref}])
-        self._event(case_id, "consensus.signed", user_id,
-                    {"round": rnd.number, "meeting": ref}, signature=signature)  # fmt: skip
+
+        def same_meeting(prior: list[dict[str, Any]]) -> None:
+            recorded = [e for e in prior if e["type"] == "meeting.recorded"]
+            if recorded[-1]["data"]["meeting"] != ref:
+                raise Flow3Refused(MEETING_CHANGED)
+
+        data = {"round": rnd.number, "meeting": ref}
+        draft = EventDraft(type="consensus.signed", actor=user_id, data=data, signature=signature)
+        self.store.append_event(case_id, draft, expect=same_meeting)  # checked under the lock

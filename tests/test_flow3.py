@@ -184,6 +184,11 @@ def test_adjudicator_3_resolves_every_disputed_field(assigned):
     assert [s["role"] for s in mi["sources"]] == ["Adjudicator 3", "Adjudicator 2"]
 
 
+def shown(store, cid: str) -> dict:
+    """The meeting record the Chair has on screen: the latest one recorded."""
+    return current_round(store, cid).meeting["data"]["meeting"]
+
+
 def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
     runner, store, cid = assigned
     f3 = runner.flow3
@@ -201,21 +206,30 @@ def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
     assert cid in assigned_cases(store, CHAIR, chair=True)  # the Chair sees committee cases
 
     with pytest.raises(Flow3Refused, match="no meeting"):
-        f3.sign_consensus(cid, CHAIR, "demo")
+        f3.sign_consensus(cid, CHAIR, "demo", shown=None)
     f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=[a1, a2], summary="Short.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     with pytest.raises(Flow3Refused, match="quorum"):
-        f3.sign_consensus(cid, CHAIR, "demo")
+        f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
     f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
                       summary="The committee reviewed the dossier.",
                       decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     assert ("consensus_to_sign", f"user:{CHAIR}") in templates(store)
+    seen = shown(store, cid)  # B07: a newer record replaces the one on the Chair's screen
+    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
+                      summary="Again.", decisions={"related_to_study_drug": "related"})  # fmt: skip
+    with pytest.raises(Flow3Refused, match="changed"):
+        f3.sign_consensus(cid, CHAIR, "demo", shown=seen)
+    assert not [e for e in store.events(cid) if e["type"] == "consensus.signed"]
+    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS),
+                      summary="The committee reviewed the dossier.",
+                      decisions={"related_to_study_drug": "not_related"})  # fmt: skip
     note = next(json.loads(p.read_text()) for p in store.paths.outbox.glob("*consensus_to_sign*"))
     assert note["link"].startswith("/committee?role=adjudicator&user=adj.okafor")
     other = next(a for a in ADJS if a != CHAIR)
     with pytest.raises(SignatureRefused, match="Chair"):
-        f3.sign_consensus(cid, other, "demo")
-    f3.sign_consensus(cid, CHAIR, "demo")
+        f3.sign_consensus(cid, other, "demo", shown=shown(store, cid))
+    f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
     assert state(store, cid) == State.OUTCOME
     finish(runner)
     outcome = store.get_json(cid, outcomes(store, cid)[0]["outcome"]["path"])
@@ -250,7 +264,7 @@ def test_fields_shown_only_by_an_open_decision_stay_open_with_it(assigned):
         f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes"})
     f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes",
                       "mi_type": "type_2", "event_date": "2026-01-08"})  # fmt: skip
-    f3.sign_consensus(cid, CHAIR, "demo")
+    f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
     finish(runner)
     assert state(store, cid) == State.CLOSED
     values = store.get_json(cid, outcomes(store, cid)[0]["outcome"]["path"])["values"]
@@ -310,7 +324,7 @@ def test_more_data_from_the_committee_returns_to_the_committee(assigned):
     f3.record_meeting(cid, COORD, held_on="2026-11-19", attendees=list(ADJS),
                       summary="Reviewed with the new results.",
                       decisions={"mi_type": "type_1"})  # fmt: skip
-    f3.sign_consensus(cid, CHAIR, "demo")
+    f3.sign_consensus(cid, CHAIR, "demo", shown=shown(store, cid))
     assert state(store, cid) == State.OUTCOME
 
 

@@ -166,6 +166,37 @@ def test_the_committee_records_and_the_chair_signs(reviewing):
     assert store.state(cid).state == State.OUTCOME
 
 
+def test_the_chair_cannot_sign_a_meeting_record_he_has_not_seen(reviewing):
+    """B07: a meeting recorded again while the Chair's page is open is not signed with
+    the record he was shown; he is told it changed and sees the new one."""
+    runner, store, cid = reviewing
+    f3 = runner.flow3
+    rnd = current_round(store, cid)
+    f3.sign_review(cid, rnd.holders["1"], "demo", answers(mi_type="type_1"))
+    f3.sign_review(cid, rnd.holders["2"], "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    f3.sign_review(cid, current_round(store, cid).holders["3"], "demo", {"mi_type": "type_4"})
+    runner.run_case_steps()
+    adjs = [u for u, v in f3.users().items() if v["role"] == "adjudicator"]
+    meeting = {"held_on": "2026-11-18", "attendees": adjs}
+    f3.record_meeting(cid, "cec.sofia", **meeting, summary="v1: type 1.",
+                      decisions={"mi_type": "type_1"})  # fmt: skip
+    at = as_user("adj.okafor", "views/committee.py", cid)
+    assert "Type 1" in tables(at)
+    next(t for t in at.text_input if t.label.startswith("Password")).input("demo")
+    f3.record_meeting(cid, "cec.sofia", **meeting, summary="v2: type 2.",
+                      decisions={"mi_type": "type_2"})  # fmt: skip
+    next(b for b in at.button if b.label == "Sign the consensus").click().run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events(cid) if e["type"] == "consensus.signed"]
+    assert any("changed" in e.value for e in at.error)
+    assert "Type 2" in tables(at)  # the new record is now on screen
+    next(t for t in at.text_input if t.label.startswith("Password")).input("demo")
+    next(b for b in at.button if b.label == "Sign the consensus").click().run()
+    signed = [e for e in store.events(cid) if e["type"] == "consensus.signed"]
+    assert signed[0]["data"]["meeting"]["path"].endswith("meeting_v2.json")
+
+
 def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     runner, store, cid = reviewing
     rnd = current_round(store, cid)

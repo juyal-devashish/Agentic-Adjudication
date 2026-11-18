@@ -156,13 +156,17 @@ if meeting is not None:
     if stale:
         st.warning("This meeting was before the new data arrived. Record the next meeting.")
     elif ctx.actor == chair and record["quorum_met"]:
+        # Sign the record drawn on the run the Chair saw, not one recorded since (B07).
+        seen_key = f"consensus_shown_{cid}"
+        shown = st.session_state.get(seen_key, meeting["data"]["meeting"])
+        st.session_state[seen_key] = meeting["data"]["meeting"]
         with st.form(f"consensus_{cid}"):
             password = st.text_input(
                 f"Password for {ctx.user['name']} (demo password: demo)", type="password"
             )
             if st.form_submit_button("Sign the consensus", type="primary"):
                 try:
-                    flow3.sign_consensus(cid, ctx.actor, password)
+                    flow3.sign_consensus(cid, ctx.actor, password, shown=shown)
                     st.toast("Consensus signed")
                     st.rerun()
                 except SignatureRefused as exc:
