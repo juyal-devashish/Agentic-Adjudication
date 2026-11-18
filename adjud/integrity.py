@@ -55,8 +55,9 @@ def case_dirs(paths: DataPaths) -> list[Path]:
 def verify_all(paths: DataPaths) -> list[VerifyReport]:
     reports = [verify_case_log(d) for d in case_dirs(paths)]
     slack = ChainedLog(paths.root / "slack" / "actions.jsonl")  # Slack app (P-55, ADR 0003)
+    talks = ChainedLog(paths.root / "slack" / "conversations.jsonl")  # the Agent (P-58, Q18)
     ledger = ChainedLog(paths.ai / "usage.jsonl")
-    for chained in (intake_log(paths), ledger, slack):
+    for chained in (intake_log(paths), ledger, slack, talks):
         if chained.path.exists():
             check = check_chain(chained)
             report = VerifyReport(chained.path, check.records, list(check.problems))

@@ -1,4 +1,5 @@
-"""The Bolt app (P-55, ADR 0003): `/adj`, App Home, buttons and the Acting As form.
+"""The Bolt app (P-55, ADR 0003): `/adj`, App Home, buttons and the Acting As form, and
+the Agent's events in the Messages tab (P-58, `agent.py`).
 
 Handlers are plain methods of `SlackHandlers` taking Bolt's arguments (ack, command,
 body, respond, client), so tests drive them with a fake client and never reach Slack.
@@ -18,6 +19,8 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from adjud.slack_app import blocks
+from adjud.slack_app.agent import SlackAgent
+from adjud.slack_app.conversations import ConversationLog
 from adjud.slack_app.core import SlackActionsLog, Workspace
 
 log = logging.getLogger("adjud.slack_app")
@@ -30,6 +33,11 @@ class SlackHandlers:
     ws: Workspace
     actions: SlackActionsLog
     notes: dict[str, str] = field(default_factory=dict)  # Slack user -> last result on Home
+    agent: SlackAgent | None = None  # the Agent in the Messages tab (P-58)
+
+    def __post_init__(self) -> None:
+        if self.agent is None:
+            self.agent = SlackAgent(self.ws, ConversationLog(self.ws.paths))
 
     @property
     def people(self) -> Any:
@@ -137,6 +145,10 @@ class SlackHandlers:
     # -- App Home ------------------------------------------------------------------------------
 
     def on_home_opened(self, event: dict[str, Any], client: Any) -> None:
+        if event.get("tab") == "messages":  # the conversation with the Agent (P-58)
+            assert self.agent is not None
+            self.agent.on_messages_tab(event, client)
+            return
         if event.get("tab", "home") != "home":
             return
         self._record(event["user"], "home_opened")
@@ -203,4 +215,10 @@ def build_app(handlers: SlackHandlers, bot_token: str, *, verify: bool = True) -
     app.action("import_queued")(handlers.on_import_button)
     app.action(re.compile(r"^open_app"))(handlers.on_open_app)
     app.view("act_as")(handlers.on_act_as_submitted)
+    agent = handlers.agent
+    assert agent is not None
+    app.event("message")(agent.on_message)  # message.im; edits and bots are ignored there
+    for name in ("app_context_changed", "agent_session_stopped", "agent_session_title_changed",
+                 "file_shared"):  # fmt: skip
+        app.event(name)(agent.on_session_event)
     return app

@@ -7,6 +7,10 @@ chose someone to act as). People who share one Slack account get one DM naming t
 Same content as the e-mail, never Clinical Content (ADR 0004). A failure is a recorded
 Delivery Attempt (adjud.delivery) and never holds up e-mail or the workflow.
 
+Each DM's channel and `ts` are recorded in `data/slack/dm_sent.jsonl` with its case, so
+the DM starts a Conversation: a reply in its thread reaches the Agent with that case as
+context (P-58, Q12).
+
 Configuration, from the environment only: NOTIFY_CHANNELS must include `slack`;
 SLACK_BOT_TOKEN (a secret, never logged); APP_BASE_URL for the links.
 """
@@ -27,6 +31,19 @@ from adjud.slack_app.core import ROLE_WORDS, Directory
 
 ACTOR = "system:slack"
 TIMEOUT_SECONDS = 10
+
+
+def notice_case(slack_dir: Path, channel: str, thread_ts: str) -> str | None:
+    """The case of the DM notice that starts this thread, if it is one (P-58, Q12): a
+    reply in a notice's thread is a Conversation about that case."""
+    path = slack_dir / "dm_sent.jsonl"
+    if not path.exists() or not thread_ts:
+        return None
+    for line in path.read_text().splitlines():
+        sent = json.loads(line) if line.strip() else {}
+        if sent.get("ts") == thread_ts and sent.get("channel") == channel:
+            return sent.get("case_id")
+    return None
 
 
 class PostClient(Protocol):
@@ -90,8 +107,8 @@ class SlackDmChannel:
                 continue
             text, blocks = notice(note, for_whom(note["to"], group, self.directory), url,
                                   self._next(note, group[0]))  # fmt: skip
-            self._post(channel=slack_user, text=text, blocks=blocks)
-            self._mark(note["id"], slack_user)
+            response = self._post(channel=slack_user, text=text, blocks=blocks)
+            self._mark(note, slack_user, response)
 
     def _next(self, note: dict[str, Any], person: dict[str, Any]) -> str | None:
         """Worked out when the DM is sent, so it says where the case is now. None for a
@@ -111,16 +128,23 @@ class SlackDmChannel:
         lines = (json.loads(ln) for ln in self.sent_path.read_text().splitlines() if ln.strip())
         return {d["slack_user"] for d in lines if d["note"] == note_id}
 
-    def _mark(self, note_id: str, slack_user: str) -> None:
+    def _mark(self, note: dict[str, Any], slack_user: str, response: Any) -> None:
+        """Who it reached, and where: the DM channel (`D…`, what a reply's message event
+        carries) and the message's `ts`, so a reply in its thread finds the case (Q12)."""
+        sent = {"note": note["id"], "slack_user": slack_user, "case_id": note.get("case_id")}
+        for key in ("channel", "ts"):
+            value = response.get(key) if hasattr(response, "get") else None
+            if isinstance(value, str):
+                sent[key] = value
         self.sent_path.parent.mkdir(parents=True, exist_ok=True)
         with self.sent_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"note": note_id, "slack_user": slack_user}) + "\n")
+            f.write(json.dumps(sent) + "\n")
 
-    def _post(self, **kwargs: Any) -> None:
+    def _post(self, **kwargs: Any) -> Any:
         from slack_sdk.errors import SlackApiError
 
         try:
-            self.client.chat_postMessage(unfurl_links=False, unfurl_media=False, **kwargs)
+            return self.client.chat_postMessage(unfurl_links=False, unfurl_media=False, **kwargs)
         except SlackApiError as exc:
             resp = exc.response
             status = getattr(resp, "status_code", 0) or 0

@@ -28,6 +28,11 @@ class FakeClient:
     def __init__(self):
         self.published: list[dict] = []
         self.opened: list[dict] = []
+        self.posts: list[dict] = []
+
+    def chat_postMessage(self, **kwargs):  # noqa: N802 (slack_sdk's name)
+        self.posts.append(kwargs)
+        return {"ok": True, "channel": "D0PRESENTER", "ts": f"{len(self.posts)}.0"}
 
     def views_publish(self, user_id, view):
         self.published.append({"user_id": user_id, "view": view})
@@ -183,8 +188,9 @@ def test_link_clicks_and_home_opening_are_handled(app, data):
     h.on_home_opened({"user": ME, "tab": "home"}, client)
     assert client.published[-1]["user_id"] == ME
     n = len(client.published)
-    h.on_home_opened({"user": ME, "tab": "messages"}, client)
-    assert len(client.published) == n
+    h.on_home_opened({"user": ME, "tab": "messages", "channel": "D0PRESENTER"}, client)
+    assert len(client.published) == n  # the Messages tab is the Agent's (P-58): no Home
+    assert "I act as *Dr. Anna Weber (Safety Specialist)*" in json.dumps(client.posts)
 
 
 def test_help_and_unknown_commands_answer_privately(app, data):
@@ -206,9 +212,11 @@ def test_the_slack_actions_log_is_verified_and_survives_a_reset_without_acting_a
 
 
 def test_the_bolt_app_registers_every_listener_without_calling_slack(app):
+    """/adj, App Home (both tabs), three buttons, the Acting As form, and the Agent's
+    events: message.im and four session events (P-58)."""
     h, _ = app
     bolt = build_app(h, "xoxb-test", verify=False)
-    assert len(bolt._listeners) == 6
+    assert len(bolt._listeners) == 11
 
 
 def forbidden(ws: Workspace) -> set[str]:
