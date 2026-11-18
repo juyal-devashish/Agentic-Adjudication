@@ -54,6 +54,9 @@ def test_links_land_each_recipient_on_its_page():
     assert link("DEMO01-0001", "role:safety_specialist") == (
         "/record?role=safety_specialist&case=DEMO01-0001"
     )
+    assert link("DEMO01-0001", "role:safety_specialist", page="qc") == (
+        "/qc?role=safety_specialist&case=DEMO01-0001"
+    )  # the Safety Specialist's Quality Check notices open where her task is (P-57)
 
 
 def test_site_notification_goes_to_that_sites_users_only():

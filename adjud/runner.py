@@ -28,7 +28,7 @@ from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
-from adjud.slack_app.core import Directory
+from adjud.slack_app.core import Directory, Workspace
 from adjud.slack_app.dm import ACTOR as SLACK_ACTOR
 from adjud.slack_app.dm import SlackDmChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
@@ -85,6 +85,7 @@ class Runner:
                         Directory(self.paths.config, self.paths.root / "slack", self.study),
                         settings,
                         settings.client(),
+                        next_step=Workspace(self.paths, self.study, clock=self.clock).next_step,
                     ),
                     SLACK_ACTOR,
                     since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
