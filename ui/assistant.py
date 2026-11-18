@@ -120,8 +120,10 @@ class Assistant:
             r"\b(my tasks?|to do|todo|waiting for me|what do i need|what should i)\b", low
         ):
             return self.tasks()
-        if command == "/import" or (not command and re.search(r"\bimport\b", low)):
+        if command == "/import":
             return self.run_import()
+        if not command and re.search(r"\bimport\b", low):  # never import on plain words
+            return self.tasks()  # it lists the waiting files and says to type /import
         if command == "/why" or (not command and re.search(r"\b(why|eligib|not a case)", low)):
             return self.why(t)
         if command == "/qc" or (not command and re.search(r"\b(qc|quality|suggest)", low)):

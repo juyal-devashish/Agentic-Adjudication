@@ -61,6 +61,17 @@ def test_data_manager_imports_from_the_chat_and_is_told_why_not(demo):
     assert any(e.get("actor") == "dm.dana" for e in log)  # imported as the data manager
 
 
+def test_a_plain_message_about_importing_does_not_import(demo):
+    """Only /import (or its starter button) imports; "don't import yet" must not."""
+    at = run(role="data_manager")
+    for text in ("don't import yet, just tell me what is waiting", "how does import work?"):
+        say(at, text)
+        assert "Type **/import**" in chat(at)
+    assert [f.name for f in demo.inbox.iterdir()] == ["01_initial.csv"]
+    assert not list(demo.root.glob("cases/*/events.jsonl"))
+    assert not list(demo.root.glob("intake/evaluations.jsonl"))
+
+
 def test_site_sees_only_its_cases_and_gets_a_link_to_upload(demo):
     Runner(demo).run_once()
     at = run(role="site", user_site=SITE101)
