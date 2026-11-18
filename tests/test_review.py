@@ -229,6 +229,65 @@ def test_box_on_a_scan_blacks_out_the_pixels(ctx):
     assert area.getextrema()[1] < 10  # the grey scribble is now black, not grey
 
 
+def form_pdf(value: str) -> bytes:
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_text((72, 72), "ECG REPORT. Sinus rhythm.", fontsize=11)
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name = pymupdf.PDF_WIDGET_TYPE_TEXT, "patient"
+        widget.field_value, widget.rect = value, pymupdf.Rect(72, 150, 400, 175)
+        page.add_widget(widget)
+        page.add_freetext_annot(pymupdf.Rect(72, 300, 300, 330), "Tray zebra quokka")
+        return doc.tobytes()
+
+
+def test_form_fields_and_annotations_are_flattened_so_a_box_removes_them(ctx):
+    """A form field's value and an annotation's text are page content like any other: a box
+    over them removes them, and no field or annotation reaches the output (P-30)."""
+    store, proc, cid = ctx
+    upload(store, cid, [("form.pdf", form_pdf("Robin Quill 2929647"))], SITE)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        page = doc[0]
+        assert not list(page.widgets()) and page.first_annot is None and not doc.is_form_pdf
+        field = _fractions(page, pymupdf.Rect(72, 150, 400, 175))
+        note = _fractions(page, pymupdf.Rect(72, 300, 300, 330))
+    boxes = [{"file": "form.pdf", "page": 1, "rect": r} for r in (field, note)]
+    change_redactions(store, cid, SITE, boxes=boxes)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    assert done["status"] == "verified"
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        page = doc[0]
+        text = page.get_text()
+        assert not list(page.widgets()) and page.first_annot is None
+    assert "2929647" not in text and "Quill" not in text and "quokka" not in text
+    assert "Sinus rhythm" in text
+
+
+def test_a_detected_form_field_value_is_removed_not_left_as_a_residual(ctx):
+    store, proc, cid = ctx
+    value = "Patient: Robert Fairweather MRN: 77881234 Date of birth: 12/07/1951"
+    upload(store, cid, [("form.pdf", form_pdf(value))], SITE)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    assert done["status"] == "verified" and done["findings"]
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        text = doc[0].get_text()
+    assert "Fairweather" not in text and "77881234" not in text and "1951" not in text
+
+
+def test_verification_fails_while_a_form_field_or_annotation_remains():
+    from adjud.deid.detect import KnownValues
+    from adjud.deid.pdf import verify_pdf
+    from adjud.deid.policy import Policy
+
+    policy = Policy.for_study(CONFIG, "DEMO01")
+    result = verify_pdf(form_pdf("nothing to see"), policy, KnownValues())
+    assert not result.passed and result.annotated_pages == [1]
+
+
 @pytest.mark.parametrize(
     ("box", "match"),
     [
