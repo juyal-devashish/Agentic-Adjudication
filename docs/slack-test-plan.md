@@ -73,9 +73,24 @@ After stage 2 with at least one case through the Quality Check:
 - [ ] `git status` shows `.env` untracked; `git log -p | grep -E "xoxb-|xapp-"` finds nothing.
 - [ ] No file was uploaded to Slack (the app has no `files:write` scope).
 
-## 5. Assistant-retirement runs (after Friday)
+## 5. Assistant-retirement runs (P-56)
 
-ADR 0003: the Assistant page may be retired only when each of its abilities has a Slack equivalent covered by tests, 3 consecutive full demo runs (all four flows) are driven from Slack without opening the Assistant, and `uv run python -m tools.notify_parity` is CLEAN after each; then a new decision removes it. Record each run:
+ADR 0003: the Assistant page may be retired only when each of its abilities has a Slack equivalent covered by tests, 3 consecutive full demo runs (all four flows) are driven from Slack without opening the Assistant, and `uv run python -m tools.notify_parity` is CLEAN after each. P-56 (2026-11-18) hid the Assistant already; meeting this bar lets its code be deleted (plan step 30).
+
+**One run** (about 30 minutes). Start from a fresh `reset_demo --preload` with the runner, the UI and `python -m adjud.slack_app` running, `NOTIFY_CHANNELS=outbox,smtp,slack`. Start every step from Slack: App Home, a DM or `/adj`. Open the app only through a Slack button, and never type the Assistant's address.
+
+- [ ] `/adj act-as rahul`: Home shows *1 AE file waiting*; **Import queued files** creates DEMO01-0001 to 0003; Home says *1 record is not a case* with **Open AE import**, which shows AE-008's rule in the app.
+- [ ] `/adj pull` as Rahul answers in counts and case IDs; as anyone else it is refused.
+- [ ] `/adj act-as priya`: the DM *documents requested* and the Home task open *Documents* on DEMO01-0001; upload, review and sign there.
+- [ ] `/adj act-as tom`: the same for DEMO01-0002 with the poor scan (site 102).
+- [ ] `/adj act-as anna`: the Home task for each case shows *suggested: pass*, *none* or *query*; `/adj status 0001` shows the same word; the button opens *Quality check*. Pass 0001 and 0002, and send 0003's query.
+- [ ] `/adj act-as priya`: the query DM opens 0003; answer by uploading and signing; Anna's new task appears.
+- [ ] Each assigned adjudicator (`/adj act-as okafor`, then the others): the DM and the Home task open *Adjudication*; sign agreeing answers on 0001, run `tools.make_flow3_fixtures --apply disputed` on 0002.
+- [ ] `/adj act-as sofia`: *Record the committee meeting* opens *Committee*; `/adj act-as okafor`: *Sign the committee's consensus*.
+- [ ] Outcome DMs arrive; the Case record's *Notifications* shows e-mail and Slack *Sent* for each notice.
+- [ ] `uv run python -m tools.notify_parity` prints CLEAN; `uv run python -m tools.verify_log` is all OK. Fill one row below.
+
+Record each run:
 
 | Run | Date | Notices | DMs sent | Failed attempts | E-mailed | Parity |
 |---|---|---|---|---|---|---|
