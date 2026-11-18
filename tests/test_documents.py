@@ -165,3 +165,19 @@ def test_mislabelled_image_is_ocred_and_rebuilt_as_an_image_only_page(setup):
         assert doc.page_count == 1
         assert doc[0].get_text().strip() == ""  # image-only: no hidden text layer
         assert doc[0].get_images()
+
+
+def test_removing_a_file_while_identifiers_are_removed_is_refused_plainly(setup):
+    """A second tab's "Remove" while the case is DEIDENTIFYING used to crash the page
+    with TransitionRefused; the site is now told to wait for the run."""
+    from adjud.review import ReviewRefused, delete_document
+
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-104-0006", "AE-007")
+    folder = "DEMO01-104-0006_AE-007"
+    upload(pipe.store, cid, files(folder, "entlassungsbrief.pdf", "notizen.txt"), "site104.coord")
+    proc.process_case(cid)
+    upload(pipe.store, cid, files(folder, "roentgen_thorax.pdf"), "site104.coord")
+    assert pipe.store.state(cid).state == State.DEIDENTIFYING
+    with pytest.raises(ReviewRefused, match="identifiers"):
+        delete_document(pipe.store, cid, "notizen.txt", "site104.coord")

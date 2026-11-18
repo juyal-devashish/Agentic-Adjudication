@@ -93,6 +93,8 @@ def delete_document(
 ) -> None:
     if name not in documents_of(store, case_id).files:
         raise ReviewRefused(f"no current document named {name!r}")
+    if store.state(case_id).state == State.DEIDENTIFYING:  # e.g. a second tab's upload
+        raise ReviewRefused("identifiers are being removed; try again when that is done")
     store.append_event(
         case_id,
         EventDraft(type="document.deleted", actor=actor, data={"name": name}, reason=reason),

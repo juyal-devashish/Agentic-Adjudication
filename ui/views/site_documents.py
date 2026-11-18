@@ -162,10 +162,15 @@ for name in sorted(docs.files):
         if (
             is_site
             and cs.state not in SIGNED_STATES
+            and cs.state != State.DEIDENTIFYING
             and st.button(f"Remove {name}", key=f"rm_{name}")
         ):
-            delete_document(store, cid, name, ctx.actor, reason="rejected file removed")
-            st.rerun()
+            try:
+                delete_document(store, cid, name, ctx.actor, reason="rejected file removed")
+            except ReviewRefused as exc:
+                st.warning(f"Not removed: {exc}.")
+            else:
+                st.rerun()
     elif done:
         notes = [w for w in done.get("warnings", []) if w.startswith("EXTENSION_MISMATCH")]
         if notes:
@@ -304,10 +309,15 @@ if reviewable:
         if (
             is_site
             and cs.state not in SIGNED_STATES
+            and cs.state != State.DEIDENTIFYING
             and st.button(f"Remove {name}", key=f"rm_r_{name}")
         ):
-            delete_document(store, cid, name, ctx.actor, reason="removed by site")
-            st.rerun()
+            try:
+                delete_document(store, cid, name, ctx.actor, reason="removed by site")
+            except ReviewRefused as exc:
+                st.warning(f"Not removed: {exc}.")
+            else:
+                st.rerun()
 
 # --- sign and submit --------------------------------------------------------------------------
 st.header("Sign and submit")
