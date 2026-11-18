@@ -79,6 +79,9 @@ class PhiGate:
         rel = cfg.get("seeded_identities")  # synthetic data only
         path = ws.paths.root / rel if rel else None
         identities = json.loads(path.read_text())["subjects"] if path and path.exists() else {}
+        if rel and not identities:  # e.g. a demo folder without the kit: detectors only
+            log.warning("seeded_identities %s not found in %s: the PHI gate runs on its "
+                        "detectors only", rel, ws.paths.root)  # fmt: skip
         extra = [str(w) for w in (cfg.get("slack_phi_gate") or {}).get("allow") or []]
         return cls(ws, policy, identities, allowed_terms(ws) + extra)
 

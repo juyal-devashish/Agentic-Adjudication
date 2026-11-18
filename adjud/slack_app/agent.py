@@ -109,7 +109,7 @@ class SlackAgent:
         record = {"slack_user": slack_user, "channel": channel, "thread": thread,
                   "kind": "turn"}  # fmt: skip
         if person is None:
-            self._post(client, channel, thread, NO_PERSON, [blocks._text(NO_PERSON)])
+            self._say(client, channel, thread, NO_PERSON, None, None)
             self.conversations.record(**record, acting_as=None, outcome="refused",
                                       note="no person")  # fmt: skip
             return
@@ -117,7 +117,10 @@ class SlackAgent:
         context = AgentContext(person=person["id"], name=person["name"], role=person["role"],
                                site=person.get("site"), case_id=case_id)  # fmt: skip
         messages = self._history(client, event, channel, thread)
-        reply = self._gateway().converse(context, messages, agent_toolbox(self.ws, person))
+        if messages and messages[-1].role == "user":
+            reply = self._gateway().converse(context, messages, agent_toolbox(self.ws, person))
+        else:  # nothing to answer (no words, no file): the Tasks, from code
+            reply = AgentReply("off", "unavailable", note="an empty message")
         looked_at = self._cases_in_tools(person, reply)
         about = case_id or (looked_at[0] if len(looked_at) == 1 else None)
         record |= {"acting_as": person["id"], "case_id": about, "mode": reply.mode,
@@ -130,8 +133,9 @@ class SlackAgent:
                                 cases=cases, label=reply.label)  # fmt: skip
             self._record_said(record, verdict, reply.text, source="ai")
             return
-        text, task_blocks = self._fallback(person)
-        verdict = self._say(client, channel, thread, text, person, about, extra=task_blocks)
+        text, intro, task_blocks = self._fallback(person)
+        verdict = self._say(client, channel, thread, text, person, about, shown=intro,
+                            extra=task_blocks)  # fmt: skip
         self._record_said(record, verdict, text, source="code")
 
     def _failed(self, event: dict[str, Any], client: Any, channel: str, thread: str,
@@ -154,14 +158,16 @@ class SlackAgent:
         else:
             self.conversations.record(**record, source=source, outcome="posted", reply=text)
 
-    def _fallback(self, person: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-        """The answer without AI: the person's Tasks, with their buttons."""
+    def _fallback(self, person: dict[str, Any]) -> tuple[str, str, list[dict[str, Any]]]:
+        """The answer without AI: the person's Tasks, with their buttons. Returns the
+        whole text (gated, and Slack's notification text), the line shown above the task
+        blocks, and the blocks."""
         tasks = self.ws.tasks(person)
         if not tasks:
-            return NOTHING, []
+            return NOTHING, NOTHING, []
         lines = [f"• {t.case_id + ': ' if t.case_id else ''}{t.words}" for t in tasks]
         text = NO_AI + "\n" + "\n".join(lines[: blocks.MAX_ROWS])
-        return text, blocks.tasks_reply(self.ws, person)[1:]
+        return text, NO_AI, blocks.tasks_reply(self.ws, person)[1:]
 
     # -- the greeting on the Messages tab --------------------------------------------------
 
@@ -204,18 +210,22 @@ class SlackAgent:
         *,
         cases: set[str] | None = None,
         label: str | None = None,
+        shown: str | None = None,
         extra: list[dict[str, Any]] | None = None,
     ) -> Verdict:
         """Post `text` if the PHI gate passes it, else the hold notice; with *Open in the
-        app* for this person. Returns the gate's verdict. Never raises."""
+        app* for this person. `shown` and `extra`: the section text and the blocks after
+        it, when blocks carry part of `text` (the Tasks). Returns the gate's verdict.
+        Never raises."""
         try:
             verdict = self._gate().check(text, cases or set(filter(None, [case_id])))
         except Exception as exc:  # no gate, no post: the text is held
             log.exception("the PHI gate is not available")
             verdict = Verdict(True, {}, type(exc).__name__)
-        shown = HOLD_TEXT if verdict.held else text
-        out = [blocks._text(chunk) for chunk in _chunks(shown)]
-        if not verdict.held:
+        if verdict.held:
+            out = [blocks._text(HOLD_TEXT)]
+        else:
+            out = [blocks._text(chunk) for chunk in _chunks(shown or text)]
             out += extra or []
         if person is not None:
             url = self.ws.link(person, self._page(person, case_id), case_id)
@@ -223,7 +233,7 @@ class SlackAgent:
                 url, action_id="open_app_agent")]})  # fmt: skip
         out.append(blocks._context(f"{label} · Synthetic data only." if label and not
                                    verdict.held else "Synthetic data only."))  # fmt: skip
-        self._post(client, channel, thread, shown, out)
+        self._post(client, channel, thread, HOLD_TEXT if verdict.held else text, out)
         return verdict
 
     def _page(self, person: dict[str, Any], case_id: str | None) -> str:

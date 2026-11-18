@@ -23,7 +23,7 @@ from adjud.slack_app.app import SlackHandlers
 from adjud.slack_app.conversations import ConversationLog
 from adjud.slack_app.core import Directory, SlackActionsLog, Workspace
 from adjud.slack_app.dm import SlackDmChannel, SlackSettings
-from adjud.slack_app.phi_gate import HOLD_TEXT
+from adjud.slack_app.phi_gate import HOLD_TEXT, PhiGate
 from tests import test_slack_agent_tools as with_cases
 from tools.reset_demo import DEMO_AES, reset
 
@@ -158,6 +158,9 @@ def test_with_the_agents_ai_off_code_answers_with_the_persons_tasks(ws):
     (post,) = client.posts
     assert post["text"].startswith(NO_AI)
     assert "DEMO01-0001: Upload the documents" in post["text"]
+    shown = json.dumps(post["blocks"])  # each Task once, as its own row with its button
+    assert shown.count("Upload the documents") == 2  # DEMO01-0001 and -0003, not twice each
+    assert post["blocks"][0]["text"]["text"] == NO_AI
     urls = [e["url"] for b in post["blocks"] for e in
             (b.get("elements") or [b.get("accessory") or {}]) if e.get("url")]  # fmt: skip
     assert "http://localhost:8501/documents?role=site&user=site101.coord&case=DEMO01-0001" in urls
@@ -168,6 +171,29 @@ def test_with_the_agents_ai_off_code_answers_with_the_persons_tasks(ws):
     agent.on_message(message("anything?", ts="1700000200.0"), client)
     assert "import_queued" not in json.dumps(client.posts[-1])  # imported already
     assert "nothing is waiting" in client.posts[-1]["text"]
+
+
+def test_a_message_with_nothing_in_it_is_answered_with_the_tasks(ws, tmp_path):
+    agent = replay_agent(ws, tmp_path)
+    ws.people.act_as(ME, "site101.coord")
+    client = FakeSlack()
+    agent.on_message(message("   "), client)
+    assert client.texts[0].startswith(NO_AI) and client.statuses == ["processing", "active"]
+    assert log_of(ws.paths)[-1]["note"] == "an empty message"
+
+
+def test_without_seeded_identities_the_gate_still_runs_its_detectors(ws, caplog):
+    """A demo folder without the kit (data/demo has none): a warning, and the detectors
+    alone. Measured here, not gated: how many of the kit's must-redact values they hold."""
+    from tests.test_slack_agent_tools import seeded_phi
+
+    (ws.paths.root / "flow1-testkit").unlink()
+    gate = PhiGate.for_workspace(ws)
+    assert gate.identities == {} and "detectors only" in caplog.text
+    phi = seeded_phi()
+    held = sum(gate.check(f"The letter on page 1 says {v}, as recorded.").held for _, v in phi)
+    print(f"detectors only: {held} of {len(phi)} seeded must-redact values held")
+    assert gate.check("Patient: ROBERTS, Philip. DOB: 24/07/1955").held
 
 
 def test_the_status_goes_back_to_active_when_the_agent_fails(ws, tmp_path):
