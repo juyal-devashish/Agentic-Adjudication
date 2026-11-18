@@ -415,6 +415,22 @@ def test_a_review_signed_while_reassigning_is_not_reassigned(assigned, monkeypat
     assert signed_slots(store, cid) == ["1"] and holders(store, cid) == (a1, a2)
 
 
+def test_a_reassignment_names_the_review_the_coordinator_saw(assigned):
+    """B09: a page left open must not move another review than the one chosen."""
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    third = next(a for a in ADJS if a not in (a1, a2))
+    f3.sign_review(cid, a1, "demo", answers())
+    with pytest.raises(Flow3Refused, match="not open"):
+        f3.reassign(cid, COORD, "1", third, "On leave", expected_from=a1)
+    with pytest.raises(Flow3Refused, match="changed"):  # slot 2 is open, but not a1's
+        f3.reassign(cid, COORD, "2", third, "On leave", expected_from=a1)
+    assert holders(store, cid) == (a1, a2)
+    f3.reassign(cid, COORD, "2", third, "On leave", expected_from=a2)
+    assert holders(store, cid) == (a1, third)
+
+
 def test_readjudication_opens_a_new_round_and_supersedes_the_old_outcome(assigned):
     runner, store, cid = assigned
     f3, f4 = runner.flow3, runner.flow4

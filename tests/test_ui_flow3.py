@@ -215,6 +215,22 @@ def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     assert "independent review is open" in text(at)
 
 
+def test_a_stale_reassign_form_does_not_move_the_other_review(reviewing):
+    """B09: the chosen review is signed while the page is open; Reassign must refuse,
+    not fall back to the other adjudicator's review."""
+    runner, store, cid = reviewing
+    a1, a2 = current_round(store, cid).holders["1"], current_round(store, cid).holders["2"]
+    at = as_user("cec.sofia", "views/assignments.py", cid)
+    next(s for s in at.selectbox if s.label == "Review").set_value("1")
+    next(t for t in at.text_input if t.label == "Reason (required)").input("Dr. A1 on leave")
+    runner.flow3.sign_review(cid, a1, "demo", answers())
+    next(b for b in at.button if b.label == "Reassign").click().run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events(cid) if e["type"] == "adjudication.reassigned"]
+    assert current_round(store, cid).holders["2"] == a2
+    assert any("Not reassigned" in e.value for e in at.error)
+
+
 def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewing):
     """The adjudicator signs the request on the page; the site sees an anonymous query
     from the adjudication; after the site answers, the Quality Check shows where it came

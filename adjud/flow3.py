@@ -476,8 +476,10 @@ class Flow3:
     # -- CEC Coordinator and Chair ------------------------------------------------------------
 
     def reassign(self, case_id: str, coordinator_id: str, slot: str, to: str,
-                 reason: str) -> None:  # fmt: skip
-        """Move an open review to another eligible adjudicator (ASN-02, ASN-07)."""
+                 reason: str, expected_from: str | None = None) -> None:  # fmt: skip
+        """Move an open review to another eligible adjudicator (ASN-02, ASN-07).
+        `expected_from` is the holder the Coordinator saw: a page left open must not move
+        another person's review."""
         self._user(coordinator_id, "cec_coordinator")
         if not reason.strip():
             raise Flow3Refused("give a reason for the reassignment")
@@ -487,6 +489,8 @@ class Flow3:
         def check(now: Round | None, state: State) -> None:
             if now is None or slot not in _open_slots(state) or slot in now.signed:
                 raise Flow3Refused("that review is not open")
+            if expected_from is not None and now.holders.get(slot) != expected_from:
+                raise Flow3Refused("that review has changed; choose again")
             if to in now.holders.values():
                 raise Flow3Refused("that person already holds a review on this case")
 
