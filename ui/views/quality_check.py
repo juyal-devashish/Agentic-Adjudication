@@ -163,12 +163,17 @@ def review_and_sign(latest: dict) -> None:
     if blocked:
         st.caption("A check failed, so this round can only end in a query to the site.")
     suggested_query = latest.get("proposal") == "query"
+    # Nothing is pre-selected when the Suggested Outcome is "unclear" (AI unsure or off).
+    if suggested_query or blocked:
+        preselect = options.index("query")
+    else:
+        preselect = 0 if latest.get("proposal") == "pass" else None
     # The decision sits outside the form so the fields for it appear as soon as it is
     # chosen (widgets inside a form do not redraw the page until submitted).
     decision = st.radio(
         "Your decision",
         options,
-        index=options.index("query") if suggested_query or blocked else 0,
+        index=preselect,
         format_func={
             "pass": "Pass: the documents are complete and fit for adjudication; sign the "
             "narrative with it",
@@ -181,6 +186,10 @@ def review_and_sign(latest: dict) -> None:
     # decision to "query" and back: its text is kept under its own key while hidden.
     box, kept = f"narrative_{cid}_{latest['round']}", f"narrative_kept_{cid}_{latest['round']}"
     text = ""
+    if decision is None:
+        theme.frozen_text(draft, "Narrative draft")
+        st.write("Choose pass or query to sign.")
+        return
     if decision == "query":
         with st.expander("Narrative draft (dropped if you send the query)"):
             theme.frozen_text(draft, "Narrative draft")

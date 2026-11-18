@@ -236,6 +236,10 @@ def test_quality_check_page_is_one_stop_with_the_narrative_and_one_signature(dem
     assert any(b.label == "Download the dossier (PDF)" for b in at.get("download_button"))
     # Query fields only once the Safety Specialist chooses to send a query.
     decision = next(r for r in at.radio if r.label == "Your decision")
+    assert decision.value is None  # no Suggested Outcome, so nothing is pre-selected (B26)
+    assert not any(b.label.startswith("Sign") for b in at.button)
+    decision.set_value("pass").run()
+    decision = next(r for r in at.radio if r.label == "Your decision")
     assert decision.value == "pass" and not at.multiselect
     assert any(a.label == "Narrative" for a in at.text_area)  # the draft, ready to edit
     assert not any(a.label == "Message to the site" for a in at.text_area)
