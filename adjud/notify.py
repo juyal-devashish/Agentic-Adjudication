@@ -50,8 +50,9 @@ def link(
     case_id: str | None, to: str, role: str | None = None, page: str | None = None
 ) -> str | None:
     """Deep link into the UI for the recipient: a site lands on the case's documents, a
-    role on the case record, one person (with their `role`) on their own page for the case
-    (ui/app.py reads role, user and case from the query string). A mailbox gets no link."""
+    role on the case record (or on `page`), one person (with their `role`) on their own
+    page for the case (ui/app.py reads role, user and case from the query string). A
+    mailbox gets no link."""
     if not case_id or to.startswith("mailbox:"):
         return None
     if to.startswith("user:") and role:
@@ -59,7 +60,7 @@ def link(
         return f"/{page}?role={role}&user={to.removeprefix('user:')}&case={case_id}"
     if to.startswith("site:"):
         return f"/documents?role=site&case={case_id}"
-    return f"/record?role={to.removeprefix('role:')}&case={case_id}"
+    return f"/{page or 'record'}?role={to.removeprefix('role:')}&case={case_id}"
 
 
 @dataclass

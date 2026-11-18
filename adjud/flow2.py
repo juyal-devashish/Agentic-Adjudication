@@ -132,8 +132,10 @@ class Flow2:
             expect(self.store.events(case_id))
             raise
 
-    def _notify(self, case_id: str, to: str, template: str, actor: str) -> None:
-        note = self.outbox.queue(case_id, to, template)
+    def _notify(
+        self, case_id: str, to: str, template: str, actor: str, page: str | None = None
+    ) -> None:
+        note = self.outbox.queue(case_id, to, template, page=page)
         self._event(case_id, "notification.queued", actor,
                     {"to": to, "template": template, "id": note["id"]})  # fmt: skip
 
@@ -210,7 +212,7 @@ class Flow2:
                      "decision": "review", "proposal": proposal})  # fmt: skip
         self._event(case_id, "qc.review_needed", SYSTEM_QC,
                     {"reasons": reasons, "proposal": proposal})  # fmt: skip
-        self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC)
+        self._notify(case_id, "role:safety_specialist", "qc_review_needed", SYSTEM_QC, "qc")
         return result
 
     # -- QC agents ---------------------------------------------------------------------------

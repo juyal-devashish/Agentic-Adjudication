@@ -124,11 +124,11 @@ def write_handoff(
         ),
     )
     site = f"site:{manifest['subject'].split('-')[1]}"
-    for to, template in (
-        (site, "submission_received"),
-        ("role:safety_specialist", "documents_received"),
+    for to, template, page in (
+        (site, "submission_received", None),
+        ("role:safety_specialist", "documents_received", "qc"),  # where her task is (P-57)
     ):
-        note = outbox.queue(case_id, to, template)
+        note = outbox.queue(case_id, to, template, page=page)
         store.append_event(
             case_id,
             EventDraft(
