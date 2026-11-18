@@ -57,7 +57,13 @@ LANDING = {  # each role's own work page in the app (P-56)
     "cec_coordinator": "assignments",
     "adjudicator": "adjudicate",
 }
-NO_PERSON = "Choose whom you act as first: `/adj act-as` (demo)."
+NO_PERSON = ("Choose whom you act as first: *Switch person* on the Home tab, or "
+             "`/adj act-as` in a channel (demo).")  # fmt: skip
+SWITCH = ("Here I act as you, *{name}*. To take someone else's part in the demo, use "
+          "*Switch person* on the Home tab, or type `/adj act-as <name>` in a channel. Commands "
+          "typed in this conversation reach me as messages and do not run.")  # fmt: skip
+# "/adj ...", "act as priya", "act-as anna": a command or a switch typed to the Agent
+SWITCH_RE = re.compile(r"^\s*(?:/adj\b|/?act[\s-]*as\b)", re.IGNORECASE)
 NO_AI = "I can't answer questions right now. Here is what is waiting for you:"
 NOTHING = "I can't answer questions right now, and nothing is waiting for you."
 FAILED = "Something went wrong with that answer. Your tasks are in the app."
@@ -139,6 +145,13 @@ class SlackAgent:
             self._say(client, channel, thread, NO_PERSON, None, None)
             self.conversations.record(**record, acting_as=None, outcome="refused",
                                       note="no person")  # fmt: skip
+            return
+        if SWITCH_RE.match(str(event.get("text") or "")) and not event.get("files"):
+            text = SWITCH.format(name=person["name"])  # from code: nothing is switched here
+            said = self._say(client, channel, thread, text, person, None)
+            self._record_said(record | {"acting_as": person["id"], "case_id": None,
+                                        "note": "switch or command typed to the Agent"},
+                              said, text, source="code")  # fmt: skip
             return
         case_id = self._thread_case(person, channel, thread)
         context = AgentContext(person=person["id"], name=person["name"], role=person["role"],

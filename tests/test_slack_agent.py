@@ -364,3 +364,20 @@ def test_a_post_slack_refused_is_logged_failed_and_a_greeting_is_tried_again(ws,
     agent.on_messages_tab(opened, FakeSlack())
     agent.on_messages_tab(opened, FakeSlack())  # greeted now: once
     assert [e["outcome"] for e in log_of(ws.paths)[-3:]] == ["failed", "failed", "posted"]
+
+
+def test_switching_person_in_the_conversation_points_to_switch_person(ws, tmp_path):
+    """Live run: "/adj act-as priya" typed in the Agent's thread reached the Agent as a
+    message (commands do not run there), and the AI only refused. Code answers it: whom
+    you act as, and how to switch (Home's Switch person, or /adj in a channel); no AI call,
+    nothing switched."""
+    agent = replay_agent(ws, tmp_path)  # no recorded answers: an AI call would fail
+    ws.people.act_as(ME, "dm.dana")
+    for text in ("/adj act-as priya", "act as priya", "Act-as anna please", "/adj tasks"):
+        client = FakeSlack()
+        agent.on_message(message(text), client)
+        (said,) = client.texts
+        assert "Rahul Mehta" in said and "Switch person" in said and "/adj" in said, text
+        assert client.statuses == ["processing", "active"]
+    assert ws.people.person_for(ME)["id"] == "dm.dana"
+    assert {e["source"] for e in log_of(ws.paths)} == {"code"}
