@@ -97,7 +97,7 @@ _Avoid_: reopening, re-review
 ## Notifications
 
 **Notification**:
-One notice to one recipient about one case and task, never holding PHI. Every Notification is kept in the outbox for good.
+One notice to one recipient about one case and task, never holding PHI on any Channel. By e-mail it holds no Clinical Content either (case ID, task and link); its Slack DM may add Clinical Content without PHI, such as a Site Query's text (ADR 0005). Every Notification is kept in the outbox for good.
 _Avoid_: alert, message (for the notice itself)
 
 **Channel**:
@@ -109,7 +109,7 @@ One try at delivering one Notification through one Channel, recorded as sent or 
 _Avoid_: send (as a noun), retry (for the first try)
 
 **Clinical Content**:
-Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, query text, the Narrative, AI-written text about the case, and adjudication answers. It may go to Slack when it holds no PHI; PHI is the line, not Clinical Content. Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content.
+Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, query text, the Narrative, AI-written text about the case, and adjudication answers. It may go to Slack when it holds no PHI; PHI is the line there, not Clinical Content. It never goes into e-mail (ADR 0005). Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content.
 _Avoid_: PHI (for this broader idea), medical data, sensitive data
 
 **PHI**:
