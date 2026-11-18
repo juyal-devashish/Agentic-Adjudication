@@ -54,6 +54,10 @@ _Avoid_: revision, correction
 An independent clinician who reviews a case and answers the adjudication form. *Adjudicator 1* and *Adjudicator 2* review every case; *Adjudicator 3* is a third, different person who answers only the Disputed Fields.
 _Avoid_: reviewer (alone), assessor
 
+**Assignment**:
+Giving a case's Round to Adjudicators 1 and 2, never from the case's site. It starts Flow 3; a reassignment moves one review to another Adjudicator, with a reason.
+_Avoid_: reviewer assignment, allocation
+
 **Independent Review**:
 One adjudicator's signed answers to the adjudication form, given without seeing anyone else's.
 _Avoid_: assessment (alone), vote
@@ -105,8 +109,12 @@ One try at delivering one Notification through one Channel, recorded as sent or 
 _Avoid_: send (as a noun), retry (for the first try)
 
 **Clinical Content**:
-Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, identifiers found in them, query text, the Narrative, AI-written text about the case, and adjudication answers. Never sent to Slack or put in a notification. Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content.
+Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, identifiers found in them, query text, the Narrative, AI-written text about the case, and adjudication answers. Never sent to Slack or put in a notification. Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content. Free of PHI is not enough: a redacted Narrative holds no PHI and is still Clinical Content.
 _Avoid_: PHI (for this broader idea), medical data, sensitive data
+
+**PHI**:
+Anything in a case's documents that identifies the subject: names, dates of birth, record and phone numbers, addresses and the like. Removed from every document before the site signs. Narrower than Clinical Content.
+_Avoid_: personal data (alone), identifiers (for the category), Clinical Content
 
 **Task**:
 One step waiting for one person on one case, such as signing a submission, a Quality Check or a review. Shown in Slack and in the app by case ID and in words, never with Clinical Content.
