@@ -25,7 +25,9 @@ is saved like any call (`cases/<id>/ai/`, `ai.called`); a turn about no case is 
 `tools.verify_log` checks. Replay is keyed by the input hash of the whole turn (prompt
 version, model, the person, the messages, the tool definitions); a recorded turn's tool
 calls are run again through the toolbox, so its actions happen and the role limits of
-the tools still apply.
+the tools still apply. If a tool turns out differently from the recording (refused now,
+or now allowed), the recorded text would be untrue: the turn stops there and is an error
+with no text, its tool calls saying what ran.
 """
 
 from __future__ import annotations
@@ -439,14 +441,17 @@ class Gateway:
         rec = json.loads(path.read_text())
         simulated = bool(rec.get("simulated", True))
         tool_calls: list[dict[str, Any]] = []
-        uses = [
-            _RecordedUse(f"replay_{i}", c["tool"], c.get("input") or {})
-            for i, c in enumerate(rec.get("tool_calls", []))
-        ]
-        if uses:
-            self._run_tools(uses, toolbox, tool_calls)
         text = str(rec.get("text") or "")
         status, note = ("ok", "") if text.strip() else ("error", "recorded answer has no text")
+        # the recorded text holds only if every tool turns out as it did when recorded
+        # (an `error` flag, absent: it succeeded); at the first that does not, stop
+        for i, c in enumerate(rec.get("tool_calls", [])):
+            use = _RecordedUse(f"replay_{i}", c["tool"], c.get("input") or {})
+            self._run_tools([use], toolbox, tool_calls)
+            if tool_calls[-1]["error"] != bool(c.get("error", False)):
+                status, text = "error", ""
+                note = f"tool {use.name} turned out differently from the recorded answer"
+                break
         record = {
             "function": fn.name,
             "prompt": fn.prompt_id,
@@ -455,7 +460,7 @@ class Gateway:
             "model": rec.get("model", self.cfg.model),
             "input_hash": h,
             "input": payload,
-            "output": {"text": text},
+            "output": {"text": text} if status == "ok" else None,
             "valid": status == "ok",
             "tool_calls": tool_calls,
             "usage": {},

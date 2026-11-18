@@ -253,21 +253,47 @@ def test_replay_runs_the_recorded_tools_and_returns_the_recorded_text(store, tmp
 
     path = tmp_path / "replays" / "slack_agent" / f"{h}.json"
     path.parent.mkdir(parents=True)
+    # recorded with the refusals it met: they are refused again, so the text still holds
     path.write_text(json.dumps({
         "simulated": True,
-        "text": "Imported 1 file.",
-        "tool_calls": [{"tool": "import_files", "input": {}},
-                       {"tool": "other_site_cases", "input": {}},
-                       {"tool": "not_in_this_toolbox", "input": {}}],
+        "text": "Imported 1 file. The other site's cases are not yours to see.",
+        "tool_calls": [{"tool": "import_files", "input": {}, "error": False},
+                       {"tool": "other_site_cases", "input": {}, "error": True},
+                       {"tool": "not_in_this_toolbox", "input": {}, "error": True}],
     }))  # fmt: skip
     r = g.converse(PRIYA, ASK, tasks.toolbox())
     assert r.ok and r.simulated and r.label == "Simulated AI" and r.cost_usd == 0
-    assert r.text == "Imported 1 file." and tasks.imported == 1  # the action happened
+    assert r.text.startswith("Imported 1 file.") and tasks.imported == 1  # the action happened
     # a tool the person does not have, or one that refuses, stays refused in replay too
     assert [c["error"] for c in r.tool_calls] == [False, True, True]
     saved = json.loads((store.paths.root / r.call["path"]).read_text())
     assert saved["mode"] == "replay" and saved["simulated"] is True
     assert all(rep.ok for rep in verify_all(store.paths))
+
+
+def test_replay_never_posts_a_recorded_text_whose_tools_turned_out_differently(store, tmp_path):
+    """Recorded as a success, refused this time: the recorded "Imported" would be untrue.
+    The turn is an error with no text, later recorded tools do not run, and tool_calls
+    says what did run, so the caller answers in its own words."""
+    tasks = Tasks()
+    g = gw(store, tmp_path, modes={"slack_agent": "replay"})
+    h = conversation_hash(SLACK_AGENT, g.cfg.model, PRIYA, ASK, tasks.toolbox().definitions())
+    path = tmp_path / "replays" / "slack_agent" / f"{h}.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "simulated": True,
+        "text": "Done: imported 1 file and listed the other site's cases.",
+        "tool_calls": [{"tool": "import_files", "input": {}},  # no flag: recorded as success
+                       {"tool": "other_site_cases", "input": {}},
+                       {"tool": "import_files", "input": {}}],
+    }))  # fmt: skip
+    r = g.converse(PRIYA, ASK, tasks.toolbox())
+    assert (r.status, r.text) == ("error", "") and "other_site_cases" in r.note
+    assert [(c["tool"], c["error"]) for c in r.tool_calls] == [
+        ("import_files", False), ("other_site_cases", True)]  # fmt: skip
+    assert tasks.imported == 1  # the third recorded call never ran
+    saved = json.loads((store.paths.root / r.call["path"]).read_text())
+    assert saved["valid"] is False and saved["output"] is None
 
 
 def test_a_turn_must_end_with_the_persons_message(store, tmp_path):
