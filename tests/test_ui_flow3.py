@@ -103,6 +103,41 @@ def test_the_site_never_sees_who_adjudicates(reviewing):
     assert "Both reviews agree" in shown and "Closed" in html_text(at)
 
 
+FLOW34_MESSAGES = ("More information was requested for an adjudication",
+                   "A case needs the adjudication committee", "Adjudication complete",
+                   "Re-adjudication started")  # fmt: skip
+FLOW34_PEOPLE = ("Okafor", "Lindqvist", "Reyes", "Sofia Marques", "EDC (mock)")
+
+
+def test_the_site_record_hides_who_asked_for_more_data(reviewing):
+    """ACC-04, P-45: the site sees its own query, but not the adjudicator who asked nor the
+    e-mail to the CEC Coordinator, in the audit trail or the notifications."""
+    runner, store, cid = reviewing
+    runner.flow3.request_more_data(cid, current_round(store, cid).holders["1"], "demo",
+                                   "The angiography report.")  # fmt: skip
+    runner.run_case_steps()
+    assert store.state(cid).state == State.QUERY_OPEN
+    shown = tables(as_user(SITE, "views/results.py", cid))
+    assert "A query about your documents needs an answer" in shown  # its own query stays
+    for word in FLOW34_MESSAGES + FLOW34_PEOPLE:
+        assert word not in shown, word
+
+
+def test_the_site_record_hides_the_outcome_and_re_adjudication_e_mails(reviewing):
+    runner, store, cid = reviewing
+    rnd = current_round(store, cid)
+    for slot in ("1", "2"):
+        runner.flow3.sign_review(cid, rnd.holders[slot], "demo", answers())
+    for _ in range(4):
+        runner.run_case_steps()
+    assert store.state(cid).state == State.CLOSED
+    runner.flow4.start_readjudication(cid, "cec.sofia", "demo", "New ECG found.")
+    runner.run_case_steps()
+    shown = tables(as_user(SITE, "views/results.py", cid))
+    for word in FLOW34_MESSAGES + FLOW34_PEOPLE:
+        assert word not in shown, word
+
+
 def test_the_committee_records_and_the_chair_signs(reviewing):
     runner, store, cid = reviewing
     f3 = runner.flow3

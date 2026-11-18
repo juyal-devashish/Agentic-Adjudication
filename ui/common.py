@@ -18,6 +18,11 @@ from adjud.paths import DataPaths
 from adjud.qc import Checklist
 
 STUDY = "DEMO01"
+# Flows 3–4 e-mails name adjudicators or show the adjudication's progress: a site or another
+# adjudicator sees only the ones addressed to it (ACC-04, P-45).
+BLINDED = {"adjudication_assigned", "adj3_assigned", "consensus_to_sign", "committee_needed",
+           "more_data_requested", "outcome_for_pv", "adjudication_complete",
+           "readjudication_started"}  # fmt: skip
 
 
 def paths() -> DataPaths:

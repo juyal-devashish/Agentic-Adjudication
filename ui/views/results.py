@@ -14,7 +14,7 @@ import sys
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, case_list, context, paths, pipeline, site_name, users
+from common import BLINDED, case_header, case_list, context, paths, pipeline, site_name, users
 
 from adjud.ai.gateway import Gateway
 from adjud.handoff import read_manifest
@@ -253,12 +253,14 @@ else:
 
 def visible_note(n: dict) -> bool:
     """Flows 3–4 e-mails to a person: not shown to the site (ACC-04), and to an adjudicator
-    only when addressed to them."""
+    only when addressed to them. The site sees no Flows 3–4 e-mail but its own query."""
     to = n["to"]
+    if ctx.role == "site":
+        return not to.startswith(("user:", "mailbox:")) and (
+            n.get("template") not in BLINDED or to == f"site:{ctx.user.get('site')}"
+        )
     if not to.startswith(("user:", "mailbox:")):
         return True
-    if ctx.role == "site":
-        return False
     return ctx.role != "adjudicator" or to == f"user:{ctx.actor}"
 
 
@@ -423,7 +425,11 @@ else:
     )
 events = store.events(cid)
 if ctx.role == "site":
+    # Flows 3–4 e-mails, queued and delivered, would name who asked or show progress (P-45).
+    blinded = {e["data"].get("id") for e in events if e["type"] == "notification.queued"
+               and not visible_note(e["data"])}  # fmt: skip
     events = [e for e in events if e["type"] not in FLOW34_EVENTS
+              and not (e["type"].startswith("notification.") and e["data"].get("id") in blinded)
               and not str(e["data"].get("to", "")).startswith(("user:", "mailbox:"))]  # fmt: skip
 names = {u["id"]: u["name"] for u in users()}
 # Most entries are automatic steps; a reviewer often wants only what people did
