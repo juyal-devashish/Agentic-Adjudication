@@ -84,13 +84,27 @@ ROLE_NAMES = {  # in demo order; the first is where the app opens (on AE import)
 }
 
 
+# Every page of the app: key (the URL path) -> file, menu title and icon. app.py registers
+# them all; a view opens one by its file (st.switch_page).
+PAGES = {
+    "import": ("views/edc_input.py", "AE import", ":material/move_to_inbox:"),
+    "documents": ("views/site_documents.py", "Documents", ":material/description:"),
+    "qc": ("views/quality_check.py", "Quality check", ":material/rule:"),
+    "assignments": ("views/assignments.py", "Assignments", ":material/assignment_ind:"),
+    "adjudicate": ("views/adjudication.py", "Adjudication", ":material/gavel:"),
+    "committee": ("views/committee.py", "Committee", ":material/groups:"),
+    "record": ("views/results.py", "Case record", ":material/fact_check:"),
+}
+
 # The pages each role works on, its landing page first. Case record is read-only for all.
-ROLE_PAGES = {  # every role lands on the Assistant, the guided chat (P-40)
-    "data_manager": ["assistant", "import", "record"],
-    "site": ["assistant", "documents", "record"],
-    "safety_specialist": ["assistant", "qc", "record"],
-    "cec_coordinator": ["assistant", "assignments", "committee", "record"],
-    "adjudicator": ["assistant", "adjudicate", "committee", "record"],
+# Each role lands on the page of its own work, with its tasks listed at the top; the
+# Assistant chat is hidden, and work starts in Slack (P-56, superseding P-40; ADR 0003).
+ROLE_PAGES = {
+    "data_manager": ["import", "record"],
+    "site": ["documents", "record"],
+    "safety_specialist": ["qc", "record"],
+    "cec_coordinator": ["assignments", "committee", "record"],
+    "adjudicator": ["adjudicate", "committee", "record"],
 }
 
 

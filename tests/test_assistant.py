@@ -6,11 +6,25 @@ manual step. It never signs or decides anything (ADR 0001)."""
 from __future__ import annotations
 
 import pytest
+from streamlit.testing.v1 import AppTest
 
 from adjud.paths import DataPaths
 from adjud.runner import Runner
-from tests.test_ui import ROOT, run
+from tests.test_ui import ROOT
 from tools.reset_demo import DEMO_AES, reset
+
+# P-56 hid the Assistant from the app; it is opened here through a test-only entry point
+# until the retirement bar is met and it is deleted (plan step 30).
+ENTRY = str(ROOT / "tests" / "assistant_page.py")
+
+
+def run(**state) -> AppTest:
+    at = AppTest.from_file(ENTRY, default_timeout=30)
+    for k, v in state.items():
+        at.session_state[k] = v
+    at.run()
+    assert not at.exception, at.exception
+    return at
 
 
 @pytest.fixture
@@ -39,7 +53,9 @@ def say(at, text: str):
     return at
 
 
-def test_every_role_lands_on_the_assistant(demo):
+def test_the_assistant_greets_every_role(demo):
+    """P-56 replaced "every role lands on the Assistant": no role lands on it now
+    (tests/test_ui.py checks that); opened directly, it still greets each role."""
     for role in ("data_manager", "site", "safety_specialist"):
         at = run(role=role)
         assert at.title[0].value == "Assistant", role

@@ -222,3 +222,45 @@ def case_list(ctx: Context, intro: str) -> None:
         selection_mode="single-row",
         key=key,
     )
+
+
+@st.cache_resource
+def _workspace(root: str):
+    from adjud.slack_app.core import Workspace
+
+    return Workspace(DataPaths(Path(root)), STUDY)
+
+
+TASKS_SHOWN = 5  # then "and N more", so the page's own content stays near the top
+
+
+def your_tasks(ctx: Context, here: str) -> None:
+    """'Your tasks': what waits for this person, the same list as Slack's App Home (P-56,
+    ADR 0003), each with a button to the page where it is done, on its case. `here` is the
+    current page's key: the list shows on the role's landing page only. A task with no case
+    done on this page needs no button. No Clinical Content: a case ID and a step."""
+    import theme
+    from wording import PAGES, ROLE_PAGES
+
+    if ROLE_PAGES[ctx.role][0] != here:
+        return
+
+    tasks = _workspace(str(paths().root)).tasks(ctx.user)
+    with st.container(key="your_tasks"):
+        st.markdown("**Your tasks**")
+        if not tasks:
+            theme.quiet("Nothing is waiting for you.")
+            return
+        for task in tasks[:TASKS_SHOWN]:
+            case, words, action = st.columns([1.2, 4, 1.4], vertical_alignment="center")
+            case.markdown(f"**{task.case_id}**" if task.case_id else "")
+            words.markdown(task.words)
+            if task.case_id is None and task.page == here:
+                continue
+            label = f"Open {task.case_id}" if task.case_id else f"Open {PAGES[task.page][1]}"
+            if action.button(label, key=f"task_{task.page}_{task.case_id}"):
+                if task.case_id:
+                    st.session_state["case_id"] = task.case_id
+                st.switch_page(PAGES[task.page][0])
+        if len(tasks) > TASKS_SHOWN:
+            theme.quiet(f"and {len(tasks) - TASKS_SHOWN} more")

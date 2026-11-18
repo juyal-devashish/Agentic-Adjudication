@@ -10,7 +10,16 @@ import pandas as pd
 import streamlit as st
 import theme
 from boxdraw import page_box
-from common import case_header, case_list, context, doc_label, doc_types, pipeline, processor
+from common import (
+    case_header,
+    case_list,
+    context,
+    doc_label,
+    doc_types,
+    pipeline,
+    processor,
+    your_tasks,
+)
 from preview import pdf_page, show_sheets
 
 from adjud.documents import DeidBusy, documents_of, upload
@@ -33,10 +42,12 @@ store = pipe.store
 
 if ctx.case_id is None:
     st.title("Documents")
+    your_tasks(ctx, "documents")
     case_list(ctx, "Select a case to upload and review its documents.")
     st.stop()
 
 cid = ctx.case_id
+your_tasks(ctx, "documents")
 case_header(ctx, "views/site_documents.py")
 cs = store.state(cid)
 is_site = ctx.role == "site"

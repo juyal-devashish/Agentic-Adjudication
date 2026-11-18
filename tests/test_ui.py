@@ -70,22 +70,24 @@ def test_import_now_from_page_1_creates_cases(demo):
 @pytest.mark.parametrize(
     ("role", "own"),
     [
-        ("data_manager", ["assistant", "edc_input", "results"]),
-        ("site", ["assistant", "site_documents", "results"]),
-        ("safety_specialist", ["assistant", "quality_check", "results"]),
-        ("cec_coordinator", ["assistant", "assignments", "committee", "results"]),
-        ("adjudicator", ["assistant", "adjudication", "committee", "results"]),
+        ("data_manager", ["edc_input", "results"]),
+        ("site", ["site_documents", "results"]),
+        ("safety_specialist", ["quality_check", "results"]),
+        ("cec_coordinator", ["assignments", "committee", "results"]),
+        ("adjudicator", ["adjudication", "committee", "results"]),
     ],
 )
 def test_each_role_sees_only_its_own_pages(demo, role, own):
-    """The menu lists only the role's pages, it lands on its own first page (the
-    Assistant, P-40), and another role's page (a typed URL) sends it back there."""
-    titles = {"assistant": "Assistant", "edc_input": "AE import", "site_documents": "Documents",
+    """The menu lists only the role's pages and no Assistant (P-56), it lands on its own
+    first page, and another role's page or the old Assistant address (a typed URL) sends
+    it back there without an error."""
+    titles = {"edc_input": "AE import", "site_documents": "Documents",
               "quality_check": "Quality check", "results": "Case record",
               "assignments": "Assignments", "adjudication": "Adjudication",
               "committee": "Committee"}  # fmt: skip
     at = run(role=role)
     assert titles[own[0]] in [t.value for t in at.title]
+    assert "**Your tasks**" in [m.value for m in at.markdown]
     assert [link.proto.label for link in at.get("page_link")] == [titles[p] for p in own]
     for page in titles:
         at.switch_page(f"views/{page}.py")
@@ -93,6 +95,49 @@ def test_each_role_sees_only_its_own_pages(demo, role, own):
         assert not at.exception, at.exception
         landed = titles[page] if page in own else titles[own[0]]
         assert landed in [t.value for t in at.title], (page, landed)
+    # A typed /assistant: the page is no longer registered, so AppTest.switch_page refuses
+    # it; ask for its address the way the browser does (st.Page hashes the URL path).
+    from streamlit.util import calc_hash
+
+    at.switch_page("views/results.py").run()  # start from a page that is not the landing
+    assert "Case record" in [t.value for t in at.title]
+    at._page_hash = calc_hash("assistant")
+    at.run()
+    assert not at.exception, at.exception
+    assert titles[own[0]] in [t.value for t in at.title]
+    assert "Assistant" not in [t.value for t in at.title]
+
+
+def test_the_landing_page_lists_your_tasks_and_opens_one(demo):
+    """P-56: the role's first page lists its tasks, the same list as Slack's App Home;
+    a task's button opens the page where it is done, on its case."""
+    from adjud.runner import Runner
+
+    at = run(role="data_manager")  # the preloaded AE file waits; no button on AE import
+    assert "1 AE file waiting to be imported" in [m.value for m in at.markdown]
+    assert not [b for b in at.button if b.label.startswith("Open ")]
+
+    Runner(demo).run_once()  # the cases now wait for the site's documents
+    site101 = {"id": "site101.coord", "name": "Priya Nair", "role": "site",
+               "site": "101", "email": "priya.nair@larkfield-general.example"}  # fmt: skip
+    at = run(role="site", user_site=site101)
+    assert "Documents" in [t.value for t in at.title]
+    rows = [m.value for m in at.markdown]
+    i = rows.index("**DEMO01-0001**")
+    assert rows[i + 1] == "Upload the documents"
+    next(b for b in at.button if b.label == "Open DEMO01-0001").click().run()
+    assert not at.exception, at.exception
+    assert at.session_state["case_id"] == "DEMO01-0001"
+    assert "Case DEMO01-0001" in html_text(at)
+    assert at.get("file_uploader")  # on Documents, ready for the upload
+    # Another site's user sees none of site 101's cases among their tasks.
+    site104 = {"id": "site104.coord", "name": "Katrin Vogel", "role": "site", "site": "104",
+               "email": "katrin.vogel@klinikum-auenstadt.example"}  # fmt: skip
+    at = run(role="site", user_site=site104)
+    assert "**DEMO01-0001**" not in [m.value for m in at.markdown]
+
+    at = run(role="adjudicator")
+    assert any("Nothing is waiting for you." in h.proto.body for h in at.get("html"))
 
 
 def test_results_and_documents_pages_render_for_a_case(demo):
@@ -431,7 +476,7 @@ def test_the_next_step_links_to_the_page_where_this_person_acts(demo):
     Runner(demo).run_once()  # cases wait for documents
 
     def step_links(at):  # the sidebar menu's links are not next steps
-        menu = {"Assistant", "AE import", "Documents", "Quality check", "Case record"}
+        menu = {"AE import", "Documents", "Quality check", "Case record"}
         return [p.proto.label for p in at.get("page_link") if p.proto.label not in menu]
 
     at = run("views/results.py", role="site", case_id="DEMO01-0001")
@@ -495,17 +540,17 @@ def test_a_pop_up_shows_each_email_sent_about_a_case_the_viewer_may_see(demo):
 
 def test_switching_role_moves_to_that_roles_page_and_keeps_the_role(demo):
     """Switching role keeps the new role (the page switch once dropped it and snapped
-    back), lands on the Assistant, and the menu offers that role's own pages."""
+    back), lands on that role's first page, and the menu offers that role's own pages."""
     at = AppTest.from_file(APP, default_timeout=30)
     at.query_params["role"] = "data_manager"
     at.run()
-    assert "Assistant" in [t.value for t in at.title]
+    assert "AE import" in [t.value for t in at.title]
     for role, page in (("site", "Documents"), ("safety_specialist", "Quality check"),
                        ("data_manager", "AE import")):  # fmt: skip
         next(s for s in at.selectbox if s.label == "Role").select(role).run()
         assert not at.exception, at.exception
         assert at.session_state["role"] == role and at.query_params["role"] == role
-        assert "Assistant" in [t.value for t in at.title]
+        assert page in [t.value for t in at.title]
         assert page in [link.proto.label for link in at.get("page_link")]
 
 
