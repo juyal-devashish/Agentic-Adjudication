@@ -650,14 +650,24 @@ def _ae_id(text: str) -> str | None:
 
 
 def _failed_rules(results: list[dict[str, Any]]) -> list[str]:
+    """One line per top-level rule not met. A group keeps its own description and joins its
+    unmet branches with "or" (any) or "and" (all), so either/or rules read as one rule."""
     out = []
     for r in results:
         if r["passed"]:
             continue
+        label = r.get("description", r.get("id", ""))
         if "children" in r:
-            out += _failed_rules(r["children"]) or [r.get("description", r.get("id", ""))]
+            joiner = " or " if r.get("group") == "any" else " and "
+            reasons = joiner.join(_failed_rules(r["children"]))
+            out.append(f"{label}: {reasons}" if reasons else label)
         else:
+            fields = dict(theme.AE_FIELDS)
             value = theme.plain_value(str(r.get("actual") if r.get("actual") is not None else ""))
-            field = dict(theme.AE_FIELDS).get(r["field"], r["field"])
-            out.append(f"{r.get('description', r['id'])} ({field}: {value})")
+            shown = f"{fields.get(r['field'], r['field'])}: {value}"
+            if "compared_with" in r:  # a field-to-field comparison: show the other value too
+                other = str(r.get("expected", ""))
+                other = fields.get(other, other.replace("_", " ").capitalize())
+                shown += f", {other}: {theme.plain_value(str(r['compared_with'] or ''))}"
+            out.append(f"{label} ({shown})")
     return out

@@ -319,3 +319,29 @@ def test_why_and_status_find_an_ae_id_that_is_not_three_digits(demo, monkeypatch
     assert ae in text and f"became case **{case_id}**" in text
     assert a.find_case(f"/status {ae}") == case_id
     assert a.find_case(f"/status {ae.replace('-', '').lower()}") == case_id
+
+
+def test_why_keeps_an_any_group_as_one_rule_and_shows_the_compared_date(monkeypatch):
+    """B41: /why AE-011 listed both branches of R3 "Treatment-emergent, or fatal" as two
+    separate unmet rules, as if both had to be fixed, and never named the first-dose date
+    the onset was compared with."""
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import _failed_rules
+
+    r3a = {"id": "R3a", "description": "Onset on or after first dose", "field": "onset_date",
+           "operator": "on_or_after_field", "expected": "first_dose_date",
+           "actual": "2025-06-30", "compared_with": "2025-07-07", "passed": False}  # fmt: skip
+    r3b = {"id": "R3b", "description": "Fatal outcome (always adjudicated)", "field": "outcome",
+           "operator": "equals", "expected": "FATAL", "actual": "RECOVERED",
+           "passed": False}  # fmt: skip
+    r1 = {"id": "R1", "description": "Serious adverse event", "field": "serious",
+          "operator": "equals", "expected": "Y", "actual": "Y", "passed": True}  # fmt: skip
+    r3 = {"id": "R3", "description": "Treatment-emergent, or fatal", "group": "any",
+          "passed": False, "children": [r3a, r3b]}  # fmt: skip
+    failed = _failed_rules([r1, r3])
+    assert len(failed) == 1  # one top-level rule not met, not two
+    line = failed[0]
+    assert line.startswith("Treatment-emergent, or fatal")
+    assert "Onset on or after first dose" in line and "Fatal outcome" in line
+    assert " or " in line.split(":", 1)[1]  # either branch would have been enough
+    assert "30 Jun 2025" in line and "7 Jul 2025" in line and "Recovered" in line
