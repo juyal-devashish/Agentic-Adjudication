@@ -115,6 +115,9 @@ def test_flow2_end_to_end_with_ai_off(submitted):
         flow2.sign_qc_pass(cid, SITE, "demo", completed)
     with pytest.raises(Flow2Refused, match="instruction"):  # the template note is still there
         flow2.sign_qc_pass(cid, SS, "demo", draft.replace("[Add", "Chest pain. [Add"))
+    for bypass in (draft.replace("[Add", "Add", 1), draft.replace("allocation.]", "allocation.")):
+        with pytest.raises(Flow2Refused, match="instruction"):  # B25: brackets removed only
+            flow2.sign_qc_pass(cid, SS, "demo", bypass)
     assert state(store, cid) == State.QC_REVIEW
     flow2.sign_qc_pass(cid, SS, "demo", completed, "Both documents present")
     assert state(store, cid) == State.READY_FOR_ADJUDICATION

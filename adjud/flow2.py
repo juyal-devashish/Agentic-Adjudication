@@ -497,7 +497,15 @@ class Flow2:
         if not text.strip():
             raise Flow2Refused("the narrative is empty")
         template = (self.config_dir / self.study / "narrative_template.md").read_text()
-        if any(note in text for note in re.findall(r"\[[^\]]+\]", template)):
+
+        # Any sentence of a [bracketed] note still there, brackets or not, counts (B25)
+        def norm(s: str) -> str:
+            return " ".join(s.casefold().split())
+
+        body = norm(text)
+        notes = re.findall(r"\[([^\]]+)\]", template)
+        sentences = [norm(s).rstrip(".!?") for n in notes for s in re.split(r"(?<=[.!?])\s+", n)]
+        if any(s and s in body for s in sentences):
             raise Flow2Refused(
                 "complete the narrative first: the template's instruction in [brackets] "
                 "is still in it"
