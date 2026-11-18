@@ -342,8 +342,18 @@ class Assistant:
         else:
             lines.append(f"No AI Suggestion this round ({sg.get('note') or 'AI is off'}).")
         nar = result.get("narrative") or {}
-        if not in_review:  # the draft is signed and frozen; nothing is left to decide here
-            if signed:
+        if not in_review:  # the round is decided; nothing is left to edit or sign here
+            query = self._latest_event(case_id, "query.opened")
+            if (
+                query
+                and query["seq"] > (signed or {"seq": -1})["seq"]
+                and ("more_data" not in query["data"].get("codes", []))
+            ):
+                lines.append(
+                    f"A query was sent to the site by {query['signature']['signer']} on "
+                    f"{theme.date_words(query['at'])}; the narrative draft was dropped."
+                )
+            elif signed:
                 lines.append(
                     f"Quality check passed and narrative signed by {signed['signature']['signer']}."
                 )

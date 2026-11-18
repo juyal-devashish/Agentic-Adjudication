@@ -227,3 +227,33 @@ def test_flow3_roles_get_no_ai_suggestion_and_qc_wording_follows_the_state(demo,
     text = Assistant(users[SS]).handle(f"/qc {cid[-4:]}").text
     assert "ready to edit" not in text and "You decide" not in text
     assert "Quality check passed and narrative signed by" in text
+
+
+def test_qc_after_a_query_says_the_query_was_sent(demo, monkeypatch):
+    """B29: once the Safety Specialist sends a query, /qc reports it instead of saying the
+    narrative draft is ready to edit and that the reader decides and signs."""
+    import yaml
+
+    from tests.test_flow3 import SS, pdf, to_qc_review
+
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    from adjud.documents import upload
+
+    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain.")),
+                        ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE101["id"])  # fmt: skip
+    to_qc_review(runner, store, cid)
+    runner.flow2.open_query(cid, ["missing_document"], "Please add the troponin results.",
+                            user_id=SS, password="demo")  # fmt: skip
+    users = {u["id"]: u for u in yaml.safe_load((demo.config / "users.yaml").read_text())["users"]}
+    for uid in (SS, "dm.dana"):
+        reply = Assistant(users[uid]).handle(f"/qc {cid[-4:]}")
+        assert "ready to edit" not in reply.text and "You decide" not in reply.text, uid
+        assert f"A query was sent to the site by {users[SS]['name']}" in reply.text, uid
+        assert not reply.actions, uid
