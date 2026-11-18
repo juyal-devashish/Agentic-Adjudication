@@ -182,12 +182,22 @@ def test_a_message_with_nothing_in_it_is_answered_with_the_tasks(ws, tmp_path):
     assert log_of(ws.paths)[-1]["note"] == "an empty message"
 
 
-def test_without_seeded_identities_the_gate_still_runs_its_detectors(ws, caplog):
-    """A demo folder without the kit (data/demo has none): a warning, and the detectors
-    alone. Measured here, not gated: how many of the kit's must-redact values they hold."""
+def test_a_demo_folder_without_the_kit_takes_the_repositorys_seeded_identities(ws):
+    (ws.paths.root / "flow1-testkit").unlink()  # data/demo has no kit of its own
+    gate = PhiGate.for_workspace(ws)
+    assert "DEMO01-101-0001" in gate.identities
+    assert gate.check("Philip Roberts was admitted.").held
+
+
+def test_without_seeded_identities_the_gate_still_runs_its_detectors(ws, caplog, monkeypatch,
+                                                                     tmp_path):  # fmt: skip
+    """No kit anywhere: a warning, and the detectors alone. Measured here, not gated:
+    how many of the kit's must-redact values they hold."""
+    from adjud.slack_app import phi_gate
     from tests.test_slack_agent_tools import seeded_phi
 
     (ws.paths.root / "flow1-testkit").unlink()
+    monkeypatch.setattr(phi_gate, "REPO_DATA", tmp_path / "no-kit")
     gate = PhiGate.for_workspace(ws)
     assert gate.identities == {} and "detectors only" in caplog.text
     phi = seeded_phi()
@@ -329,3 +339,4 @@ def test_the_messages_tab_greets_once_per_person(ws, tmp_path):
     assert len(client.posts) == 2 and "*Rahul Mehta (Data manager)*" in client.texts[1]
     assert "thread_ts" not in client.posts[1]
     assert [e["kind"] for e in log_of(ws.paths)] == ["greeting", "greeting"]
+

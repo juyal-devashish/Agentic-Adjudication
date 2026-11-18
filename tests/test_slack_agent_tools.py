@@ -206,3 +206,11 @@ def test_a_labelled_patient_or_next_of_kin_named_like_a_user_is_still_held(ws):
         for cases in (["DEMO01-0001"], []):
             assert gate.check(text, cases).held, (text, cases)
     assert not gate.check("Reported by Priya Nair; Dr. Anna Weber signs.", []).held
+
+
+def test_a_seeded_date_of_birth_in_words_or_a_street_without_its_postcode_is_held(ws):
+    gate = PhiGate.for_workspace(ws)  # subject DEMO01-101-0001: born 1955-07-24
+    for text in ("Born 24 July 1955.", "DOB: 24 Jul 1955", "born on July 24, 1955",
+                 "Date of birth 24.07.1955", "lives at 9 Victoria Ridges"):  # fmt: skip
+        for cases in (["DEMO01-0001"], []):
+            assert gate.check(text, cases).held, (text, cases)

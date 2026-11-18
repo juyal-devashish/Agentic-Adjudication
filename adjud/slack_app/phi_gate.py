@@ -4,7 +4,8 @@ Anything without PHI may go to Slack; PHI is what de-identification removes unde
 study's `deid_policy.yaml`. So before a text is posted, it is checked the way a redacted
 output is verified (`adjud.deid.pdf.verify_pdf`): every detector (labels, patterns,
 address segments, Presidio NER) on the text, then the generator's seeded identifiers
-(synthetic data only, from `study.yaml: seeded_identities`) and the terms the site added.
+(synthetic data only, from `study.yaml: seeded_identities`, under the data folder or,
+for a demo folder without the kit, the repository's) and the terms the site added.
 For the cases the turn is about, every seeded value of the subject is searched as
 verification searches it; for every other subject too, except that a bare surname
 counts only in Title or UPPER case ("Ward", not "the ward"). As in verification, any
@@ -32,6 +33,8 @@ import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 from adjud.deid.detect import HONORIFIC_WORDS, Finding, KnownValues, _subtract, detect
@@ -42,6 +45,7 @@ from adjud.documents import documents_of, seeded_values
 from adjud.slack_app.core import ROLE_WORDS, Workspace
 
 log = logging.getLogger("adjud.slack_app")
+REPO_DATA = Path(__file__).resolve().parents[2] / "data"  # the kit, for a demo folder
 HOLD_TEXT = "That answer may contain identifiers; open it in the app."
 # Slack mrkdwn marks, read as spaces: `Smith_John.pdf` is checked as "Smith John.pdf"
 _MARKS = str.maketrans(dict.fromkeys("*_`~", " "))
@@ -80,8 +84,10 @@ class PhiGate:
         cfg = yaml.safe_load((ws.paths.config / ws.study / "study.yaml").read_text()) or {}
         rel = cfg.get("seeded_identities")  # synthetic data only
         path = ws.paths.root / rel if rel else None
+        if path and not path.exists():  # a demo folder (data/demo) has no kit of its own
+            path = REPO_DATA / rel
         identities = json.loads(path.read_text())["subjects"] if path and path.exists() else {}
-        if rel and not identities:  # e.g. a demo folder without the kit: detectors only
+        if rel and not identities:  # no kit anywhere: detectors only
             log.warning("seeded_identities %s not found in %s: the PHI gate runs on its "
                         "detectors only", rel, ws.paths.root)  # fmt: skip
         extra = [str(w) for w in (cfg.get("slack_phi_gate") or {}).get("allow") or []]
@@ -125,7 +131,7 @@ class PhiGate:
         in_turn = self._subjects(case_ids)
         out: list[tuple[str, str]] = []
         for subject, s in self.identities.items():
-            values = seeded_values(self.identities, subject)
+            values = seeded_values(self.identities, subject) + _more_forms(s)
             if subject not in in_turn:
                 values = [v for v in values if v != s.get("last")]
             out += [(v, "SEEDED") for v in values]
@@ -139,6 +145,23 @@ class PhiGate:
         names = {str(s.get("last") or "") for subject, s in self.identities.items()
                  if subject not in in_turn}  # fmt: skip
         return sorted(n for n in names if len(n) >= 3)
+
+
+def _more_forms(s: dict[str, Any]) -> list[str]:
+    """The forms prose takes that `seeded_values` does not list: the date of birth in
+    words or with dots ("24 July 1955", "July 24, 1955", "24.07.1955") and the street
+    of the address without its town and postcode."""
+    out: list[str] = []
+    if s.get("dob"):
+        d = date.fromisoformat(s["dob"])
+        for month in (d.strftime("%B"), d.strftime("%b")):
+            out += [f"{d.day} {month} {d.year}", f"{d.day:02d} {month} {d.year}",
+                    f"{month} {d.day}, {d.year}"]  # fmt: skip
+        out.append(d.strftime("%d.%m.%Y"))
+    street = str(s.get("address") or "").split(",")[0].strip()
+    if len(street) >= 6:
+        out.append(street)
+    return out
 
 
 def _labelled_patient(f: Finding) -> bool:
