@@ -393,14 +393,19 @@ class AgentTools:
         drafted = next((e for e in reversed(events) if e["type"] == "narrative.drafted"), None)
         if drafted is None:
             raise ToolError(f"{case_id} has no narrative draft yet")
-        approved = any(e["type"] in ("quality_check.signed", "narrative.signed",
-                                     "narrative.approved") and e["seq"] > drafted["seq"]
-                       for e in events)  # fmt: skip
+        # once signed, the signed file is the narrative (it may differ from the draft)
+        approval = next((e for e in reversed(events)
+                         if e["type"] in ("quality_check.signed", "narrative.signed",
+                                          "narrative.approved")
+                         and e["seq"] > drafted["seq"] and e["data"].get("narrative")),
+                        None)  # fmt: skip
+        approved = approval is not None
         d = drafted["data"]
         edited = qc_drafts(self.ws.store, case_id).narrative if not approved else None
+        path = approval["data"]["narrative"]["path"] if approval else d["draft"]["path"]
         return {
             "case": case_id,
-            "text": edited or self.ws.store.get_file(case_id, d["draft"]["path"]).decode(),
+            "text": edited or self.ws.store.get_file(case_id, path).decode(),
             "source": {"ai": "AI", "template": "study template"}.get(d.get("source"), "?"),
             "simulated": bool(d.get("simulated")),
             "edited_unsigned": edited is not None,

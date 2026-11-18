@@ -394,3 +394,15 @@ def test_a_query_text_with_identifiers_stays_out_of_the_dm(ws, monkeypatch):
     query["data"]["text"] = "Page 2 is about another patient."
     assert "another patient" in (QueryInDm(ws)(note) or "")
     assert QueryInDm(ws)({"template": "documents_requested", "case_id": CID}) is None
+
+
+def test_after_the_signature_the_agent_shows_the_signed_narrative(ws, in_qc_review):
+    tools = acting(ws, "ss.anna", [], Downloads({}))
+    draft = call(tools, "narrative_draft", case="0001")
+    assert draft["approved"] is False
+    edited = "Subject DEMO01-101-0001 had a myocardial infarction. EDITED BY THE SS."
+    assert edited not in draft["text"]
+    in_qc_review.flow2.sign_qc_pass(CID, "ss.anna", "demo", edited, "Documents present")
+    signed = call(tools, "narrative_draft", case="0001")
+    assert signed["approved"] is True and signed["edited_unsigned"] is False
+    assert signed["text"].strip() == edited  # the signed file, not the earlier draft
