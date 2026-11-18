@@ -190,6 +190,24 @@ def test_edc_pull_imports_study_records_but_not_history(tmp_path, clock):
     assert again.new_cases == 0 and again.count("changed") == 0  # idempotent
 
 
+def test_edc_pull_reports_the_queued_files_it_imports_too(tmp_path, clock):
+    """The pull imports the whole inbox, so it reports every file, not only its own (B12)."""
+    from adjud.edc_pull import pull
+
+    data = tmp_path / "data"
+    (data / "edc_mock").mkdir(parents=True)
+    for f in (KIT / "edc_mock").iterdir():
+        (data / "edc_mock" / f.name).write_bytes(f.read_bytes())
+    pipe = IntakePipeline(data, Path(__file__).resolve().parents[1] / "data" / "config",
+                          data / "edc_mock", clock=clock)  # fmt: skip
+    pipe.paths.inbox.mkdir(parents=True, exist_ok=True)
+    shutil.copy(SCEN / "01_initial.csv", pipe.paths.inbox)
+    results = pull(pipe, "dm.dana")
+    by_file = {r.file: r for r in results}
+    assert "01_initial.csv" in by_file and by_file["01_initial.csv"].new_cases > 0
+    assert any(f.startswith("edc_pull_") for f in by_file)
+
+
 def test_manual_entry_reports_every_problem_at_once(pipe):
     """The reason and the empty fields in one answer, reason first (kit TC-INT-11)."""
     r = pipe.manual_entry({"study_id": "DEMO01"}, "", "dm.dana")

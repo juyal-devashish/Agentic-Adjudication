@@ -3,8 +3,9 @@
 Reads the mock EDC's AE table (`edc_mock/ae.csv`), leaves out the history records the
 mock keeps only for the earlier-events lookup (`edc_pull.exclude_ae_id_prefixes` in
 study.yaml), writes the rest as `edc_pull_<time>.csv` to the inbox and imports it like
-any other AE file. Intake is idempotent on (study, subject, AE ID), so pulling again
-only adds new records and updates changed ones.
+any other AE file, together with any file already waiting in the inbox (all of them are
+reported). Intake is idempotent on (study, subject, AE ID), so pulling again only adds new
+records and updates changed ones.
 """
 
 from __future__ import annotations
@@ -35,6 +36,6 @@ def pull(pipe: IntakePipeline, actor: str) -> list[ImportResult]:
     writer.writerows(rows)
     name = f"edc_pull_{pipe.clock().strftime('%Y%m%dT%H%M%S')}.csv"
     write_atomic(Path(paths.inbox) / name, out.getvalue().encode(), overwrite=False)
-    return [
-        r for r in pipe.process_inbox(paths.inbox, paths.processed, actor=actor) if r.file == name
-    ]
+    # Imports the whole inbox, so files queued before the pull are imported too: report
+    # every one, not only the pull's own file, so no case or rejection goes unmentioned.
+    return pipe.process_inbox(paths.inbox, paths.processed, actor=actor)
