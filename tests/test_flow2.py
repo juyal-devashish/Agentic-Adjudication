@@ -102,6 +102,8 @@ def test_flow2_end_to_end_with_ai_off(submitted):
         flow2.open_query(cid, ["other"], "x", user_id=SS, password="wrong")
     with pytest.raises(Flow2Refused, match="reason"):
         flow2.open_query(cid, [], "x", user_id=SS, password="demo")
+    with pytest.raises(Flow2Refused, match="text"):  # QC-07: reason codes plus free text
+        flow2.open_query(cid, ["other"], "   ", user_id=SS, password="demo")
     # One stop (P-39): the narrative was drafted in this round, from dossier version 2
     review = store.get_json(cid, "qc/checks_v2.json")
     assert review["proposal"] == "unclear" and review["dossier"]["version"] == 2

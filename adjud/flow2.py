@@ -531,6 +531,8 @@ class Flow2:
         codes = [c for c in codes if c in QUERY_CODES]
         if not codes:
             raise Flow2Refused("choose at least one reason for the query")
+        if not text.strip():  # QC-07: reason codes plus free text for the site
+            raise Flow2Refused("write the query text for the site")
         if self.store.state(case_id).state != State.QC_REVIEW:
             raise Flow2Refused("the case is not waiting for a QC review")
         data = {"codes": codes, "text": text.strip(), "results": self._checks_ref(case_id)}
