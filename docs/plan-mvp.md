@@ -369,8 +369,8 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [x] *Your tasks* at the top of each landing page, from the same Tasks as App Home
 - [x] Slack: the suggested outcome as one word for the Safety Specialist, "N records are not a case" with *Open AE import*, `/adj pull`; each with fake-client tests and the Clinical Content check
 - [x] Run sheet rewritten Slack-first; retirement-run checklist in [slack-test-plan.md](slack-test-plan.md)
-- [ ] Retirement bar (ADR 0003): 3 consecutive full demo runs driven from Slack, `tools.notify_parity` clean after each (results recorded in the test plan)
-- [ ] Then delete `ui/assistant.py`, `ui/views/assistant.py` and their tests
+- [x] ~~Retirement bar (ADR 0003): 3 consecutive full demo runs driven from Slack, `tools.notify_parity` clean after each~~ Not run: P-58's Slack Agent replaced the Assistant instead (step 32)
+- [x] Then delete `ui/assistant.py`, `ui/views/assistant.py` and their tests (done by P-58, Q16)
 
 **Done when:** no role sees the Assistant; each landing page lists that person's Tasks with buttons to the right page and case; the new Slack payloads pass the Clinical Content check; with Slack off the whole workflow still runs from the app and e-mail; full suite and kit pass.
 
@@ -396,9 +396,9 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [x] Slack's agent events and session status; edits and bot messages ignored; with the Agent's AI off, code answers with the person's Tasks
 - [x] Unsigned actions: import and pull; the site's upload of attached files (the original stays in Slack, delete tried and recorded); the Narrative Draft and draft Site Query that open the Quality check page pre-filled (events `narrative.draft_edited` and `query.drafted`, valid only in QC review and never moving the case; files come with the `file_share` message, `file_shared` is only acknowledged)
 - [x] Notices as Conversations (Q12); the Site Query text in the site's DM, answered by upload (Q13); *Open in the app* for every signed step
-- [ ] Tests: ADR 0004's content checks replaced by "no PHI in any Slack payload"; role limits; uploads; the full run from import to Assignment
-- [ ] The Assistant deleted (Q16) and step 30 closed with a note
-- [ ] AGENTS.md, CLAUDE.md and README brought in line with ADR 0005 (they still cite ADR 0004 for Slack; their "no clinical content" rule stays for e-mail)
+- [x] Tests: ADR 0004's content checks replaced by "no PHI in any Slack payload"; role limits; uploads; the full run from import to Assignment
+- [x] The Assistant deleted (Q16) and step 30 closed with a note
+- [x] AGENTS.md, CLAUDE.md and README brought in line with ADR 0005 (they still cite ADR 0004 for Slack; their "no clinical content" rule stays for e-mail)
 - [ ] A live run on the demo workspace; runbook updated; merged into `main`
 
 **Done when:** in the demo workspace each role can ask the Agent about its work and do its unsigned steps in Slack, and every signed step opens the right page in the app; no Slack payload carries the kit's seeded PHI; the P-57 demo still runs; with Slack and AI off the whole workflow runs from the app and e-mail; full suite and kit pass.
