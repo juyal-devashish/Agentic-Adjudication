@@ -77,11 +77,11 @@ def strings(payload: Any) -> list[str]:
 
 def phi_in(payloads: Any) -> list[str]:
     """The seeded identifiers found in any string of the payloads (whole words only, so
-    a surname never matches inside another word)."""
+    a surname never matches inside another word; `_` separates words, as in file names)."""
     found: set[str] = set()
     texts = [s.lower() for s in strings(payloads)]
     for value in seeded_identifiers():
-        pattern = re.compile(r"(?<!\w)" + re.escape(value) + r"(?!\w)")
+        pattern = re.compile(r"(?<![^\W_])" + re.escape(value) + r"(?![^\W_])")
         if any(pattern.search(t) for t in texts):
             found.add(value)
     return sorted(found)
@@ -98,6 +98,7 @@ def test_the_seeded_identifiers_are_the_kits_and_none_is_an_app_users_name():
     assert phi_in([{"text": "fine"}, ["Case DEMO01-0001: *Philip Roberts*"]]) == [
         "philip roberts", "roberts"]  # fmt: skip
     assert phi_in({"text": "Carry on; DEMO01-101-0001 had a myocardial infarction."}) == []
+    assert phi_in({"text": "Added `Roberts_Philip_letter.pdf`."}) == ["roberts"]
 
 
 # -- Slack, as the whole demo uses it ----------------------------------------------------------

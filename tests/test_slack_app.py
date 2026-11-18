@@ -1,4 +1,4 @@
-"""The Slack app (plan P-55, ADR 0003, ADR 0004) with a fake Slack client: nothing here
+"""The Slack app (plan P-55, ADR 0003, ADR 0005) with a fake Slack client: nothing here
 reaches Slack. Acting As, /adj, App Home, the data manager's import, the Slack actions
 log, and a check of every payload the app builds against the identifiers the kit seeded
 (ADR 0005 replaced ADR 0004's Clinical Content rule for Slack: PHI is the line, P-58)."""
