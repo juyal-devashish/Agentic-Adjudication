@@ -135,11 +135,16 @@ class Directory:
 
     def slack_user_for(self, person_id: str) -> str | None:
         """Where a notice for this person goes: their own Slack user (real use), else the
-        demo presenter, the Slack account that last chose someone to act as."""
+        Slack account acting as them (the last to choose them, when several did), else the
+        demo presenter, the account that last chose anyone. So with one Slack account per
+        character, each notice reaches that character's window (P-58)."""
         own = self.by_id.get(person_id, {}).get("slack_user_id")
         if own:
             return own
         acting = self.acting()
+        theirs = [slack for slack, pid in acting.items() if pid == person_id]
+        if theirs:
+            return theirs[-1]
         return next(reversed(acting), None) if acting else None
 
     def find(self, words: str) -> list[dict[str, Any]]:
