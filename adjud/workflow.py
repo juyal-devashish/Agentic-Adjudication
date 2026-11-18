@@ -210,3 +210,40 @@ def replay(events: list[dict[str, Any]]) -> CaseState:
         state = new
     assert state is not None
     return CaseState(**cs, state=state, seq=events[-1]["seq"], last_hash=events[-1]["hash"])
+
+
+# A state in words, for people: the app and the Slack app (P-55) say the same.
+STATE_WORDS = {
+    State.EVENT_CREATED: "Case created",
+    State.AWAITING_DOCUMENTS: "Waiting for documents",
+    State.DEIDENTIFYING: "Removing identifiers",
+    State.AWAITING_SITE_CONFIRMATION: "Waiting for site review",
+    State.SUBMITTED: "Submitted",
+    State.QC_CHECKS: "Quality check running",
+    State.QC_REVIEW: "Waiting for QC review",
+    State.QUERY_OPEN: "Query open with the site",
+    State.NARRATIVE: "Narrative being drafted",
+    State.NARRATIVE_REVIEW: "Waiting for narrative review",
+    State.READY_FOR_ADJUDICATION: "Ready for adjudication",
+    State.ADJ_REVIEW: "Independent reviews",
+    State.ADJ3_REVIEW: "Adjudicator 3 review",
+    State.CEC_MEETING: "Waiting for the committee",
+    State.MORE_DATA: "More data requested",
+    State.OUTCOME: "Outcome being derived",
+    State.EXPORT: "Exporting to the EDC",
+    State.CLOSED: "Closed",
+    State.WITHDRAWN: "Withdrawn",
+}
+
+# Flows 3–4 states a site sees only as one generic word: neither a dispute (Adjudicator 3)
+# nor the committee is shown to it (ACC-04, P-45).
+SITE_BLINDED = frozenset(
+    {State.ADJ_REVIEW, State.ADJ3_REVIEW, State.CEC_MEETING, State.MORE_DATA, State.OUTCOME}
+)
+
+
+def state_words(state: State, role: str | None = None) -> str:
+    """The state in words for someone in `role`; a site sees Flows 3–4 as one state."""
+    if role == "site" and state in SITE_BLINDED:
+        return "With adjudication"
+    return STATE_WORDS.get(state, str(state))

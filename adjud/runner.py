@@ -19,7 +19,7 @@ from typing import Any
 import yaml
 
 from adjud.delivery import EMAIL, SLACK, Deliverer, DeliveryLog, channels_from_env
-from adjud.documents import DocumentProcessor
+from adjud.documents import DeidBusy, DocumentProcessor
 from adjud.events import Clock, format_time, utc_now
 from adjud.flow2 import Flow2
 from adjud.flow3 import Flow3
@@ -28,8 +28,9 @@ from adjud.handoff import pending_handoffs, write_handoff
 from adjud.intake import IntakePipeline
 from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
-from adjud.slack import ACTOR as SLACK_ACTOR
-from adjud.slack import SlackChannel, SlackSettings
+from adjud.slack_app.core import Directory
+from adjud.slack_app.dm import ACTOR as SLACK_ACTOR
+from adjud.slack_app.dm import SlackDmChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
@@ -75,17 +76,21 @@ class Runner:
         if channels is not None and SLACK in channels:
             settings = SlackSettings.from_env()
             if settings is None:
-                log.warning("NOTIFY_CHANNELS lists slack, but SLACK_WEBHOOK_URL is not set: off")
+                log.warning("NOTIFY_CHANNELS lists slack, but SLACK_BOT_TOKEN is not set: off")
             else:  # Slack posts what is queued from when it was first switched on (P-54)
                 self.slack = Deliverer(
                     self.pipeline.store,
                     self.paths.config,
-                    SlackChannel(settings),
+                    SlackDmChannel(
+                        Directory(self.paths.config, self.paths.root / "slack", self.study),
+                        settings,
+                        settings.client(),
+                    ),
                     SLACK_ACTOR,
                     since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
                     clock=self.clock,
                 )
-                log.info("Slack on: notifications queued from now on are posted too")
+                log.info("Slack on: notifications queued from now on are sent as DMs too")
 
     def send_mail(self) -> None:
         """E-mail queued notifications when SMTP is configured (plan P-29)."""
@@ -142,6 +147,8 @@ class Runner:
                 log.info("de-identified %s run %s: %s", cs.case_id, summary["run"],
                          summary["files"])  # fmt: skip
                 done += 1
+            except DeidBusy:  # "Remove identifiers now" on the page is running it
+                log.info("%s is being de-identified elsewhere; skipped", cs.case_id)
             except Exception:
                 log.exception("de-identification failed for %s", cs.case_id)
         for case_id in pending_handoffs(self.pipeline.store):

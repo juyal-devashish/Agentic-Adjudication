@@ -17,11 +17,13 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
-from filelock import FileLock
+from filelock import FileLock, Timeout
 
 from adjud.chain import ChainedLog, Record, check_chain
 from adjud.events import Clock, EventDraft, file_refs, sha256_bytes, utc_now
@@ -34,6 +36,7 @@ CASE_ID_RE = re.compile(r"^[A-Z0-9]+-\d{4,}$")
 class CaseStore(Protocol):
     def create_case(self, case_id: str, first_event: EventDraft) -> Record: ...
     def append_event(self, case_id: str, event: EventDraft) -> Record: ...
+    def exclusive(self, case_id: str, name: str) -> Any: ...
     def events(self, case_id: str) -> list[Record]: ...
     def state(self, case_id: str) -> CaseState: ...
     def list_cases(self) -> list[str]: ...
@@ -47,6 +50,10 @@ class CaseExists(Exception):
 
 class CaseNotFound(Exception):
     pass
+
+
+class CaseBusy(Exception):
+    """Another process holds the case's lock for a long step (see `exclusive`)."""
 
 
 # --- module-level helpers (kit interface) ----------------------------------------------
@@ -153,15 +160,45 @@ class FileCaseStore:
             raise CaseExists(case_id)
         return self._append(case_id, first_event)
 
-    def append_event(self, case_id: str, event: EventDraft) -> Record:
+    def append_event(
+        self,
+        case_id: str,
+        event: EventDraft,
+        *,
+        expect: Callable[[list[Record]], None] | None = None,
+    ) -> Record:
+        """Append one event. `expect(prior events)` runs under the case lock before the
+        write and may raise to refuse it: a check that nothing changed since it was read."""
         if event.type == "case.created":
             raise ValueError("use create_case for case.created")
         if not (self.case_dir(case_id) / "events.jsonl").exists():
             raise CaseNotFound(case_id)
-        return self._append(case_id, event)
+        return self._append(case_id, event, expect)
 
-    def _append(self, case_id: str, draft: EventDraft) -> Record:
+    @contextmanager
+    def exclusive(self, case_id: str, name: str) -> Iterator[None]:
+        """Hold a named lock on one case for a long step, such as a de-identification run,
+        so a second caller (another tab, the runner) is refused at once with CaseBusy
+        instead of running the step twice. The OS releases it if the process dies."""
+        lock = FileLock(self.case_dir(case_id) / f".{name}.lock", timeout=0)
+        try:
+            lock.acquire()
+        except Timeout:
+            raise CaseBusy(case_id) from None
+        try:
+            yield
+        finally:
+            lock.release()
+
+    def _append(
+        self,
+        case_id: str,
+        draft: EventDraft,
+        expect: Callable[[list[Record]], None] | None = None,
+    ) -> Record:
         def validate(prior: list[Record]) -> None:
+            if expect is not None:
+                expect(prior)
             if draft.type == "case.created" and prior:
                 raise CaseExists(case_id)
             current = replay(prior).state if prior else None
@@ -188,11 +225,19 @@ class FileCaseStore:
     def put_json_once(self, case_id: str, rel_path: str, obj: Any) -> str:
         """Like put_json, but a re-run after a crash (file written, event not yet) reuses
         an identical file. A different file of that name is still refused."""
-        content = json_bytes(obj)
+        return self.put_file_once(case_id, rel_path, json_bytes(obj))
+
+    def put_file_once(self, case_id: str, rel_path: str, content: bytes) -> str:
+        """Like put_file, but reuses an identical file left by an earlier attempt."""
         path = self._safe_path(case_id, rel_path)
         if path.exists() and path.read_bytes() == content:
             return sha256_bytes(content)
-        return self.put_file(case_id, rel_path, content)
+        try:
+            return self.put_file(case_id, rel_path, content)
+        except FileExistsError:  # written at the same moment by a concurrent attempt
+            if path.read_bytes() != content:
+                raise
+            return sha256_bytes(content)
 
     # --- reads -----------------------------------------------------------------------
 

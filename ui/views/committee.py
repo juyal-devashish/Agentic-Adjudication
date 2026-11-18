@@ -83,7 +83,9 @@ if ctx.role == "cec_coordinator":
     st.header("Record the meeting")
     members = [u for u, v in flow3.users().items() if v["role"] == "adjudicator"]
     with st.form(f"meeting_{cid}"):
-        held = st.date_input("Meeting date", value=date.today(), format="YYYY-MM-DD")
+        held = st.date_input(
+            "Meeting date", value=date.today(), max_value=date.today(), format="YYYY-MM-DD"
+        )
         attendees = st.multiselect("Attendees", members, default=members, format_func=names.get)
         summary = st.text_area("Summary of the discussion")
         decisions = {}
@@ -156,13 +158,17 @@ if meeting is not None:
     if stale:
         st.warning("This meeting was before the new data arrived. Record the next meeting.")
     elif ctx.actor == chair and record["quorum_met"]:
+        # Sign the record drawn on the run the Chair saw, not one recorded since (B07).
+        seen_key = f"consensus_shown_{cid}"
+        shown = st.session_state.get(seen_key, meeting["data"]["meeting"])
+        st.session_state[seen_key] = meeting["data"]["meeting"]
         with st.form(f"consensus_{cid}"):
             password = st.text_input(
                 f"Password for {ctx.user['name']} (demo password: demo)", type="password"
             )
             if st.form_submit_button("Sign the consensus", type="primary"):
                 try:
-                    flow3.sign_consensus(cid, ctx.actor, password)
+                    flow3.sign_consensus(cid, ctx.actor, password, shown=shown)
                     st.toast("Consensus signed")
                     st.rerun()
                 except SignatureRefused as exc:

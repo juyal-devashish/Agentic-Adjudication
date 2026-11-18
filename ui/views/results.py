@@ -14,7 +14,7 @@ import sys
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, case_list, context, paths, pipeline, site_name, users
+from common import BLINDED, case_header, case_list, context, paths, pipeline, site_name, users
 
 from adjud.ai.gateway import Gateway
 from adjud.handoff import read_manifest
@@ -46,6 +46,7 @@ EVENT_WORDS = {
     "narrative.signed": "Narrative signed",
     "handoff.flow3_ready": "Ready for adjudication",
     "documents.uploaded": "Documents uploaded",
+    "upload.rejected": "Uploaded ZIP file refused",
     "deid.started": "Identifier removal started",
     "deid.file_processed": "File processed",
     "deid.completed": "Identifier removal finished",
@@ -88,6 +89,11 @@ def event_words(e: dict) -> str:
             return "Notification posted to Slack"
         return f"Slack message failed: {e['data'].get('error', 'unknown')}"
     return EVENT_WORDS.get(e["type"], e["type"])
+
+
+def rejected_reason(e: dict) -> str:
+    """Why an uploaded ZIP was refused; the upload folder keeps it in the event's data."""
+    return e["data"].get("reason", "") if e["type"] == "upload.rejected" else ""
 
 
 FLOW34_EVENTS = {t for t in EVENT_WORDS if t.split(".")[0] in (
@@ -253,12 +259,14 @@ else:
 
 def visible_note(n: dict) -> bool:
     """Flows 3–4 e-mails to a person: not shown to the site (ACC-04), and to an adjudicator
-    only when addressed to them."""
+    only when addressed to them. The site sees no Flows 3–4 e-mail but its own query."""
     to = n["to"]
+    if ctx.role == "site":
+        return not to.startswith(("user:", "mailbox:")) and (
+            n.get("template") not in BLINDED or to == f"site:{ctx.user.get('site')}"
+        )
     if not to.startswith(("user:", "mailbox:")):
         return True
-    if ctx.role == "site":
-        return False
     return ctx.role != "adjudicator" or to == f"user:{ctx.actor}"
 
 
@@ -423,7 +431,11 @@ else:
     )
 events = store.events(cid)
 if ctx.role == "site":
+    # Flows 3–4 e-mails, queued and delivered, would name who asked or show progress (P-45).
+    blinded = {e["data"].get("id") for e in events if e["type"] == "notification.queued"
+               and not visible_note(e["data"])}  # fmt: skip
     events = [e for e in events if e["type"] not in FLOW34_EVENTS
+              and not (e["type"].startswith("notification.") and e["data"].get("id") in blinded)
               and not str(e["data"].get("to", "")).startswith(("user:", "mailbox:"))]  # fmt: skip
 names = {u["id"]: u["name"] for u in users()}
 # Most entries are automatic steps; a reviewer often wants only what people did
@@ -440,7 +452,7 @@ st.dataframe(
                 "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
                 "Who": who(e["actor"], names),
                 "What": event_words(e),
-                "Reason": e.get("reason") or "",
+                "Reason": e.get("reason") or rejected_reason(e),
             }
             for e in shown
         ]

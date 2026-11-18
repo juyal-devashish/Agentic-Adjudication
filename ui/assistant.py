@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import theme
-from common import doc_label, pipeline, site_name, study_config
+from common import doc_label, my_review, pipeline, site_name, study_config
 from wording import IMPORT_OUTCOME, import_summary, in_sentence, next_step
 
 from adjud.documents import documents_of
@@ -95,13 +95,12 @@ class Assistant:
                 if self.sees(cs.subject, cs.case_id)]  # fmt: skip
 
     def find_case(self, text: str) -> str | None:
-        """A case named in the text: DEMO01-0001, 0001, or an AE ID such as AE-001."""
+        """A case named in the text: DEMO01-0001, 0001, or an AE ID such as AE-001 or AE-M01."""
         ids = {cs.case_id: cs for cs in self.cases()}
         if m := re.search(r"\b([A-Z0-9]+-\d{4})\b", text.upper()):
             if m.group(1) in ids:
                 return m.group(1)
-        if m := re.search(r"\bAE-?(\d{3})\b", text.upper()):
-            ae = f"AE-{m.group(1)}"
+        if ae := _ae_id(text):
             return next((c for c, cs in ids.items() if cs.ae_id == ae), None)
         if m := re.search(r"\b(\d{4})\b", text):
             return next((c for c in ids if c.endswith(f"-{m.group(1)}")), None)
@@ -120,8 +119,10 @@ class Assistant:
             r"\b(my tasks?|to do|todo|waiting for me|what do i need|what should i)\b", low
         ):
             return self.tasks()
-        if command == "/import" or (not command and re.search(r"\bimport\b", low)):
+        if command == "/import":
             return self.run_import()
+        if not command and re.search(r"\bimport\b", low):  # never import on plain words
+            return self.tasks()  # it lists the waiting files and says to type /import
         if command == "/why" or (not command and re.search(r"\b(why|eligib|not a case)", low)):
             return self.why(t)
         if command == "/qc" or (not command and re.search(r"\b(qc|quality|suggest)", low)):
@@ -150,7 +151,7 @@ class Assistant:
         lines: list[str] = []
         actions: list[Action] = []
         if self.role == "data_manager":
-            waiting = sorted(f.name for f in self.pipe_paths().inbox.glob("*") if f.is_file())
+            waiting = [f.name for f in self.pipe_paths().waiting_files()]
             if waiting:
                 lines.append(
                     f"**{len(waiting)} AE file{'s' if len(waiting) > 1 else ''} "
@@ -263,14 +264,16 @@ class Assistant:
             requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
             ready=submission_status(self.store, case_id).ready,
             has_files=bool(documents_of(self.store, case_id).files),
+            review=my_review(self.user["id"], case_id) if self.role == "adjudicator" else None,
         )
         lines = [
             f"**{case_id}**: {snap['ae_term']}, subject {snap['subject_id']} at "
             f"{site_name(snap['site_id'])}, onset {theme.date_words(snap['onset_date'])}.",
-            f"Status: **{theme.state_words(cs.state)}** since {theme.date_words(cs.state_since)}.",
+            f"Status: **{theme.state_words(cs.state, self.role)}** "
+            f"since {theme.date_words(cs.state_since)}.",
             step,
         ]
-        if cs.state == State.QC_REVIEW and self.role != "site":
+        if cs.state == State.QC_REVIEW and self._sees_ai_suggestion():
             lines.append(self._suggestion_line(case_id))
         if cs.state == State.READY_FOR_ADJUDICATION:
             signed = self._latest_event(case_id, "quality_check.signed") or self._latest_event(
@@ -287,6 +290,19 @@ class Assistant:
 
     def quality_check(self, case_id: str) -> Reply:
         if self.role == "site":
+            return Reply(
+                "The quality check is the Safety Specialist's review. I can tell "
+                f"you where the case is: `/status {case_id}`."
+            )
+        signed = self._latest_event(case_id, "quality_check.signed")
+        in_review = self.store.state(case_id).state == State.QC_REVIEW
+        if not self._sees_ai_suggestion():  # adjudication sees only the signed package (P-49)
+            if signed and not in_review:
+                return Reply(
+                    f"The quality check of {case_id} passed and the narrative was signed "
+                    f"by {signed['signature']['signer']}. The dossier and the signed "
+                    "narrative are in the case's package."
+                )
             return Reply(
                 "The quality check is the Safety Specialist's review. I can tell "
                 f"you where the case is: `/status {case_id}`."
@@ -325,22 +341,37 @@ class Assistant:
                 lines.append(f"Would also help (advice only): {helps}.")
         else:
             lines.append(f"No AI Suggestion this round ({sg.get('note') or 'AI is off'}).")
-        lines.append(self._suggestion_line(case_id))
         nar = result.get("narrative") or {}
+        if not in_review:  # the round is decided; nothing is left to edit or sign here
+            query = self._latest_event(case_id, "query.opened")
+            if (
+                query
+                and query["seq"] > (signed or {"seq": -1})["seq"]
+                and ("more_data" not in query["data"].get("codes", []))
+            ):
+                lines.append(
+                    f"A query was sent to the site by {query['signature']['signer']} on "
+                    f"{theme.date_words(query['at'])}; the narrative draft was dropped."
+                )
+            elif signed:
+                lines.append(
+                    f"Quality check passed and narrative signed by {signed['signature']['signer']}."
+                )
+            return Reply("\n\n".join(lines))
+        lines.append(self._suggestion_line(case_id))
         if nar:
             source = "the AI" if nar.get("source") == "ai" else "the study template"
             lines.append(f"The narrative draft, from {source}, is ready to edit.")
         lines.append("You decide and sign; the AI only suggests.")
         actions = []
-        if self.store.state(case_id).state == State.QC_REVIEW and self.role == "safety_specialist":
+        if self.role == "safety_specialist":
             actions.append(Action(f"Review and sign {case_id}", "qc", case_id))
         return Reply("\n\n".join(lines), actions)
 
     def why(self, text: str) -> Reply:
-        m = re.search(r"\bAE-?(\d{3})\b", text.upper())
-        if not m:
+        ae = _ae_id(text)
+        if not ae:
             return Reply("Which record? For example `/why AE-008`.")
-        ae = f"AE-{m.group(1)}"
         latest: dict[str, Any] | None = None
         for e in read_log(self.store.evaluations_path):
             key = e.get("key", "")
@@ -358,6 +389,13 @@ class Assistant:
             action = [Action(f"Open {latest.get('case_id')}", "record", latest.get("case_id"))]
             return Reply(text, action)
         rules = "\n".join(f"- Not met: {r}" for r in failed)
+        if case_id := latest.get("case_id"):  # stopped qualifying: flagged, never withdrawn
+            return Reply(
+                f"**{ae}** ({subject}) is case **{case_id}**. Since an update in the EDC it "
+                f"no longer meets the study's rules for adjudication:\n{rules}\n\nThe case "
+                "is flagged for review, not withdrawn.",
+                [Action(f"Open {case_id}", "record", case_id)],
+            )
         return Reply(
             f"**{ae}** ({subject}) does not meet the study's rules for "
             f"adjudication, so it is not a case:\n{rules}\n\nAll other rules "
@@ -372,15 +410,30 @@ class Assistant:
                 "for you. I'll let you know here when new cases arrive."
             )
         paths = self.pipe_paths()
-        if not any(f.is_file() for f in paths.inbox.glob("*")):
+        if not paths.waiting_files():
             return Reply(
                 "There is no AE file waiting in the import queue.",
                 [Action("Go to AE import", "import")],
             )
         results = self.pipe.process_inbox(paths.inbox, paths.processed, actor=self.user["id"])
-        lines = []
+        if not results:  # another import took the queued files first
+            return Reply(
+                "The queued AE files had already been imported.",
+                [Action("Open the import results", "import")],
+            )
+        blocks = []  # one Markdown block per file, so summaries never join a bullet
         for r in results:
-            lines.append(import_summary({**r.summary(), "file": r.file}))
+            summary = import_summary({**r.summary(), "file": r.file})
+            lines = [summary]
+            if summary.endswith("below and import it again."):  # list what "below" means
+                for e in r.errors:
+                    where = ", ".join(
+                        p for p in (e["row"] and f"Row {e['row']}", e["column"] and
+                                    f"column {e['column']}") if p
+                    )  # fmt: skip
+                    problem = e["code"].replace("_", " ").capitalize()
+                    detail = f" ({e['message']})" if e.get("message") else ""
+                    lines.append(f"- {where + ': ' if where else ''}{problem}{detail}")
             for o in r.outcomes:
                 subject, ae = o["key"].split("|")[1:3]
                 word = IMPORT_OUTCOME.get(o["outcome"], o["outcome"])
@@ -388,9 +441,10 @@ class Assistant:
                     lines.append(f"- {ae} ({subject}): {word.lower()} **{o['case_id']}**")
                 else:
                     lines.append(f"- {ae} ({subject}): {word.lower()}. Ask me `/why {ae}`.")
+            blocks.append("\n".join(lines))
         if any(o.get("case_id") for r in results for o in r.outcomes):
-            lines.append("\nThe sites are e-mailed now with a link to upload their documents.")
-        return Reply("\n".join(lines), [Action("Open the import results", "import")])
+            blocks.append("The sites are e-mailed now with a link to upload their documents.")
+        return Reply("\n\n".join(blocks), [Action("Open the import results", "import")])
 
     # -- live updates ------------------------------------------------------------------------
 
@@ -399,7 +453,7 @@ class Assistant:
         order it happened, for the cases this person may see. Updates `seen`."""
         out: list[tuple[str, Reply]] = []
         for cs in self.cases():
-            last = seen.get(cs.case_id, 0)
+            last = seen.get(cs.case_id, self._start(cs.case_id))
             for e in self.store.events(cs.case_id):
                 if e["seq"] <= last:
                     continue
@@ -407,6 +461,16 @@ class Assistant:
                     out.append((e["at"], reply))
             seen[cs.case_id] = cs.seq
         return [r for _, r in sorted(out, key=lambda x: x[0])]
+
+    def _start(self, case_id: str) -> int:
+        """Where updates begin on a case this person did not see before: an adjudicator
+        is told from the event that gave them the case, not its Flow 1-2 history."""
+        if self.role != "adjudicator":
+            return 0
+        from adjud.flow3 import first_visible_seq
+
+        seq = first_visible_seq(self.store, case_id, self.user["id"], bool(self.user.get("chair")))
+        return (seq or 1) - 1
 
     def _update(self, case_id: str, e: dict[str, Any]) -> Reply | None:
         t, ss, site = e["type"], self.role == "safety_specialist", self.role == "site"
@@ -427,6 +491,8 @@ class Assistant:
                 )
             return Reply(text + " Waiting for the site's review.")
         if t == "submission.signed":
+            if not self._sees_ai_suggestion():
+                return Reply(f"{case_id}: signed and submitted by {who}.")
             return Reply(
                 f"{case_id}: signed and submitted by {who}. The quality check is "
                 "running: the checks, the AI Suggestion and the narrative draft…"
@@ -434,6 +500,8 @@ class Assistant:
         if t == "qc.review_needed":
             if site:
                 return Reply(f"{case_id}: your documents are with the Safety Specialist.")
+            if not self._sees_ai_suggestion():
+                return Reply(f"{case_id}: the quality check is with the Safety Specialist.")
             line = f"{case_id}: the quality check is ready. {self._suggestion_line(case_id)}"
             return Reply(line, [Action(f"Review and sign {case_id}", "qc", case_id)] if ss else [])
         if t == "query.opened":
@@ -464,8 +532,10 @@ class Assistant:
         adj, coord = self.role == "adjudicator", self.role == "cec_coordinator"
         act = [Action(f"Adjudicate {case_id}", "adjudicate", case_id)]
         if t == "adjudication.assigned":
-            if adj:
+            if adj and me in d["adjudicators"].values():
                 return Reply(f"{case_id}: an independent review is assigned to you.", act)
+            if adj:
+                return None  # the reviews of round 1 and 2 are someone else's
             n = f" (round {d['round']})" if d["round"] > 1 else ""
             return Reply(f"{case_id}: Adjudicators 1 and 2 assigned{n}. The reviews are blind.")
         if t == "adjudication.reassigned":
@@ -530,6 +600,12 @@ class Assistant:
         e = self._latest(case_id, "qc.checks_completed")
         return self.store.get_json(case_id, e["results"]["path"]) if e else None
 
+    def _sees_ai_suggestion(self) -> bool:
+        """The AI Suggestion and the suggested QC outcome prepare the Safety Specialist's
+        review; the site, the adjudicators and the CEC Coordinator are not shown them
+        (P-49: adjudication works from the dossier and the signed narrative)."""
+        return self.role not in ("site", "adjudicator", "cec_coordinator")
+
     def _suggestion_line(self, case_id: str) -> str:
         result = self._qc_result(case_id)
         if result is None:
@@ -566,15 +642,32 @@ class Assistant:
         )
 
 
+def _ae_id(text: str) -> str | None:
+    """An AE ID named in the text, as AE-<id>: AE-008, AE008, AE-M01 or AE-7000. AE IDs
+    have no fixed shape; at least one digit keeps plain words such as "AEROBIC" out."""
+    m = re.search(r"\bAE-?([A-Z]*\d[A-Z0-9]*)\b", text.upper())
+    return f"AE-{m.group(1)}" if m else None
+
+
 def _failed_rules(results: list[dict[str, Any]]) -> list[str]:
+    """One line per top-level rule not met. A group keeps its own description and joins its
+    unmet branches with "or" (any) or "and" (all), so either/or rules read as one rule."""
     out = []
     for r in results:
         if r["passed"]:
             continue
+        label = r.get("description", r.get("id", ""))
         if "children" in r:
-            out += _failed_rules(r["children"]) or [r.get("description", r.get("id", ""))]
+            joiner = " or " if r.get("group") == "any" else " and "
+            reasons = joiner.join(_failed_rules(r["children"]))
+            out.append(f"{label}: {reasons}" if reasons else label)
         else:
+            fields = dict(theme.AE_FIELDS)
             value = theme.plain_value(str(r.get("actual") if r.get("actual") is not None else ""))
-            field = dict(theme.AE_FIELDS).get(r["field"], r["field"])
-            out.append(f"{r.get('description', r['id'])} ({field}: {value})")
+            shown = f"{fields.get(r['field'], r['field'])}: {value}"
+            if "compared_with" in r:  # a field-to-field comparison: show the other value too
+                other = str(r.get("expected", ""))
+                other = fields.get(other, other.replace("_", " ").capitalize())
+                shown += f", {other}: {theme.plain_value(str(r['compared_with'] or ''))}"
+            out.append(f"{label} ({shown})")
     return out

@@ -93,16 +93,24 @@ open_slots = [
     )
     if s not in rnd.signed
 ]
+free = [u for u in flow3.pool(cid) if u not in rnd.holders.values()]
+# What the form showed: if it changed before the click (a signature, another tab), the
+# rebuilt boxes may hold another review or person than the one chosen, so refuse.
+shown = (state, rnd.number, rnd.passes, dict(rnd.holders), sorted(rnd.signed), free)
+seen = st.session_state.get(f"reassign_shown_{cid}")
+st.session_state[f"reassign_shown_{cid}"] = shown
 if open_slots:
     st.subheader("Reassign an open review")
-    with st.form(f"reassign_{cid}"):
+    with st.form(f"reassign_{cid}", clear_on_submit=True):
         slot = st.selectbox("Review", open_slots, format_func=lambda s: f"Adjudicator {s}")
-        free = [u for u in flow3.pool(cid) if u not in rnd.holders.values()]
         to = st.selectbox("To", free, format_func=names.get)
         reason = st.text_input("Reason (required)")
         if st.form_submit_button("Reassign", type="primary", disabled=not free):
             try:
-                flow3.reassign(cid, ctx.actor, slot, to, reason)
+                if seen != shown:
+                    raise Flow3Refused("the assignments changed while the page was open; "
+                                       "check them and choose again")  # fmt: skip
+                flow3.reassign(cid, ctx.actor, slot, to, reason, expected_from=rnd.holders[slot])
                 st.toast("Review reassigned")
                 st.rerun()
             except Flow3Refused as exc:

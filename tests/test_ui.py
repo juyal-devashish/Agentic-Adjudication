@@ -236,6 +236,10 @@ def test_quality_check_page_is_one_stop_with_the_narrative_and_one_signature(dem
     assert any(b.label == "Download the dossier (PDF)" for b in at.get("download_button"))
     # Query fields only once the Safety Specialist chooses to send a query.
     decision = next(r for r in at.radio if r.label == "Your decision")
+    assert decision.value is None  # no Suggested Outcome, so nothing is pre-selected (B26)
+    assert not any(b.label.startswith("Sign") for b in at.button)
+    decision.set_value("pass").run()
+    decision = next(r for r in at.radio if r.label == "Your decision")
     assert decision.value == "pass" and not at.multiselect
     assert any(a.label == "Narrative" for a in at.text_area)  # the draft, ready to edit
     assert not any(a.label == "Message to the site" for a in at.text_area)
@@ -526,3 +530,55 @@ def test_the_site_sees_recognised_document_types_and_can_correct_one(demo):
     assert not at.exception, at.exception
     docs = documents_of(runner.pipeline.store, "DEMO01-0001")
     assert docs.type_of("discharge_summary.pdf") == ("other", "site")
+
+
+def test_a_rerun_that_loses_the_recognised_type_records_no_site_label(demo):
+    """B14: a box over the title makes the re-run lose the recognised type. The type
+    selectbox keeps the value it showed before; that must not become a site label."""
+    from adjud.documents import documents_of, upload
+    from adjud.review import change_redactions
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    src = demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    files = [(f.name, f.read_bytes()) for f in sorted(src.iterdir())]
+    upload(store, "DEMO01-0001", files, "site101.coord")
+    runner.run_once()
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    kind = next(s for s in at.selectbox if s.label == "Document type")
+    assert kind.value == "discharge_summary"
+    box = {"file": "discharge_summary.pdf", "page": 1, "rect": [0.07909, 0.21598, 0.44991, 0.24085]}
+    change_redactions(store, "DEMO01-0001", "site101.coord", boxes=[box])
+    runner.run_once()
+    assert documents_of(store, "DEMO01-0001").type_of("discharge_summary.pdf") == (None, "")
+
+    at.run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events("DEMO01-0001") if e["type"] == "document.labelled"]
+    assert "Set by the site." not in [c.value for c in at.caption]
+    kind = next(s for s in at.selectbox if s.label == "Document type")
+    assert kind.value is None
+
+
+def test_a_refused_zip_and_its_reason_show_on_documents_and_in_the_record(demo):
+    """B16: the upload_rejected e-mail links to Documents, which must say which ZIP was
+    refused and why; the case record names the event and shows the reason."""
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    folders = runner.uploads
+    (demo.root / "uploads" / "DEMO01-0001" / "broken.zip").write_bytes(b"not a zip")
+    folders.tick()  # first sight: waits for the file to stop changing
+    assert folders.tick()["rejected"] == ["broken.zip"]
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    assert any("broken.zip" in w.value and "damaged" in w.value for w in at.warning)
+
+    at = run("views/results.py", role="site", case_id="DEMO01-0001")
+    trail = next(df.value for df in at.dataframe if "Reason" in df.value.columns)
+    row = trail[trail["What"] == "Uploaded ZIP file refused"]
+    assert len(row) == 1 and "damaged" in row["Reason"].iloc[0]

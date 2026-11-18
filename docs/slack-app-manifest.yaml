@@ -1,0 +1,41 @@
+# Slack app manifest for the demo workspace (plan P-55, ADR 0003, ADR 0004).
+# Built from docs/research/slack-interactive-app.md §10, trimmed to the Friday slice.
+# Paste it at api.slack.com/apps → Create New App → From a manifest, in the DEMO workspace
+# only. Slack validates it there; if it objects to a field, see the research notes.
+#
+# Socket Mode: no public address. After creating the app:
+#   Basic Information → App-Level Tokens → Generate, scope connections:write → SLACK_APP_TOKEN
+#   Install App → Install to Workspace → Bot User OAuth Token → SLACK_BOT_TOKEN
+# Both go in .env only, never in the repository or the chat.
+_metadata:
+  major_version: 1
+display_information:
+  name: Adjudication Demo
+  description: Tasks and notices for the adjudication demo. Synthetic data only.
+features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true            # the DMs with "Open in the app"
+    messages_tab_read_only_enabled: true  # nobody types free text to the app (ADR 0004)
+  bot_user:
+    display_name: Adjudication Demo
+    always_online: false
+  slash_commands:
+    - command: /adj
+      description: Your adjudication tasks, cases and status
+      usage_hint: "tasks | cases | status 0001 | import | act-as anna | help"
+      should_escape: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write   # DMs to people (chat.postMessage to a user ID)
+      - commands     # /adj
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_home_opened   # publish the Home tab when someone opens it
+  interactivity:
+    is_enabled: true      # buttons and the Acting As form
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

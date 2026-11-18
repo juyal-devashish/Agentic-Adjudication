@@ -158,6 +158,58 @@ def test_m4_submission_signature_and_handoff_manifest(ctx):
     assert {"submission_received", "documents_received"} <= set(templates)
 
 
+def test_one_submission_takes_one_signature_from_two_tabs(ctx, monkeypatch):
+    """B15: a second tab signing at the same moment is refused with a message, not a
+    TransitionRefused; one submission.signed is written."""
+    import adjud.review
+
+    store, proc, cid = ctx
+    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY. Chest pain."))], SITE)
+    proc.process_case(cid)
+    real, raced = adjud.review.sign, []
+
+    def sign(*args, **kw):  # the other tab signs while this one checks the password
+        if not raced:
+            raced.append(True)
+            submit(store, cid, SITE, "demo", CONFIG)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(adjud.review, "sign", sign)
+    with pytest.raises(ReviewRefused, match="not waiting"):
+        submit(store, cid, SITE, "demo", CONFIG)
+    assert [e["type"] for e in store.events(cid)].count("submission.signed") == 1
+    assert store.state(cid).state == State.SUBMITTED
+
+
+def test_a_document_removed_while_signing_is_not_signed_or_handed_on(ctx, monkeypatch):
+    """B37: another tab removes a file while this one checks the password; the signature
+    is refused, so the removed file never enters a submission or the Flow 2 manifest."""
+    import adjud.review
+
+    store, proc, cid = ctx
+    upload(store, cid, [("a.pdf", pdf("DISCHARGE SUMMARY. Chest pain.")),
+                        ("b.pdf", pdf("ECG REPORT. Sinus rhythm."))], SITE)  # fmt: skip
+    proc.process_case(cid)
+    real, raced = adjud.review.sign, []
+
+    def sign(*args, **kw):  # the other tab removes b.pdf while this one checks the password
+        if not raced:
+            raced.append(True)
+            delete_document(store, cid, "b.pdf", SITE, reason="wrong file")
+        return real(*args, **kw)
+
+    monkeypatch.setattr(adjud.review, "sign", sign)
+    with pytest.raises(ReviewRefused, match="documents changed"):
+        submit(store, cid, SITE, "demo", CONFIG)
+    assert "submission.signed" not in [e["type"] for e in store.events(cid)]
+    assert store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+
+    signed = submit(store, cid, SITE, "demo", CONFIG)  # signing again covers what is there
+    assert [f["name"] for f in signed["data"]["files"]] == ["a.pdf"]
+    manifest = write_handoff(store, cid, CONFIG, proc.outbox)
+    assert [d["source_name"] for d in manifest["documents"]] == ["a.pdf"]
+
+
 def test_rejected_file_must_be_deleted_before_submission(ctx):
     store, proc, cid = ctx
     upload(
@@ -227,6 +279,65 @@ def test_box_on_a_scan_blacks_out_the_pixels(ctx):
     sx, sy = out.width / 1240, out.height / 1754
     area = out.crop((int(310 * sx), int(410 * sy), int(690 * sx), int(450 * sy)))
     assert area.getextrema()[1] < 10  # the grey scribble is now black, not grey
+
+
+def form_pdf(value: str) -> bytes:
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        page.insert_text((72, 72), "ECG REPORT. Sinus rhythm.", fontsize=11)
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name = pymupdf.PDF_WIDGET_TYPE_TEXT, "patient"
+        widget.field_value, widget.rect = value, pymupdf.Rect(72, 150, 400, 175)
+        page.add_widget(widget)
+        page.add_freetext_annot(pymupdf.Rect(72, 300, 300, 330), "Tray zebra quokka")
+        return doc.tobytes()
+
+
+def test_form_fields_and_annotations_are_flattened_so_a_box_removes_them(ctx):
+    """A form field's value and an annotation's text are page content like any other: a box
+    over them removes them, and no field or annotation reaches the output (P-30)."""
+    store, proc, cid = ctx
+    upload(store, cid, [("form.pdf", form_pdf("Robin Quill 2929647"))], SITE)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        page = doc[0]
+        assert not list(page.widgets()) and page.first_annot is None and not doc.is_form_pdf
+        field = _fractions(page, pymupdf.Rect(72, 150, 400, 175))
+        note = _fractions(page, pymupdf.Rect(72, 300, 300, 330))
+    boxes = [{"file": "form.pdf", "page": 1, "rect": r} for r in (field, note)]
+    change_redactions(store, cid, SITE, boxes=boxes)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    assert done["status"] == "verified"
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        page = doc[0]
+        text = page.get_text()
+        assert not list(page.widgets()) and page.first_annot is None
+    assert "2929647" not in text and "Quill" not in text and "quokka" not in text
+    assert "Sinus rhythm" in text
+
+
+def test_a_detected_form_field_value_is_removed_not_left_as_a_residual(ctx):
+    store, proc, cid = ctx
+    value = "Patient: Robert Fairweather MRN: 77881234 Date of birth: 12/07/1951"
+    upload(store, cid, [("form.pdf", form_pdf(value))], SITE)
+    proc.process_case(cid)
+    done = processed(store, cid, "form.pdf")
+    assert done["status"] == "verified" and done["findings"]
+    with pymupdf.open(stream=store.get_file(cid, done["output"]["path"]), filetype="pdf") as doc:
+        text = doc[0].get_text()
+    assert "Fairweather" not in text and "77881234" not in text and "1951" not in text
+
+
+def test_verification_fails_while_a_form_field_or_annotation_remains():
+    from adjud.deid.detect import KnownValues
+    from adjud.deid.pdf import verify_pdf
+    from adjud.deid.policy import Policy
+
+    policy = Policy.for_study(CONFIG, "DEMO01")
+    result = verify_pdf(form_pdf("nothing to see"), policy, KnownValues())
+    assert not result.passed and result.annotated_pages == [1]
 
 
 @pytest.mark.parametrize(

@@ -23,7 +23,7 @@ class FakeClock:
 @pytest.fixture(autouse=True)
 def _no_real_slack(monkeypatch):
     """Tests never call Slack (P-54): a webhook set in the shell or .env is ignored."""
-    for var in ("NOTIFY_CHANNELS", "SLACK_WEBHOOK_URL"):
+    for var in ("NOTIFY_CHANNELS", "SLACK_WEBHOOK_URL", "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"):
         monkeypatch.delenv(var, raising=False)
 
 

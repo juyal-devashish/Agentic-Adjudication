@@ -14,13 +14,9 @@ import json
 from typing import Any
 
 import streamlit as st
-from common import context, paths, pipeline, users
+from common import BLINDED, context, paths, pipeline, users
 
 SEEN = "mail_toasts_seen"  # lines of the delivery log already shown in this session
-# Flows 3–4 e-mails name adjudicators: a site or another adjudicator sees only its own.
-BLINDED = {"adjudication_assigned", "adj3_assigned", "consensus_to_sign", "committee_needed",
-           "more_data_requested", "outcome_for_pv", "adjudication_complete",
-           "readjudication_started"}  # fmt: skip
 
 
 def _notification(note_id: str) -> dict[str, Any] | None:

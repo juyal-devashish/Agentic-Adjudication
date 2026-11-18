@@ -78,10 +78,11 @@ class ChannelError(Exception):
     """A Delivery Attempt failed. The message is the recorded reason: short and safe
     (e.g. "HTTP 404", "timeout"), never a secret, an address or clinical content."""
 
-    def __init__(self, reason: str, *, unreachable: bool = False):
+    def __init__(self, reason: str, *, unreachable: bool = False, later: bool = False):
         super().__init__(reason)
         self.reason = reason
         self.unreachable = unreachable  # the service is down: skip the rest of this tick
+        self.later = later  # nowhere to deliver yet: no attempt counted, tried next tick
 
 
 class Channel(Protocol):
@@ -212,6 +213,9 @@ class Deliverer:
             try:
                 self.channel.send(n, who)
             except ChannelError as exc:
+                if exc.later:  # e.g. no Slack user yet: wait, without using up a try
+                    log.info("%s: %s waits: %s", self.channel.name, n["id"], exc.reason)
+                    continue
                 self.log.record(n, self.channel.name, self.actor, "failed", ids, exc.reason)
                 counts["failed"] += 1
                 if exc.unreachable:

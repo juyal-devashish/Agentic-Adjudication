@@ -22,9 +22,10 @@ from adjud.documents import documents_of
 from adjud.events import EventDraft
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SUBMIT_MEANING = "Submitted — documents complete and de-identified"
+_CHANGES_FILES = ("documents.uploaded", "document.deleted", "redactions.changed")
 
 
 class ReviewRefused(Exception):
@@ -93,6 +94,8 @@ def delete_document(
 ) -> None:
     if name not in documents_of(store, case_id).files:
         raise ReviewRefused(f"no current document named {name!r}")
+    if store.state(case_id).state == State.DEIDENTIFYING:  # e.g. a second tab's upload
+        raise ReviewRefused("identifiers are being removed; try again when that is done")
     store.append_event(
         case_id,
         EventDraft(type="document.deleted", actor=actor, data={"name": name}, reason=reason),
@@ -158,6 +161,7 @@ def submission_status(store: FileCaseStore, case_id: str) -> SubmissionStatus:
 def submit(
     store: FileCaseStore, case_id: str, user_id: str, password: str, config_dir: Path
 ) -> dict[str, Any]:
+    seen = len(store.events(case_id))  # read before the files to sign (B37)
     status = submission_status(store, case_id)
     if not status.ready:
         raise ReviewRefused("; ".join(status.reasons))
@@ -165,6 +169,13 @@ def submit(
     if user is None or user["role"] != "site":
         raise SignatureRefused("only a site user can submit")
     signature = sign(user, password, SUBMIT_MEANING, status.records)
+
+    def still_waiting(prior: list[dict[str, Any]]) -> None:  # signed in another tab meanwhile
+        if replay(prior).state != State.AWAITING_SITE_CONFIRMATION:
+            raise ReviewRefused("the case is not waiting for site review")
+        if any(e["type"] in _CHANGES_FILES or e["type"].startswith("deid.") for e in prior[seen:]):
+            raise ReviewRefused("the documents changed while signing; review them and sign again")
+
     return store.append_event(
         case_id,
         EventDraft(
@@ -173,4 +184,5 @@ def submit(
             signature=signature,
             data={"files": status.records},
         ),
+        expect=still_waiting,
     )

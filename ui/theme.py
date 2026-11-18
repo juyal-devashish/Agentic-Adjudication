@@ -9,6 +9,7 @@ import html
 
 import streamlit as st
 
+from adjud import workflow
 from adjud.workflow import State
 
 INK, MUTED, VIOLET = "#1C2833", "#5A6B78", "#4A3AA0"
@@ -160,27 +161,7 @@ RAIL_STEP = {
     State.MORE_DATA: State.ADJ_REVIEW,
     State.EXPORT: State.OUTCOME,
 }
-STATE_WORDS = {
-    State.EVENT_CREATED: "Case created",
-    State.AWAITING_DOCUMENTS: "Waiting for documents",
-    State.DEIDENTIFYING: "Removing identifiers",
-    State.AWAITING_SITE_CONFIRMATION: "Waiting for site review",
-    State.SUBMITTED: "Submitted",
-    State.QC_CHECKS: "Quality check running",
-    State.QC_REVIEW: "Waiting for QC review",
-    State.QUERY_OPEN: "Query open with the site",
-    State.NARRATIVE: "Narrative being drafted",
-    State.NARRATIVE_REVIEW: "Waiting for narrative review",
-    State.READY_FOR_ADJUDICATION: "Ready for adjudication",
-    State.ADJ_REVIEW: "Independent reviews",
-    State.ADJ3_REVIEW: "Adjudicator 3 review",
-    State.CEC_MEETING: "Waiting for the committee",
-    State.MORE_DATA: "More data requested",
-    State.OUTCOME: "Outcome being derived",
-    State.EXPORT: "Exporting to the EDC",
-    State.CLOSED: "Closed",
-    State.WITHDRAWN: "Withdrawn",
-}
+STATE_WORDS = workflow.STATE_WORDS  # shared with the Slack app (P-55)
 FLAG_WORDS = {
     "source_changed": "AE changed in the EDC",
     "no_longer_eligible": "No longer meets the rules",
@@ -306,13 +287,15 @@ SHORT_STATE = {s: label.lower() for s, label in LIFECYCLE} | {
 }
 
 
-def short_state(state: State) -> str:
+def short_state(state: State, role: str | None = None) -> str:
     """Compact form for the case picker: 'site review', 'submitted'."""
+    if role == "site" and state in workflow.SITE_BLINDED:
+        return "adjudication"  # ACC-04, P-45
     return SHORT_STATE.get(state, str(state))
 
 
-def state_words(state: State) -> str:
-    return STATE_WORDS.get(state, str(state))
+def state_words(state: State, role: str | None = None) -> str:
+    return workflow.state_words(state, role)
 
 
 def flag_words(flags: list[str]) -> str:
@@ -342,8 +325,8 @@ STATE_INK = {
 }
 
 
-def state_status(state: State) -> str:
-    word = state_words(state)
+def state_status(state: State, role: str | None = None) -> str:
+    word = state_words(state, role)
     ink = STATE_INK.get(state)
     return status(word, ink) if ink else html.escape(word)
 

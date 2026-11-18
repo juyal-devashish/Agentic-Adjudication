@@ -11,8 +11,8 @@ Clean means, inside the window:
 - if e-mail was on, as many Notifications were e-mailed as were posted to Slack;
 - no Slack record refers to a Notification missing from the outbox.
 
-It sees what Slack *confirmed* ("ok" to the webhook), not what reached the channel: an
-incoming webhook cannot read messages back. Each run appends one line to
+It sees what Slack *confirmed* (an ok reply to each DM), not what the person read. Each
+run appends one line to
 `data/metrics/notify_parity.jsonl`, so the five runs of the bar leave a record.
 Exit code 0 when clean, 1 otherwise.
 """

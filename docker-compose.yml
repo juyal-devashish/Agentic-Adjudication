@@ -20,6 +20,19 @@ services:
         required: false
     restart: unless-stopped
 
+  # The Slack app (P-55): Socket Mode, so no port. Needs SLACK_BOT_TOKEN and SLACK_APP_TOKEN
+  # in .env; without them it exits and the rest runs as before.
+  #   docker compose --profile slack up
+  slack:
+    build: .
+    command: python -m adjud.slack_app
+    profiles: ["slack"]
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - path: .env
+        required: false
+
   # Optional local mailbox for e-mail notifications (plan P-29):
   #   docker compose --profile mail up      then set SMTP_HOST=mailpit, SMTP_PORT=1025 in .env
   # Web inbox on http://localhost:8025

@@ -103,6 +103,41 @@ def test_the_site_never_sees_who_adjudicates(reviewing):
     assert "Both reviews agree" in shown and "Closed" in html_text(at)
 
 
+FLOW34_MESSAGES = ("More information was requested for an adjudication",
+                   "A case needs the adjudication committee", "Adjudication complete",
+                   "Re-adjudication started")  # fmt: skip
+FLOW34_PEOPLE = ("Okafor", "Lindqvist", "Reyes", "Sofia Marques", "EDC (mock)")
+
+
+def test_the_site_record_hides_who_asked_for_more_data(reviewing):
+    """ACC-04, P-45: the site sees its own query, but not the adjudicator who asked nor the
+    e-mail to the CEC Coordinator, in the audit trail or the notifications."""
+    runner, store, cid = reviewing
+    runner.flow3.request_more_data(cid, current_round(store, cid).holders["1"], "demo",
+                                   "The angiography report.")  # fmt: skip
+    runner.run_case_steps()
+    assert store.state(cid).state == State.QUERY_OPEN
+    shown = tables(as_user(SITE, "views/results.py", cid))
+    assert "A query about your documents needs an answer" in shown  # its own query stays
+    for word in FLOW34_MESSAGES + FLOW34_PEOPLE:
+        assert word not in shown, word
+
+
+def test_the_site_record_hides_the_outcome_and_re_adjudication_e_mails(reviewing):
+    runner, store, cid = reviewing
+    rnd = current_round(store, cid)
+    for slot in ("1", "2"):
+        runner.flow3.sign_review(cid, rnd.holders[slot], "demo", answers())
+    for _ in range(4):
+        runner.run_case_steps()
+    assert store.state(cid).state == State.CLOSED
+    runner.flow4.start_readjudication(cid, "cec.sofia", "demo", "New ECG found.")
+    runner.run_case_steps()
+    shown = tables(as_user(SITE, "views/results.py", cid))
+    for word in FLOW34_MESSAGES + FLOW34_PEOPLE:
+        assert word not in shown, word
+
+
 def test_the_committee_records_and_the_chair_signs(reviewing):
     runner, store, cid = reviewing
     f3 = runner.flow3
@@ -131,6 +166,37 @@ def test_the_committee_records_and_the_chair_signs(reviewing):
     assert store.state(cid).state == State.OUTCOME
 
 
+def test_the_chair_cannot_sign_a_meeting_record_he_has_not_seen(reviewing):
+    """B07: a meeting recorded again while the Chair's page is open is not signed with
+    the record he was shown; he is told it changed and sees the new one."""
+    runner, store, cid = reviewing
+    f3 = runner.flow3
+    rnd = current_round(store, cid)
+    f3.sign_review(cid, rnd.holders["1"], "demo", answers(mi_type="type_1"))
+    f3.sign_review(cid, rnd.holders["2"], "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    f3.sign_review(cid, current_round(store, cid).holders["3"], "demo", {"mi_type": "type_4"})
+    runner.run_case_steps()
+    adjs = [u for u, v in f3.users().items() if v["role"] == "adjudicator"]
+    meeting = {"held_on": "2026-11-18", "attendees": adjs}
+    f3.record_meeting(cid, "cec.sofia", **meeting, summary="v1: type 1.",
+                      decisions={"mi_type": "type_1"})  # fmt: skip
+    at = as_user("adj.okafor", "views/committee.py", cid)
+    assert "Type 1" in tables(at)
+    next(t for t in at.text_input if t.label.startswith("Password")).input("demo")
+    f3.record_meeting(cid, "cec.sofia", **meeting, summary="v2: type 2.",
+                      decisions={"mi_type": "type_2"})  # fmt: skip
+    next(b for b in at.button if b.label == "Sign the consensus").click().run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events(cid) if e["type"] == "consensus.signed"]
+    assert any("changed" in e.value for e in at.error)
+    assert "Type 2" in tables(at)  # the new record is now on screen
+    next(t for t in at.text_input if t.label.startswith("Password")).input("demo")
+    next(b for b in at.button if b.label == "Sign the consensus").click().run()
+    signed = [e for e in store.events(cid) if e["type"] == "consensus.signed"]
+    assert signed[0]["data"]["meeting"]["path"].endswith("meeting_v2.json")
+
+
 def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     runner, store, cid = reviewing
     rnd = current_round(store, cid)
@@ -147,6 +213,22 @@ def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     at = as_user(me, "views/assistant.py")
     assert f"Adjudicate {cid}" in [b.label for b in at.button]
     assert "independent review is open" in text(at)
+
+
+def test_a_stale_reassign_form_does_not_move_the_other_review(reviewing):
+    """B09: the chosen review is signed while the page is open; Reassign must refuse,
+    not fall back to the other adjudicator's review."""
+    runner, store, cid = reviewing
+    a1, a2 = current_round(store, cid).holders["1"], current_round(store, cid).holders["2"]
+    at = as_user("cec.sofia", "views/assignments.py", cid)
+    next(s for s in at.selectbox if s.label == "Review").set_value("1")
+    next(t for t in at.text_input if t.label == "Reason (required)").input("Dr. A1 on leave")
+    runner.flow3.sign_review(cid, a1, "demo", answers())
+    next(b for b in at.button if b.label == "Reassign").click().run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events(cid) if e["type"] == "adjudication.reassigned"]
+    assert current_round(store, cid).holders["2"] == a2
+    assert any("Not reassigned" in e.value for e in at.error)
 
 
 def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewing):
@@ -182,3 +264,66 @@ def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewin
     assert store.state(cid).state == State.QC_REVIEW
     at = as_user("ss.anna", "views/quality_check.py", cid)
     assert any("the adjudication (a signed request for more data)" in i.value for i in at.info)
+
+
+def test_the_site_sees_only_that_the_case_is_with_adjudication(reviewing):
+    """B20, ACC-04, P-45: the header, next step, case list and sidebar never tell the site
+    that the reviews disagreed (Adjudicator 3) or that the case went to the committee."""
+    runner, store, cid = reviewing
+    f3 = runner.flow3
+    rnd = current_round(store, cid)
+    f3.sign_review(cid, rnd.holders["1"], "demo", answers(mi_type="type_1"))
+    f3.sign_review(cid, rnd.holders["2"], "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    assert store.state(cid).state == State.ADJ3_REVIEW
+
+    def site_sees() -> str:
+        shown = []
+        for page in ("views/results.py", "views/site_documents.py", "views/assistant.py"):
+            at = as_user(SITE, page, cid)
+            assert not at.exception, at.exception
+            case = next(s for s in at.selectbox if s.label == "Case")
+            shown += [text(at), tables(at), "\n".join(str(o) for o in case.options)]
+        shown.append(tables(as_user(SITE, "views/results.py")))  # the case list
+        generic = "Adjudication is done by an independent committee."  # in every state
+        return "\n".join(shown).replace(generic, "")
+
+    shown = site_sees()
+    assert "With adjudication" in shown and f"{cid}, adjudication" in shown
+    for word in ("Adjudicator 3", "adjudicator 3", "committee", "Committee"):
+        assert word not in shown, word
+
+    f3.sign_review(cid, current_round(store, cid).holders["3"], "demo", {"mi_type": "type_4"})
+    runner.run_case_steps()
+    assert store.state(cid).state == State.CEC_MEETING
+    shown = site_sees()
+    assert "With adjudication" in shown
+    for word in ("Adjudicator 3", "adjudicator 3", "committee", "Committee"):
+        assert word not in shown, word
+
+
+def test_the_status_line_follows_the_adjudicators_own_review(reviewing, monkeypatch):
+    """B33: after signing, or after being reassigned away, an adjudicator is not told to
+    complete and sign the form; only the one with an open review is, with a link to it."""
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    runner, store, cid = reviewing
+    rnd = current_round(store, cid)
+    a1, a2 = rnd.holders["1"], rnd.holders["2"]
+    a3 = next(a for a in ("adj.okafor", "adj.lindqvist", "adj.reyes") if a not in (a1, a2))
+    runner.flow3.sign_review(cid, a1, "demo", answers())
+    runner.flow3.reassign(cid, "cec.sofia", "2", a3, "On leave")
+
+    expected = {
+        a1: "You signed your review. Waiting for the other review.",
+        a2: "You hold no review on this case.",
+        a3: "Your independent review is open: complete and sign the form.",
+    }
+    for uid, line in expected.items():
+        reply = Assistant(USERS[uid]).handle(f"/status {cid}").text
+        assert line in reply and "may be open" not in reply, (uid, reply)
+        at = as_user(uid, "views/results.py", cid)
+        assert line in html_text(at) and "may be open" not in html_text(at), uid
+        links = [p.proto.label for p in at.get("page_link")]
+        assert ("Open the adjudication form" in links) == (uid == a3), (uid, links)

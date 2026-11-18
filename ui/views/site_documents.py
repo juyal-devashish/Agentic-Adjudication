@@ -13,7 +13,7 @@ from boxdraw import page_box
 from common import case_header, case_list, context, doc_label, doc_types, pipeline, processor
 from preview import pdf_page, show_sheets
 
-from adjud.documents import documents_of, upload
+from adjud.documents import DeidBusy, documents_of, upload
 from adjud.flow2 import QUERY_CODES, query_of
 from adjud.review import (
     SUBMIT_MEANING,
@@ -113,14 +113,30 @@ if can_upload:
             f"Or put one ZIP file with all the documents in this case's upload folder, "
             f"{cid}. It is picked up within a minute."
         )
+        # The upload_rejected e-mail links here and carries no reason; give it now. A later
+        # upload means the site has acted, so only refusals since then are shown.
+        refused: list[dict] = []
+        for e in store.events(cid):
+            if e["type"] == "documents.uploaded":
+                refused = []
+            elif e["type"] == "upload.rejected":
+                refused.append(e["data"])
+        for r in refused:
+            st.warning(f"{r['zip']} from the upload folder was not used: {r['reason']}")
 
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("Uploads are processed automatically within a few seconds. To see the result now:")
     if st.button("Remove identifiers now", type="primary"):
-        with st.spinner("Finding and removing identifiers. Scanned pages take a few seconds each."):
-            summary = processor().process_case(cid)
-        st.toast(f"Identifiers removed from {len(summary['files'])} file(s)")
-        st.rerun()
+        try:
+            with st.spinner(
+                "Finding and removing identifiers. Scanned pages take a few seconds each."
+            ):
+                summary = processor().process_case(cid)
+        except DeidBusy:  # another tab or the runner is on it: wait for its result
+            wait_for_redaction("Identifiers are already being removed. Waiting for it.", 60)
+        else:
+            st.toast(f"Identifiers removed from {len(summary['files'])} file(s)")
+            st.rerun()
 
 # --- files ------------------------------------------------------------------------------------
 docs = documents_of(store, cid)
@@ -151,8 +167,15 @@ def _ink(value: str) -> str:
     return f"color: {theme.STATUS_INK[ink]}; font-weight: 600"
 
 
-files_table = pd.DataFrame(rows)
-st.dataframe(files_table.style.map(_ink, subset=["Status"]), hide_index=True, width="stretch")
+# Whole numbers even when a file still processing leaves its counts empty (pandas would
+# make the columns floats and show "150.000000").
+counts = ["Identifiers removed", "Still found"]
+files_table = pd.DataFrame(rows).astype(dict.fromkeys(counts, "Int64"))
+st.dataframe(
+    files_table.style.map(_ink, subset=["Status"]).format(na_rep="", subset=counts),
+    hide_index=True,
+    width="stretch",
+)
 
 for name in sorted(docs.files):
     done = docs.processed.get(name)
@@ -162,10 +185,15 @@ for name in sorted(docs.files):
         if (
             is_site
             and cs.state not in SIGNED_STATES
+            and cs.state != State.DEIDENTIFYING
             and st.button(f"Remove {name}", key=f"rm_{name}")
         ):
-            delete_document(store, cid, name, ctx.actor, reason="rejected file removed")
-            st.rerun()
+            try:
+                delete_document(store, cid, name, ctx.actor, reason="rejected file removed")
+            except ReviewRefused as exc:
+                st.warning(f"Not removed: {exc}.")
+            else:
+                st.rerun()
     elif done:
         notes = [w for w in done.get("warnings", []) if w.startswith("EXTENSION_MISMATCH")]
         if notes:
@@ -183,16 +211,23 @@ if reviewable:
     # The type recognised from the title (P-38); the site corrects it here if it is wrong.
     current, set_by = docs.type_of(name)
     types = list(doc_types())
+    key = f"type_{cid}_{name}"
+    # Relabel only when the site picked a type in this run. Otherwise show the case's type:
+    # a keyed selectbox keeps its earlier value after a re-run changes the type (B14).
+    picked = st.session_state.pop(f"{key}_picked", False)
+    if not picked:
+        st.session_state[key] = current if current in types else None
     chosen = pick_type.selectbox(
         "Document type",
         types,
-        index=types.index(current) if current in types else None,
+        index=None,
         format_func=doc_label,
         placeholder="Not recognised yet",
         disabled=not can_change,
-        key=f"type_{cid}_{name}",
+        key=key,
+        on_change=lambda: st.session_state.update({f"{key}_picked": True}),
     )
-    if can_change and chosen and chosen != current:
+    if can_change and picked and chosen and chosen != current:
         relabel_document(store, cid, name, chosen, ctx.actor, pipe.paths.config)
         st.toast(f"{name} is now marked as {doc_label(chosen).lower()}")
         st.rerun()
@@ -304,10 +339,15 @@ if reviewable:
         if (
             is_site
             and cs.state not in SIGNED_STATES
+            and cs.state != State.DEIDENTIFYING
             and st.button(f"Remove {name}", key=f"rm_r_{name}")
         ):
-            delete_document(store, cid, name, ctx.actor, reason="removed by site")
-            st.rerun()
+            try:
+                delete_document(store, cid, name, ctx.actor, reason="removed by site")
+            except ReviewRefused as exc:
+                st.warning(f"Not removed: {exc}.")
+            else:
+                st.rerun()
 
 # --- sign and submit --------------------------------------------------------------------------
 st.header("Sign and submit")

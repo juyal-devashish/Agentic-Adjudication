@@ -36,6 +36,12 @@ class DataPaths:
     def inbox(self) -> Path:
         return self.root / "inbox"
 
+    def waiting_files(self) -> list[Path]:
+        """AE files in the import queue, as process_inbox sees them (no hidden files)."""
+        if not self.inbox.exists():
+            return []
+        return sorted(f for f in self.inbox.iterdir() if f.is_file() and not f.name.startswith("."))
+
     @property
     def processed(self) -> Path:
         return self.root / "processed"

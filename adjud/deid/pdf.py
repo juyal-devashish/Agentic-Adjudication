@@ -9,8 +9,11 @@ and the page is rebuilt as an image-only page. No hidden text layer is kept.
 
 Image files (PNG, JPG, TIFF) are made upright, straightened and output as PDF pages.
 
+Form fields and annotations are first baked into page content, so detectors see their
+text and redaction (and a site's box) removes it like any other text.
+
 The output document is built fresh and scrubbed: no metadata, XMP, embedded files,
-JavaScript, links or annotations.
+JavaScript, links, annotations or form fields.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from adjud.deid.policy import Policy
 # Metadata keys that never hold identifiers (format/producer info).
 _HARMLESS_META = {"format", "encryption", "producer", "creator", "creationDate", "modDate"}
 RENDER_DPI = 300
+MIN_DPI, MAX_DPI = 50, 1200  # a stored image resolution outside this is ignored
 
 
 def page_units(doc: pymupdf.Document) -> list[TextUnit]:
@@ -56,6 +60,20 @@ def metadata_units(doc: pymupdf.Document) -> list[TextUnit]:
 
 def needs_ocr(page: pymupdf.Page) -> bool:
     return bool(page.get_images(full=True)) or not page.get_text().strip()
+
+
+def _annotated(page: pymupdf.Page) -> bool:
+    return page.first_annot is not None or page.first_widget is not None
+
+
+def flatten(content: bytes) -> bytes:
+    """Bake form fields and annotations into page content. `apply_redactions` leaves them
+    in place, so their text would otherwise survive redaction and a site's box."""
+    with pymupdf.open(stream=content, filetype="pdf") as doc:
+        if not (doc.is_form_pdf or any(_annotated(page) for page in doc)):
+            return content
+        doc.bake()
+        return doc.tobytes()
 
 
 def _render(page: pymupdf.Page) -> Image.Image:
@@ -95,8 +113,12 @@ def ocr_pdf_page(content: bytes, page: pymupdf.Page) -> ocr.OcrPage:
 
 
 def image_frames(content: bytes) -> list[tuple[Image.Image, float | None]]:
+    """Frames and their stored resolution; an implausible one (PIL writes 1 dpi when none
+    was set) counts as missing, or the page would be metres wide and too large to render."""
     with Image.open(io.BytesIO(content)) as img:
         dpi = (img.info.get("dpi") or (None,))[0]
+        if dpi is not None and not MIN_DPI <= float(dpi) <= MAX_DPI:
+            dpi = None
         return [(frame.convert("L"), dpi) for frame in ImageSequence.Iterator(img)]
 
 
@@ -108,6 +130,7 @@ def ocr_image_frame(content: bytes, n: int, frame: Image.Image, dpi: float | Non
 
 
 def learn_pdf(content: bytes, policy: Policy, known: KnownValues) -> None:
+    content = flatten(content)
     with pymupdf.open(stream=content, filetype="pdf") as doc:
         for page, unit in zip(doc, page_units(doc), strict=True):
             learn(unit, policy, known)
@@ -212,7 +235,7 @@ def _image_page(out: pymupdf.Document, img: Image.Image, dpi: float) -> None:
 
 
 def _finish(out: pymupdf.Document) -> bytes:
-    out.scrub()  # metadata, XMP, embedded files, JS, links, annotations, hidden text
+    out.scrub()  # metadata, XMP, embedded files, JS, links, hidden text (fields: `flatten`)
     out.set_metadata({})
     out.del_xml_metadata()
     return out.tobytes(garbage=4, deflate=True, clean=True)
@@ -234,6 +257,7 @@ def redact_pdf(
     gives the same page geometry, so a box drawn on one run's output fits the next run."""
     extra, keep_set, boxes = _extra(extra_terms), set(keep or []), boxes or {}
     outcome = PdfOutcome(output=b"")
+    content = flatten(content)
     with pymupdf.open(stream=content, filetype="pdf") as doc:
         outcome.pages = doc.page_count
         units = page_units(doc)
@@ -334,11 +358,16 @@ class PdfVerification:
     metadata_left: list[str] = field(default_factory=list)
     embedded_files: list[str] = field(default_factory=list)
     unverified_pages: list[int] = field(default_factory=list)
+    annotated_pages: list[int] = field(default_factory=list)  # form fields or annotations left
 
     @property
     def passed(self) -> bool:
         return not (
-            self.residuals or self.metadata_left or self.embedded_files or self.unverified_pages
+            self.residuals
+            or self.metadata_left
+            or self.embedded_files
+            or self.unverified_pages
+            or self.annotated_pages
         )
 
     def summary(self) -> dict[str, Any]:
@@ -348,6 +377,7 @@ class PdfVerification:
             "metadata_left": self.metadata_left,
             "embedded_files": self.embedded_files,
             "unverified_pages": self.unverified_pages,
+            "annotated_pages": self.annotated_pages,
         }
 
 
@@ -369,6 +399,8 @@ def verify_pdf(
     extra, keep_set = _extra(extra_terms), set(keep or [])
     with pymupdf.open(stream=output, filetype="pdf") as doc:
         for page, unit in zip(doc, page_units(doc), strict=True):
+            if _annotated(page):
+                result.annotated_pages.append(page.number + 1)
             units = [unit]
             if needs_ocr(page):
                 if ocr.available():

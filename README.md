@@ -213,7 +213,7 @@ The roles are simulated in the sidebar: data manager, site user and Safety Speci
 | Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned `claude-opus-5-5`; minimum gate confidence 0.8 |
 | Agent switches | `ai.functions` | `document_type`, `qc_suggestion`, `narrative` (`event_match` retired by P-39); `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
 | E-mail | `SMTP_*` in `.env` | `docker compose --profile mail up` starts Mailpit on http://localhost:8025 |
-| Slack (on trial, alongside e-mail) | `NOTIFY_CHANNELS=smtp,slack` and `SLACK_WEBHOOK_URL` in `.env` | One demo channel; see the run sheet's *Trying Slack* and ADR 0002 |
+| Slack app (where work starts; signing stays in the app) | `NOTIFY_CHANNELS=smtp,slack`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` in `.env`; `uv run --env-file .env python -m adjud.slack_app` | Manifest in `docs/slack-app-manifest.yaml`; see the run sheet's *Slack app*, ADR 0003 and ADR 0004 |
 | Upload folders | `ADJUD_UPLOAD_DIR` | One folder per case waiting for documents |
 | Study rules and policies | `data/config/DEMO01/*.yaml` | Eligibility, de-identification policy, document checklist, forbidden narrative wording |
 

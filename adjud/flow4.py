@@ -18,15 +18,17 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from adjud.events import EventDraft, format_time, sha256_bytes
 from adjud.flow3 import SLOTS, Flow3, current_round
+from adjud.forms import FormRefused
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes, write_atomic
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SYSTEM_OUTCOME = "system:outcome"
 SYSTEM_EDC = "system:edc-mock"
@@ -62,8 +64,11 @@ class Flow4:
         self.flow3 = Flow3(self.store, self.config_dir, self.study)
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
+               expect: Callable[[list[dict[str, Any]]], None] | None = None,
                **kw: Any) -> None:  # fmt: skip
-        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw))
+        """Append one event; `expect(prior events)` re-checks under the case lock."""
+        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw),
+                                expect=expect)  # fmt: skip
 
     # -- outcome -------------------------------------------------------------------------------
 
@@ -113,6 +118,10 @@ class Flow4:
         missing = [f for f in form.compared_ids if f not in values]
         if missing:
             raise Flow4Refused(f"no final value for {', '.join(missing)}")
+        try:  # the combined outcome must be a valid form: no confirmed MI without its type
+            form.validate({f: v["value"] for f, v in values.items()}, form.compared_ids)
+        except FormRefused as exc:
+            raise Flow4Refused(f"the outcome is incomplete: {exc}") from exc
         notes = {f.id: {f"Adjudicator {s}": a.get(f.id) for s, a in sorted(answers.items())
                         if a.get(f.id)} for f in form.fields if not f.compared}  # fmt: skip
         related = self.flow3.cfg.get("related") or {}
@@ -227,8 +236,13 @@ class Flow4:
         derived = self._latest(case_id, "outcome.derived")
         signature = sign(user, password, READJ_MEANING,
                          [{"name": "outcome", **derived["data"]["outcome"]}])  # fmt: skip
+
+        def still_closed(prior: list[dict[str, Any]]) -> None:  # started in another tab meanwhile
+            if replay(prior).state != State.CLOSED:
+                raise Flow4Refused("only a closed case can be re-adjudicated")
+
         self._event(case_id, "readjudication.started", user_id,
                     {"after_round": derived["data"]["round"],
-                     "outcome": derived["data"]["outcome"]},
+                     "outcome": derived["data"]["outcome"]}, still_closed,
                     reason=reason.strip(), signature=signature)  # fmt: skip
         self.flow3._notify(case_id, "role:safety_specialist", "readjudication_started", user_id)

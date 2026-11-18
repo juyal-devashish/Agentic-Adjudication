@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -75,6 +77,63 @@ def test_processed_files_are_never_overwritten(pipe, tmp_path):
     assert len(list(done.glob("*.report.json"))) == 2
 
 
+def test_processed_files_are_never_overwritten_within_one_second(tmp_path):
+    """Three imports of a same-named file under one clock tick: the third used to
+    overwrite the second's archived copy and then crash writing its report."""
+    tick = datetime(2026, 11, 18, 1, 0, 0, tzinfo=UTC)
+    pipe = IntakePipeline(tmp_path / "data", KIT / "config", KIT / "edc_mock", clock=lambda: tick)
+    inbox, done = tmp_path / "inbox", tmp_path / "processed"
+    inbox.mkdir()
+    texts = [
+        (SCEN / f).read_bytes() for f in ("01_initial.csv", "01_initial.csv", "03_updates.csv")
+    ]
+    for text in texts:
+        (inbox / "01_initial.csv").write_bytes(text)
+        pipe.process_inbox(inbox, done)
+    archived = sorted(done.glob("01_initial*.csv"))
+    assert len(archived) == 3
+    assert sorted(p.read_bytes() for p in archived) == sorted(texts)
+    assert len(list(done.glob("*.report.json"))) == 3
+    assert not any(inbox.iterdir())
+
+
+def test_two_inbox_imports_at_once_import_each_file_once(pipe, tmp_path, clock):
+    """B11: a second caller (another tab, the runner, the Assistant, Slack) that starts
+    while an import is under way used to re-log every record and then crash moving a
+    file the first caller had already moved. It must wait and find nothing left."""
+    inbox, done = tmp_path / "inbox", tmp_path / "processed"
+    inbox.mkdir()
+    shutil.copy(SCEN / "01_initial.csv", inbox)
+    other = IntakePipeline(tmp_path / "data", KIT / "config", KIT / "edc_mock", clock=clock)
+    second: dict[str, object] = {}
+
+    def run_second() -> None:
+        try:
+            second["results"] = other.process_inbox(inbox, done)
+        except Exception as exc:  # noqa: BLE001 - reported by the assertion below
+            second["error"] = exc
+
+    original = pipe.import_file
+    racer = threading.Thread(target=run_second)
+
+    def import_while_another_starts(path, actor="system:intake"):
+        if not racer.is_alive() and "results" not in second and "error" not in second:
+            racer.start()
+            racer.join(timeout=2)  # it should be waiting for this import's lock
+        return original(path, actor)
+
+    pipe.import_file = import_while_another_starts
+    (first,) = pipe.process_inbox(inbox, done)
+    racer.join(timeout=30)
+    assert not racer.is_alive()
+    assert "error" not in second, second.get("error")
+    assert first.status == "ACCEPTED" and first.records > 0
+    assert second["results"] == []
+    assert len(pipe.store.evaluations_path.read_text().splitlines()) == first.records
+    assert [p.name for p in done.glob("01_initial*.csv")] == ["01_initial.csv"]
+    assert len(list(done.glob("*.report.json"))) == 1
+
+
 def test_case_created_event_records_actor_source_and_snapshot_hash(pipe):
     result = pipe.import_file(SCEN / "01_initial.csv")
     created = next(o for o in result.outcomes if o["outcome"] == "created")
@@ -129,6 +188,46 @@ def test_edc_pull_imports_study_records_but_not_history(tmp_path, clock):
     assert result.new_cases > 0  # AEs the EDC has but the first file did not
     (again,) = pull(pipe, "dm.dana")
     assert again.new_cases == 0 and again.count("changed") == 0  # idempotent
+
+
+def test_edc_pull_reports_the_queued_files_it_imports_too(tmp_path, clock):
+    """The pull imports the whole inbox, so it reports every file, not only its own (B12)."""
+    from adjud.edc_pull import pull
+
+    data = tmp_path / "data"
+    (data / "edc_mock").mkdir(parents=True)
+    for f in (KIT / "edc_mock").iterdir():
+        (data / "edc_mock" / f.name).write_bytes(f.read_bytes())
+    pipe = IntakePipeline(data, Path(__file__).resolve().parents[1] / "data" / "config",
+                          data / "edc_mock", clock=clock)  # fmt: skip
+    pipe.paths.inbox.mkdir(parents=True, exist_ok=True)
+    shutil.copy(SCEN / "01_initial.csv", pipe.paths.inbox)
+    results = pull(pipe, "dm.dana")
+    by_file = {r.file: r for r in results}
+    assert "01_initial.csv" in by_file and by_file["01_initial.csv"].new_cases > 0
+    assert any(f.startswith("edc_pull_") for f in by_file)
+
+
+def test_edc_pull_in_the_same_second_as_another_gets_its_own_name(tmp_path):
+    """A second pull while the first one's file is still in the inbox, within the same
+    second, must not crash on the name: it writes edc_pull_<time>-2.csv instead (B42)."""
+    from datetime import UTC, datetime
+
+    from adjud.edc_pull import pull
+
+    data = tmp_path / "data"
+    (data / "edc_mock").mkdir(parents=True)
+    for f in (KIT / "edc_mock").iterdir():
+        (data / "edc_mock" / f.name).write_bytes(f.read_bytes())
+    fixed = datetime(2026, 11, 17, 12, 0, 0, tzinfo=UTC)
+    pipe = IntakePipeline(data, Path(__file__).resolve().parents[1] / "data" / "config",
+                          data / "edc_mock", clock=lambda: fixed)  # fmt: skip
+    pipe.paths.inbox.mkdir(parents=True, exist_ok=True)
+    in_flight = pipe.paths.inbox / "edc_pull_20261117T120000.csv"  # the other pull's file
+    shutil.copy(SCEN / "01_initial.csv", in_flight)
+    results = pull(pipe, "dm.dana")
+    by_file = {r.file: r for r in results}
+    assert by_file["edc_pull_20261117T120000-2.csv"].status == "ACCEPTED"
 
 
 def test_manual_entry_reports_every_problem_at_once(pipe):
