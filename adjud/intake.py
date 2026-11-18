@@ -343,6 +343,10 @@ class IntakePipeline:
             if dest.exists():
                 stamp = self.clock().strftime("%Y%m%dT%H%M%S")
                 dest = processed / f"{f.stem}.{stamp}{f.suffix}"
+                n = 2
+                while dest.exists():  # the same name twice within one second
+                    dest = processed / f"{f.stem}.{stamp}-{n}{f.suffix}"
+                    n += 1
             shutil.move(str(f), dest)
             write_atomic(
                 processed / f"{dest.name}.report.json",

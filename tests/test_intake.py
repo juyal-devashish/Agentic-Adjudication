@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -73,6 +74,26 @@ def test_processed_files_are_never_overwritten(pipe, tmp_path):
     csvs = sorted(p.name for p in done.glob("01_initial*.csv"))
     assert len(csvs) == 2
     assert len(list(done.glob("*.report.json"))) == 2
+
+
+def test_processed_files_are_never_overwritten_within_one_second(tmp_path):
+    """Three imports of a same-named file under one clock tick: the third used to
+    overwrite the second's archived copy and then crash writing its report."""
+    tick = datetime(2026, 11, 18, 1, 0, 0, tzinfo=UTC)
+    pipe = IntakePipeline(tmp_path / "data", KIT / "config", KIT / "edc_mock", clock=lambda: tick)
+    inbox, done = tmp_path / "inbox", tmp_path / "processed"
+    inbox.mkdir()
+    texts = [
+        (SCEN / f).read_bytes() for f in ("01_initial.csv", "01_initial.csv", "03_updates.csv")
+    ]
+    for text in texts:
+        (inbox / "01_initial.csv").write_bytes(text)
+        pipe.process_inbox(inbox, done)
+    archived = sorted(done.glob("01_initial*.csv"))
+    assert len(archived) == 3
+    assert sorted(p.read_bytes() for p in archived) == sorted(texts)
+    assert len(list(done.glob("*.report.json"))) == 3
+    assert not any(inbox.iterdir())
 
 
 def test_case_created_event_records_actor_source_and_snapshot_hash(pipe):
