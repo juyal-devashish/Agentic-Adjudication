@@ -380,6 +380,11 @@ class Assistant:
                 [Action("Go to AE import", "import")],
             )
         results = self.pipe.process_inbox(paths.inbox, paths.processed, actor=self.user["id"])
+        if not results:  # another import took the queued files first
+            return Reply(
+                "The queued AE files had already been imported.",
+                [Action("Open the import results", "import")],
+            )
         lines = []
         for r in results:
             lines.append(import_summary({**r.summary(), "file": r.file}))

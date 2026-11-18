@@ -44,7 +44,7 @@ def finish(section: str, results: list) -> None:
     already include what was just imported."""
     st.session_state[f"import_msgs_{section}"] = [
         (r.status == "ACCEPTED", import_summary({**r.summary(), "file": r.file})) for r in results
-    ]
+    ] or [(True, "Nothing was waiting: the queued files had already been imported.")]
     st.rerun()
 
 

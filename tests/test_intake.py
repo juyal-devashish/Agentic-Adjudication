@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -94,6 +95,43 @@ def test_processed_files_are_never_overwritten_within_one_second(tmp_path):
     assert sorted(p.read_bytes() for p in archived) == sorted(texts)
     assert len(list(done.glob("*.report.json"))) == 3
     assert not any(inbox.iterdir())
+
+
+def test_two_inbox_imports_at_once_import_each_file_once(pipe, tmp_path, clock):
+    """B11: a second caller (another tab, the runner, the Assistant, Slack) that starts
+    while an import is under way used to re-log every record and then crash moving a
+    file the first caller had already moved. It must wait and find nothing left."""
+    inbox, done = tmp_path / "inbox", tmp_path / "processed"
+    inbox.mkdir()
+    shutil.copy(SCEN / "01_initial.csv", inbox)
+    other = IntakePipeline(tmp_path / "data", KIT / "config", KIT / "edc_mock", clock=clock)
+    second: dict[str, object] = {}
+
+    def run_second() -> None:
+        try:
+            second["results"] = other.process_inbox(inbox, done)
+        except Exception as exc:  # noqa: BLE001 - reported by the assertion below
+            second["error"] = exc
+
+    original = pipe.import_file
+    racer = threading.Thread(target=run_second)
+
+    def import_while_another_starts(path, actor="system:intake"):
+        if not racer.is_alive() and "results" not in second and "error" not in second:
+            racer.start()
+            racer.join(timeout=2)  # it should be waiting for this import's lock
+        return original(path, actor)
+
+    pipe.import_file = import_while_another_starts
+    (first,) = pipe.process_inbox(inbox, done)
+    racer.join(timeout=30)
+    assert not racer.is_alive()
+    assert "error" not in second, second.get("error")
+    assert first.status == "ACCEPTED" and first.records > 0
+    assert second["results"] == []
+    assert len(pipe.store.evaluations_path.read_text().splitlines()) == first.records
+    assert [p.name for p in done.glob("01_initial*.csv")] == ["01_initial.csv"]
+    assert len(list(done.glob("*.report.json"))) == 1
 
 
 def test_case_created_event_records_actor_source_and_snapshot_hash(pipe):

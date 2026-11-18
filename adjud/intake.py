@@ -220,10 +220,12 @@ class IntakePipeline:
         self.outbox = Outbox(self.paths, study, clock=clock)
         for folder in (self.paths.cases, self.paths.intake, self.paths.outbox):
             folder.mkdir(parents=True, exist_ok=True)
+        self._import_lock = FileLock(self.paths.intake / ".import.lock")
 
     def _lock(self) -> FileLock:
-        """One import at a time across runner and UI."""
-        return FileLock(self.paths.intake / ".import.lock")
+        """One import at a time across runner and UI. One instance per pipeline, so
+        process_inbox can hold it around import_file (re-entrant within a thread)."""
+        return self._import_lock
 
     # --- validation -------------------------------------------------------------------
 
@@ -337,23 +339,25 @@ class IntakePipeline:
         inbox, processed = Path(inbox), Path(processed)
         processed.mkdir(parents=True, exist_ok=True)
         results = []
-        for f in sorted(p for p in inbox.iterdir() if p.is_file() and not p.name.startswith(".")):
-            result = self.import_file(f, actor)
-            dest = processed / f.name
-            if dest.exists():
-                stamp = self.clock().strftime("%Y%m%dT%H%M%S")
-                dest = processed / f"{f.stem}.{stamp}{f.suffix}"
-                n = 2
-                while dest.exists():  # the same name twice within one second
-                    dest = processed / f"{f.stem}.{stamp}-{n}{f.suffix}"
-                    n += 1
-            shutil.move(str(f), dest)
-            write_atomic(
-                processed / f"{dest.name}.report.json",
-                json.dumps(result.summary(), indent=2, ensure_ascii=False).encode(),
-                overwrite=False,
-            )
-            results.append(result)
+        with self._lock():  # list inside it: another caller may have moved a file meanwhile
+            files = sorted(p for p in inbox.iterdir() if p.is_file() and not p.name.startswith("."))
+            for f in files:
+                result = self.import_file(f, actor)
+                dest = processed / f.name
+                if dest.exists():
+                    stamp = self.clock().strftime("%Y%m%dT%H%M%S")
+                    dest = processed / f"{f.stem}.{stamp}{f.suffix}"
+                    n = 2
+                    while dest.exists():  # the same name twice within one second
+                        dest = processed / f"{f.stem}.{stamp}-{n}{f.suffix}"
+                        n += 1
+                shutil.move(str(f), dest)
+                write_atomic(
+                    processed / f"{dest.name}.report.json",
+                    json.dumps(result.summary(), indent=2, ensure_ascii=False).encode(),
+                    overwrite=False,
+                )
+                results.append(result)
         return results
 
     def case_for(self, key: str) -> str | None:
