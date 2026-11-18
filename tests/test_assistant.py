@@ -296,3 +296,26 @@ def test_import_reply_keeps_each_file_apart_and_lists_the_rejected_rows(demo, mo
     assert "fix the rows below" in text
     below = text.split("fix the rows below", 1)[1]
     assert "Row 3" in below and "onset_date" in below  # AE-031's impossible date
+
+
+@pytest.mark.parametrize("ae", ["AE-M01", "AE-7000"])
+def test_why_and_status_find_an_ae_id_that_is_not_three_digits(demo, monkeypatch, ae):
+    """B40: AE IDs have no fixed shape (the kit's manual entry uses AE-M01), so /why and
+    /status must find such a record, not ask again which record the user means."""
+    import json
+
+    from tools.reset_demo import KIT
+
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    a = Assistant({"id": "dm.dana", "role": "data_manager"})
+    a.handle("/import")
+    entry = json.loads((KIT / "inbox_scenarios" / "manual_entry_valid.json").read_text())
+    res = a.pipe.manual_entry({**entry["record"], "ae_id": ae}, entry["reason"], "dm.dana")
+    case_id = res.outcomes[0]["case_id"]
+    assert case_id
+    text = a.handle(f"/why {ae}").text
+    assert ae in text and f"became case **{case_id}**" in text
+    assert a.find_case(f"/status {ae}") == case_id
+    assert a.find_case(f"/status {ae.replace('-', '').lower()}") == case_id

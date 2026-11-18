@@ -95,13 +95,12 @@ class Assistant:
                 if self.sees(cs.subject, cs.case_id)]  # fmt: skip
 
     def find_case(self, text: str) -> str | None:
-        """A case named in the text: DEMO01-0001, 0001, or an AE ID such as AE-001."""
+        """A case named in the text: DEMO01-0001, 0001, or an AE ID such as AE-001 or AE-M01."""
         ids = {cs.case_id: cs for cs in self.cases()}
         if m := re.search(r"\b([A-Z0-9]+-\d{4})\b", text.upper()):
             if m.group(1) in ids:
                 return m.group(1)
-        if m := re.search(r"\bAE-?(\d{3})\b", text.upper()):
-            ae = f"AE-{m.group(1)}"
+        if ae := _ae_id(text):
             return next((c for c, cs in ids.items() if cs.ae_id == ae), None)
         if m := re.search(r"\b(\d{4})\b", text):
             return next((c for c in ids if c.endswith(f"-{m.group(1)}")), None)
@@ -370,10 +369,9 @@ class Assistant:
         return Reply("\n\n".join(lines), actions)
 
     def why(self, text: str) -> Reply:
-        m = re.search(r"\bAE-?(\d{3})\b", text.upper())
-        if not m:
+        ae = _ae_id(text)
+        if not ae:
             return Reply("Which record? For example `/why AE-008`.")
-        ae = f"AE-{m.group(1)}"
         latest: dict[str, Any] | None = None
         for e in read_log(self.store.evaluations_path):
             key = e.get("key", "")
@@ -642,6 +640,13 @@ class Assistant:
         return (
             f"No suggested outcome: {', and '.join(parts) or 'something is not sure'}. You decide."
         )
+
+
+def _ae_id(text: str) -> str | None:
+    """An AE ID named in the text, as AE-<id>: AE-008, AE008, AE-M01 or AE-7000. AE IDs
+    have no fixed shape; at least one digit keeps plain words such as "AEROBIC" out."""
+    m = re.search(r"\bAE-?([A-Z]*\d[A-Z0-9]*)\b", text.upper())
+    return f"AE-{m.group(1)}" if m else None
 
 
 def _failed_rules(results: list[dict[str, Any]]) -> list[str]:
