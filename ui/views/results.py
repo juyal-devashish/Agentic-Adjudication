@@ -46,6 +46,7 @@ EVENT_WORDS = {
     "narrative.signed": "Narrative signed",
     "handoff.flow3_ready": "Ready for adjudication",
     "documents.uploaded": "Documents uploaded",
+    "upload.rejected": "Uploaded ZIP file refused",
     "deid.started": "Identifier removal started",
     "deid.file_processed": "File processed",
     "deid.completed": "Identifier removal finished",
@@ -88,6 +89,11 @@ def event_words(e: dict) -> str:
             return "Notification posted to Slack"
         return f"Slack message failed: {e['data'].get('error', 'unknown')}"
     return EVENT_WORDS.get(e["type"], e["type"])
+
+
+def rejected_reason(e: dict) -> str:
+    """Why an uploaded ZIP was refused; the upload folder keeps it in the event's data."""
+    return e["data"].get("reason", "") if e["type"] == "upload.rejected" else ""
 
 
 FLOW34_EVENTS = {t for t in EVENT_WORDS if t.split(".")[0] in (
@@ -446,7 +452,7 @@ st.dataframe(
                 "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:19]}",
                 "Who": who(e["actor"], names),
                 "What": event_words(e),
-                "Reason": e.get("reason") or "",
+                "Reason": e.get("reason") or rejected_reason(e),
             }
             for e in shown
         ]

@@ -557,3 +557,24 @@ def test_a_rerun_that_loses_the_recognised_type_records_no_site_label(demo):
     assert "Set by the site." not in [c.value for c in at.caption]
     kind = next(s for s in at.selectbox if s.label == "Document type")
     assert kind.value is None
+
+
+def test_a_refused_zip_and_its_reason_show_on_documents_and_in_the_record(demo):
+    """B16: the upload_rejected e-mail links to Documents, which must say which ZIP was
+    refused and why; the case record names the event and shows the reason."""
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    folders = runner.uploads
+    (demo.root / "uploads" / "DEMO01-0001" / "broken.zip").write_bytes(b"not a zip")
+    folders.tick()  # first sight: waits for the file to stop changing
+    assert folders.tick()["rejected"] == ["broken.zip"]
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    assert any("broken.zip" in w.value and "damaged" in w.value for w in at.warning)
+
+    at = run("views/results.py", role="site", case_id="DEMO01-0001")
+    trail = next(df.value for df in at.dataframe if "Reason" in df.value.columns)
+    row = trail[trail["What"] == "Uploaded ZIP file refused"]
+    assert len(row) == 1 and "damaged" in row["Reason"].iloc[0]

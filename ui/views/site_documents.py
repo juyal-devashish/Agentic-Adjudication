@@ -113,6 +113,16 @@ if can_upload:
             f"Or put one ZIP file with all the documents in this case's upload folder, "
             f"{cid}. It is picked up within a minute."
         )
+        # The upload_rejected e-mail links here and carries no reason; give it now. A later
+        # upload means the site has acted, so only refusals since then are shown.
+        refused: list[dict] = []
+        for e in store.events(cid):
+            if e["type"] == "documents.uploaded":
+                refused = []
+            elif e["type"] == "upload.rejected":
+                refused.append(e["data"])
+        for r in refused:
+            st.warning(f"{r['zip']} from the upload folder was not used: {r['reason']}")
 
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("Uploads are processed automatically within a few seconds. To see the result now:")
