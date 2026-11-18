@@ -157,8 +157,15 @@ def _ink(value: str) -> str:
     return f"color: {theme.STATUS_INK[ink]}; font-weight: 600"
 
 
-files_table = pd.DataFrame(rows)
-st.dataframe(files_table.style.map(_ink, subset=["Status"]), hide_index=True, width="stretch")
+# Whole numbers even when a file still processing leaves its counts empty (pandas would
+# make the columns floats and show "150.000000").
+counts = ["Identifiers removed", "Still found"]
+files_table = pd.DataFrame(rows).astype(dict.fromkeys(counts, "Int64"))
+st.dataframe(
+    files_table.style.map(_ink, subset=["Status"]).format(na_rep="", subset=counts),
+    hide_index=True,
+    width="stretch",
+)
 
 for name in sorted(docs.files):
     done = docs.processed.get(name)
