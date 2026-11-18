@@ -75,7 +75,9 @@ Every demo person signs with the password `demo`.
 
 ## 3. The script
 
-One Slack account plays every person. `/adj act-as <name>` switches between them, the same way the app's sidebar does; the Agent then acts as that person. Acting As is simulated, not enforced: say so. Type to the Agent in the app's **Messages** tab, or reply in the thread of a notice it sent: a reply in a notice's thread is about that notice's case.
+**Recommended: one Slack account per character, each in its own window.** Invite three accounts to the demo workspace (free; e-mail aliases such as `you+rahul@…` work) and sign each into its own browser profile, side by side. In each, once, type `/adj act-as rahul`, `priya` or `anna` in a channel (not in the Agent's conversation, where commands do not run); the choice survives resets. Each notice then goes to the window of the account acting as its recipient; anyone nobody has chosen (the adjudicators) goes to the account that chose last. Steps 1, 3 and 6 below then need no `/adj act-as`: click into that character's window.
+
+With a single account, one Slack account plays every person: *Switch person* on the Home tab (or `/adj act-as <name>` in a channel) switches between them, the same way the app's sidebar does; the Agent then acts as that person. Acting As is simulated, not enforced: say so. Type to the Agent in the app's **Messages** tab, or reply in the thread of a notice it sent: a reply in a notice's thread is about that notice's case.
 
 | # | In Slack | In the app | Talking point |
 |---|---|---|---|
