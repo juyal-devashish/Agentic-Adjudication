@@ -82,7 +82,7 @@ if st.button("Import file", type="primary", disabled=not (can_import and upload)
         finish("file", pipe.process_inbox(p.inbox, p.processed, actor=ctx.actor))
 show_messages("file")
 
-waiting = sorted(f.name for f in p.inbox.glob("*") if f.is_file()) if p.inbox.exists() else []
+waiting = [f.name for f in p.waiting_files()]
 if waiting:
     st.write(
         f"{len(waiting)} file(s) are waiting in the import queue: {', '.join(waiting)}. "

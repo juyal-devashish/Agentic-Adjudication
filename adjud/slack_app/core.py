@@ -225,10 +225,7 @@ class Workspace:
 
     def waiting_files(self) -> list[Path]:
         """AE files in the import queue, as process_inbox sees them (no hidden files)."""
-        inbox = self.paths.inbox
-        if not inbox.exists():
-            return []
-        return [f for f in inbox.iterdir() if f.is_file() and not f.name.startswith(".")]
+        return self.paths.waiting_files()
 
     # -- Tasks --------------------------------------------------------------------------------
 

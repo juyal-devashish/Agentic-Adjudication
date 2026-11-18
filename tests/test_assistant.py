@@ -257,3 +257,17 @@ def test_qc_after_a_query_says_the_query_was_sent(demo, monkeypatch):
         assert "ready to edit" not in reply.text and "You decide" not in reply.text, uid
         assert f"A query was sent to the site by {users[SS]['name']}" in reply.text, uid
         assert not reply.actions, uid
+
+
+def test_a_hidden_file_in_the_inbox_is_not_an_ae_file_waiting(demo):
+    """B35: process_inbox skips hidden files (e.g. macOS's .DS_Store), so the Assistant must
+    not list one as waiting, and /import must say the queue is empty, not reply blank."""
+    for f in demo.inbox.iterdir():
+        f.unlink()
+    (demo.inbox / ".DS_Store").write_bytes(b"\0")
+    at = run(role="data_manager")
+    say(at, "/tasks")
+    assert ".DS_Store" not in chat(at) and "waiting to be imported" not in chat(at)
+    say(at, "/import")
+    assert "There is no AE file waiting in the import queue." in chat(at).rsplit("/import", 1)[-1]
+    assert (demo.inbox / ".DS_Store").exists()

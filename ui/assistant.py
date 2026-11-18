@@ -152,7 +152,7 @@ class Assistant:
         lines: list[str] = []
         actions: list[Action] = []
         if self.role == "data_manager":
-            waiting = sorted(f.name for f in self.pipe_paths().inbox.glob("*") if f.is_file())
+            waiting = [f.name for f in self.pipe_paths().waiting_files()]
             if waiting:
                 lines.append(
                     f"**{len(waiting)} AE file{'s' if len(waiting) > 1 else ''} "
@@ -412,7 +412,7 @@ class Assistant:
                 "for you. I'll let you know here when new cases arrive."
             )
         paths = self.pipe_paths()
-        if not any(f.is_file() for f in paths.inbox.glob("*")):
+        if not paths.waiting_files():
             return Reply(
                 "There is no AE file waiting in the import queue.",
                 [Action("Go to AE import", "import")],
