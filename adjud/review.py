@@ -25,6 +25,7 @@ from adjud.store import FileCaseStore
 from adjud.workflow import State, replay
 
 SUBMIT_MEANING = "Submitted — documents complete and de-identified"
+_CHANGES_FILES = ("documents.uploaded", "document.deleted", "redactions.changed")
 
 
 class ReviewRefused(Exception):
@@ -160,6 +161,7 @@ def submission_status(store: FileCaseStore, case_id: str) -> SubmissionStatus:
 def submit(
     store: FileCaseStore, case_id: str, user_id: str, password: str, config_dir: Path
 ) -> dict[str, Any]:
+    seen = len(store.events(case_id))  # read before the files to sign (B37)
     status = submission_status(store, case_id)
     if not status.ready:
         raise ReviewRefused("; ".join(status.reasons))
@@ -171,6 +173,8 @@ def submit(
     def still_waiting(prior: list[dict[str, Any]]) -> None:  # signed in another tab meanwhile
         if replay(prior).state != State.AWAITING_SITE_CONFIRMATION:
             raise ReviewRefused("the case is not waiting for site review")
+        if any(e["type"] in _CHANGES_FILES or e["type"].startswith("deid.") for e in prior[seen:]):
+            raise ReviewRefused("the documents changed while signing; review them and sign again")
 
     return store.append_event(
         case_id,

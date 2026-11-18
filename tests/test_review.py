@@ -181,6 +181,35 @@ def test_one_submission_takes_one_signature_from_two_tabs(ctx, monkeypatch):
     assert store.state(cid).state == State.SUBMITTED
 
 
+def test_a_document_removed_while_signing_is_not_signed_or_handed_on(ctx, monkeypatch):
+    """B37: another tab removes a file while this one checks the password; the signature
+    is refused, so the removed file never enters a submission or the Flow 2 manifest."""
+    import adjud.review
+
+    store, proc, cid = ctx
+    upload(store, cid, [("a.pdf", pdf("DISCHARGE SUMMARY. Chest pain.")),
+                        ("b.pdf", pdf("ECG REPORT. Sinus rhythm."))], SITE)  # fmt: skip
+    proc.process_case(cid)
+    real, raced = adjud.review.sign, []
+
+    def sign(*args, **kw):  # the other tab removes b.pdf while this one checks the password
+        if not raced:
+            raced.append(True)
+            delete_document(store, cid, "b.pdf", SITE, reason="wrong file")
+        return real(*args, **kw)
+
+    monkeypatch.setattr(adjud.review, "sign", sign)
+    with pytest.raises(ReviewRefused, match="documents changed"):
+        submit(store, cid, SITE, "demo", CONFIG)
+    assert "submission.signed" not in [e["type"] for e in store.events(cid)]
+    assert store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+
+    signed = submit(store, cid, SITE, "demo", CONFIG)  # signing again covers what is there
+    assert [f["name"] for f in signed["data"]["files"]] == ["a.pdf"]
+    manifest = write_handoff(store, cid, CONFIG, proc.outbox)
+    assert [d["source_name"] for d in manifest["documents"]] == ["a.pdf"]
+
+
 def test_rejected_file_must_be_deleted_before_submission(ctx):
     store, proc, cid = ctx
     upload(
