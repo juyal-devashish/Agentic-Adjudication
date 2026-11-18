@@ -133,7 +133,7 @@ def case_header(ctx: Context, here: str) -> None:
     snap = pipe.latest_snapshot(ctx.case_id)
     since = f'<span class="adj-quiet">since {theme.date_words(cs.state_since)}</span>'
     facts = [
-        ("Status", f"{theme.state_status(cs.state)} {since}"),
+        ("Status", f"{theme.state_status(cs.state, ctx.role)} {since}"),
         ("Onset", html.escape(theme.date_words(snap["onset_date"]))),
         ("Subject", html.escape(snap["subject_id"])),
         ("Site", html.escape(site_name(snap["site_id"]))),
@@ -195,7 +195,7 @@ def case_list(ctx: Context, intro: str) -> None:
                     "Case": cs.case_id,
                     "Subject": cs.subject,
                     "AE": cs.ae_id,
-                    "Status": theme.state_words(cs.state),
+                    "Status": theme.state_words(cs.state, ctx.role),
                     "Since": theme.date_words(cs.state_since),
                     "Flags": theme.flag_words(cs.flags),
                 }

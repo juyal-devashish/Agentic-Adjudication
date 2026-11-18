@@ -287,13 +287,15 @@ SHORT_STATE = {s: label.lower() for s, label in LIFECYCLE} | {
 }
 
 
-def short_state(state: State) -> str:
+def short_state(state: State, role: str | None = None) -> str:
     """Compact form for the case picker: 'site review', 'submitted'."""
+    if role == "site" and state in workflow.SITE_BLINDED:
+        return "adjudication"  # ACC-04, P-45
     return SHORT_STATE.get(state, str(state))
 
 
-def state_words(state: State) -> str:
-    return STATE_WORDS.get(state, str(state))
+def state_words(state: State, role: str | None = None) -> str:
+    return workflow.state_words(state, role)
 
 
 def flag_words(flags: list[str]) -> str:
@@ -323,8 +325,8 @@ STATE_INK = {
 }
 
 
-def state_status(state: State) -> str:
-    word = state_words(state)
+def state_status(state: State, role: str | None = None) -> str:
+    word = state_words(state, role)
     ink = STATE_INK.get(state)
     return status(word, ink) if ink else html.escape(word)
 

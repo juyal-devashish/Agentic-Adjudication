@@ -139,7 +139,7 @@ def next_step(
             State.READY_FOR_ADJUDICATION: "The case is ready for adjudication. Nothing more is "
             "needed from you.",
         }.get(
-            state, "The case is with the adjudication committee. Nothing more is needed from you."
+            state, "The case is with adjudication. Nothing more is needed from you."
         )  # Flows 3–4: no adjudication details for the site (ACC-04)
     return {
         State.EVENT_CREATED: "Related data is being pulled from the EDC.",

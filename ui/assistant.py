@@ -269,7 +269,8 @@ class Assistant:
         lines = [
             f"**{case_id}**: {snap['ae_term']}, subject {snap['subject_id']} at "
             f"{site_name(snap['site_id'])}, onset {theme.date_words(snap['onset_date'])}.",
-            f"Status: **{theme.state_words(cs.state)}** since {theme.date_words(cs.state_since)}.",
+            f"Status: **{theme.state_words(cs.state, self.role)}** "
+            f"since {theme.date_words(cs.state_since)}.",
             step,
         ]
         if cs.state == State.QC_REVIEW and self.role != "site":

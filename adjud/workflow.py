@@ -234,3 +234,16 @@ STATE_WORDS = {
     State.CLOSED: "Closed",
     State.WITHDRAWN: "Withdrawn",
 }
+
+# Flows 3–4 states a site sees only as one generic word: neither a dispute (Adjudicator 3)
+# nor the committee is shown to it (ACC-04, P-45).
+SITE_BLINDED = frozenset(
+    {State.ADJ_REVIEW, State.ADJ3_REVIEW, State.CEC_MEETING, State.MORE_DATA, State.OUTCOME}
+)
+
+
+def state_words(state: State, role: str | None = None) -> str:
+    """The state in words for someone in `role`; a site sees Flows 3–4 as one state."""
+    if role == "site" and state in SITE_BLINDED:
+        return "With adjudication"
+    return STATE_WORDS.get(state, str(state))

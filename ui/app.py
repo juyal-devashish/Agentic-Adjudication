@@ -81,7 +81,7 @@ with st.sidebar:
     states = pipeline().store.list_case_states()
     states = [cs for cs in states if Context(user, None).sees(cs.subject, cs.case_id)]
     st.subheader("Case")
-    labels = {cs.case_id: f"{cs.case_id}, {theme.short_state(cs.state)}" for cs in states}
+    labels = {cs.case_id: f"{cs.case_id}, {theme.short_state(cs.state, role)}" for cs in states}
     chosen = st.session_state.get("case_id")
     if chosen not in labels:
         chosen = None  # e.g. a deep link to another site's case

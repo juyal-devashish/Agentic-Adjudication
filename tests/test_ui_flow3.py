@@ -264,3 +264,39 @@ def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewin
     assert store.state(cid).state == State.QC_REVIEW
     at = as_user("ss.anna", "views/quality_check.py", cid)
     assert any("the adjudication (a signed request for more data)" in i.value for i in at.info)
+
+
+def test_the_site_sees_only_that_the_case_is_with_adjudication(reviewing):
+    """B20, ACC-04, P-45: the header, next step, case list and sidebar never tell the site
+    that the reviews disagreed (Adjudicator 3) or that the case went to the committee."""
+    runner, store, cid = reviewing
+    f3 = runner.flow3
+    rnd = current_round(store, cid)
+    f3.sign_review(cid, rnd.holders["1"], "demo", answers(mi_type="type_1"))
+    f3.sign_review(cid, rnd.holders["2"], "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    assert store.state(cid).state == State.ADJ3_REVIEW
+
+    def site_sees() -> str:
+        shown = []
+        for page in ("views/results.py", "views/site_documents.py", "views/assistant.py"):
+            at = as_user(SITE, page, cid)
+            assert not at.exception, at.exception
+            case = next(s for s in at.selectbox if s.label == "Case")
+            shown += [text(at), tables(at), "\n".join(str(o) for o in case.options)]
+        shown.append(tables(as_user(SITE, "views/results.py")))  # the case list
+        generic = "Adjudication is done by an independent committee."  # in every state
+        return "\n".join(shown).replace(generic, "")
+
+    shown = site_sees()
+    assert "With adjudication" in shown and f"{cid}, adjudication" in shown
+    for word in ("Adjudicator 3", "adjudicator 3", "committee", "Committee"):
+        assert word not in shown, word
+
+    f3.sign_review(cid, current_round(store, cid).holders["3"], "demo", {"mi_type": "type_4"})
+    runner.run_case_steps()
+    assert store.state(cid).state == State.CEC_MEETING
+    shown = site_sees()
+    assert "With adjudication" in shown
+    for word in ("Adjudicator 3", "adjudicator 3", "committee", "Committee"):
+        assert word not in shown, word

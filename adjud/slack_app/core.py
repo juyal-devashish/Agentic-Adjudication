@@ -27,7 +27,7 @@ from adjud.flow3 import Flow3, assigned_cases, current_round
 from adjud.intake import IntakePipeline
 from adjud.paths import DataPaths
 from adjud.store import FileCaseStore, write_atomic
-from adjud.workflow import STATE_WORDS, State
+from adjud.workflow import State, state_words
 
 ROLE_WORDS = {
     "data_manager": "Data manager",
@@ -288,7 +288,7 @@ class Workspace:
         next_step = task.words if task else "Nothing is waiting for you on this case."
         return Status(
             case_id=case_id,
-            state=STATE_WORDS.get(cs.state, str(cs.state)),
+            state=state_words(cs.state, person["role"]),
             since=cs.state_since[:10],
             next_step=next_step,
             site=self.people.site_name(_site_of(cs.subject)),
