@@ -390,12 +390,12 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 - [x] Records: ADR 0005 (supersedes ADR 0004), ADR 0003 revised, GLOSSARY (Agent, Conversation, Clinical Content), P-58, the installed manifest in [slack-app-manifest.yaml](slack-app-manifest.yaml)
 - [x] The Agent's own AI mode (`ai.modes.slack_agent`, `ADJUD_AGENT_MODE`, default off), budget $100, a conversation entry point in the gateway and prompt `slack_agent_v1`; tests with a fake client and replay (calls about no case are saved to `data/ai/calls/`, referenced from the usage ledger and checked by `tools.verify_log`)
-- [ ] Role-scoped tools, enforced in code (Q5, Q11), reading only redacted outputs, EDC snapshots and case records
-- [ ] The PHI gate on every reply (Q17), users' and sites' names allowed; tests with the kit's seeded PHI
-- [ ] The conversation log `data/slack/conversations.jsonl` (Q18), covered by `tools.verify_log` and the demo reset
-- [ ] Slack's agent events and session status; edits and bot messages ignored
+- [x] Role-scoped tools, enforced in code (Q5, Q11), reading only redacted outputs, EDC snapshots and case records (read tools; the acting tools come with the unsigned actions below)
+- [x] The PHI gate on every reply (Q17), users' and sites' names allowed; tests with the kit's seeded PHI (all 92 must-redact values held; `study.yaml: slack_phi_gate.allow` for ordinary words NER takes for a name)
+- [x] The conversation log `data/slack/conversations.jsonl` (Q18), covered by `tools.verify_log` and the demo reset
+- [x] Slack's agent events and session status; edits and bot messages ignored; with the Agent's AI off, code answers with the person's Tasks
 - [ ] Unsigned actions: import and pull; the site's upload of attached files (the original stays in Slack, delete tried and recorded); the Narrative Draft and draft Site Query that open the Quality check page pre-filled
-- [ ] Notices as Conversations (Q12); the Site Query text in the site's DM, answered by upload (Q13); *Open in the app* for every signed step
+- [ ] Notices as Conversations (Q12); the Site Query text in the site's DM, answered by upload (Q13); *Open in the app* for every signed step (done: a reply in a notice's thread is about its case, and every Agent reply carries *Open in the app*)
 - [ ] Tests: ADR 0004's content checks replaced by "no PHI in any Slack payload"; role limits; uploads; the full run from import to Assignment
 - [ ] The Assistant deleted (Q16) and step 30 closed with a note
 - [ ] AGENTS.md, CLAUDE.md and README brought in line with ADR 0005 (they still cite ADR 0004 for Slack; their "no clinical content" rule stays for e-mail)
