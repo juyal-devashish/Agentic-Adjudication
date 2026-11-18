@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 import theme
-from common import context, paths, pipeline, site_name
+from common import context, paths, pipeline, site_name, your_tasks
 from wording import (
     AE_CHOICES,
     AE_FIELD_LABELS,
@@ -30,6 +30,7 @@ pipe = pipeline()
 can_import = ctx.role == "data_manager"  # plan P-25
 
 st.title("AE import")
+your_tasks(ctx, "import")
 st.write(
     "Adverse events from the EDC become adjudication cases only when they meet the "
     "study's rules. Every record gets an explanation, whether or not it becomes a case."
