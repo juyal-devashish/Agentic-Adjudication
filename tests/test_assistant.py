@@ -140,3 +140,51 @@ def test_unknown_questions_get_the_list_of_actions(demo, text):
     at = run(role="safety_specialist")
     say(at, text)
     assert "/status 0001" in chat(at)
+
+
+def test_an_adjudicator_is_told_only_what_gave_them_the_case(demo, monkeypatch):
+    """B21: a case that becomes visible after the chat opened is reported from the event
+    that made it visible (assignment, Adjudicator 3), not replayed from its Flow 1-2
+    history; and only the assigned adjudicators are told a review is theirs."""
+    import yaml
+
+    from adjud.documents import upload
+    from adjud.flow3 import current_round
+    from adjud.workflow import State
+    from tests.test_flow3 import SS, answers, pdf, to_qc_review
+
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
+    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain.")),
+                        ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE101["id"])  # fmt: skip
+    runner.flow2.sign_qc_pass(cid, SS, "demo", to_qc_review(runner, store, cid), "Documents")
+    users = {u["id"]: u for u in yaml.safe_load((demo.config / "users.yaml").read_text())["users"]}
+    chat = {}
+    for uid in ("adj.okafor", "adj.lindqvist", "adj.reyes"):
+        helper = Assistant(users[uid])
+        chat[uid] = (helper, {cs.case_id: cs.seq for cs in helper.cases()})
+        assert chat[uid][1] == {}, uid  # nothing assigned yet
+    runner.run_case_steps()  # Flow 3 handoff
+    runner.run_case_steps()  # the reviews are assigned
+    assert store.state(cid).state == State.ADJ_REVIEW
+    rnd = current_round(store, cid)
+    a1, a2 = rnd.holders["1"], rnd.holders["2"]
+    for uid, (helper, seen) in chat.items():
+        got = [r.text for r in helper.updates(seen)]
+        mine = uid in (a1, a2)
+        assert got == ([f"{cid}: an independent review is assigned to you."] if mine else []), uid
+    runner.flow3.sign_review(cid, a1, "demo", answers(mi_type="type_1"))
+    runner.flow3.sign_review(cid, a2, "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    assert store.state(cid).state == State.ADJ3_REVIEW
+    a3 = current_round(store, cid).holders["3"]
+    helper, seen = chat[a3]
+    assert [r.text for r in helper.updates(seen)] == [
+        f"{cid}: you are Adjudicator 3 for the disputed fields."
+    ]

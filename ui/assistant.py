@@ -414,7 +414,7 @@ class Assistant:
         order it happened, for the cases this person may see. Updates `seen`."""
         out: list[tuple[str, Reply]] = []
         for cs in self.cases():
-            last = seen.get(cs.case_id, 0)
+            last = seen.get(cs.case_id, self._start(cs.case_id))
             for e in self.store.events(cs.case_id):
                 if e["seq"] <= last:
                     continue
@@ -422,6 +422,16 @@ class Assistant:
                     out.append((e["at"], reply))
             seen[cs.case_id] = cs.seq
         return [r for _, r in sorted(out, key=lambda x: x[0])]
+
+    def _start(self, case_id: str) -> int:
+        """Where updates begin on a case this person did not see before: an adjudicator
+        is told from the event that gave them the case, not its Flow 1-2 history."""
+        if self.role != "adjudicator":
+            return 0
+        from adjud.flow3 import first_visible_seq
+
+        seq = first_visible_seq(self.store, case_id, self.user["id"], bool(self.user.get("chair")))
+        return (seq or 1) - 1
 
     def _update(self, case_id: str, e: dict[str, Any]) -> Reply | None:
         t, ss, site = e["type"], self.role == "safety_specialist", self.role == "site"
@@ -479,8 +489,10 @@ class Assistant:
         adj, coord = self.role == "adjudicator", self.role == "cec_coordinator"
         act = [Action(f"Adjudicate {case_id}", "adjudicate", case_id)]
         if t == "adjudication.assigned":
-            if adj:
+            if adj and me in d["adjudicators"].values():
                 return Reply(f"{case_id}: an independent review is assigned to you.", act)
+            if adj:
+                return None  # the reviews of round 1 and 2 are someone else's
             n = f" (round {d['round']})" if d["round"] > 1 else ""
             return Reply(f"{case_id}: Adjudicators 1 and 2 assigned{n}. The reviews are blind.")
         if t == "adjudication.reassigned":

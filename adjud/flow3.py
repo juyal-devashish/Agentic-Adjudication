@@ -132,22 +132,28 @@ def _open_slots(state: State) -> tuple[str, ...]:
 COMMITTEE_EVENTS = ("adj3.unresolved", "comparison.to_committee", "committee.resumed")
 
 
+def first_visible_seq(
+    store: FileCaseStore, case_id: str, user_id: str, chair: bool = False
+) -> int | None:
+    """The seq of the case's first event that gives this adjudicator the case (see
+    `assigned_cases`), or None while they have none."""
+    for e in store.events(case_id):
+        d = e["data"]
+        if (
+            (chair and e["type"] in COMMITTEE_EVENTS)
+            or (e["type"] == "adjudication.assigned" and user_id in d["adjudicators"].values())
+            or (e["type"] == "adjudication.reassigned" and d["to"] == user_id)
+            or (e["type"] == "comparison.disputed" and d.get("adjudicator3") == user_id)
+        ):
+            return e["seq"]
+    return None
+
+
 def assigned_cases(store: FileCaseStore, user_id: str, chair: bool = False) -> set[str]:
     """Cases this adjudicator holds or held a review on, in any round (ACC-02); for the
     committee's Chair, also every case that went to the committee."""
-    out = set()
-    for case_id in store.list_cases():
-        for e in store.events(case_id):
-            d = e["data"]
-            if (
-                (chair and e["type"] in COMMITTEE_EVENTS)
-                or (e["type"] == "adjudication.assigned" and user_id in d["adjudicators"].values())
-                or (e["type"] == "adjudication.reassigned" and d["to"] == user_id)
-                or (e["type"] == "comparison.disputed" and d.get("adjudicator3") == user_id)
-            ):
-                out.add(case_id)
-                break
-    return out
+    return {c for c in store.list_cases()
+            if first_visible_seq(store, c, user_id, chair) is not None}  # fmt: skip
 
 
 @dataclass
