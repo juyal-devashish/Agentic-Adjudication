@@ -201,16 +201,23 @@ if reviewable:
     # The type recognised from the title (P-38); the site corrects it here if it is wrong.
     current, set_by = docs.type_of(name)
     types = list(doc_types())
+    key = f"type_{cid}_{name}"
+    # Relabel only when the site picked a type in this run. Otherwise show the case's type:
+    # a keyed selectbox keeps its earlier value after a re-run changes the type (B14).
+    picked = st.session_state.pop(f"{key}_picked", False)
+    if not picked:
+        st.session_state[key] = current if current in types else None
     chosen = pick_type.selectbox(
         "Document type",
         types,
-        index=types.index(current) if current in types else None,
+        index=None,
         format_func=doc_label,
         placeholder="Not recognised yet",
         disabled=not can_change,
-        key=f"type_{cid}_{name}",
+        key=key,
+        on_change=lambda: st.session_state.update({f"{key}_picked": True}),
     )
-    if can_change and chosen and chosen != current:
+    if can_change and picked and chosen and chosen != current:
         relabel_document(store, cid, name, chosen, ctx.actor, pipe.paths.config)
         st.toast(f"{name} is now marked as {doc_label(chosen).lower()}")
         st.rerun()

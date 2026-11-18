@@ -526,3 +526,34 @@ def test_the_site_sees_recognised_document_types_and_can_correct_one(demo):
     assert not at.exception, at.exception
     docs = documents_of(runner.pipeline.store, "DEMO01-0001")
     assert docs.type_of("discharge_summary.pdf") == ("other", "site")
+
+
+def test_a_rerun_that_loses_the_recognised_type_records_no_site_label(demo):
+    """B14: a box over the title makes the re-run lose the recognised type. The type
+    selectbox keeps the value it showed before; that must not become a site label."""
+    from adjud.documents import documents_of, upload
+    from adjud.review import change_redactions
+    from adjud.runner import Runner
+
+    runner = Runner(demo)
+    runner.run_once()
+    store = runner.pipeline.store
+    src = demo.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    files = [(f.name, f.read_bytes()) for f in sorted(src.iterdir())]
+    upload(store, "DEMO01-0001", files, "site101.coord")
+    runner.run_once()
+
+    at = run("views/site_documents.py", role="site", case_id="DEMO01-0001")
+    kind = next(s for s in at.selectbox if s.label == "Document type")
+    assert kind.value == "discharge_summary"
+    box = {"file": "discharge_summary.pdf", "page": 1, "rect": [0.07909, 0.21598, 0.44991, 0.24085]}
+    change_redactions(store, "DEMO01-0001", "site101.coord", boxes=[box])
+    runner.run_once()
+    assert documents_of(store, "DEMO01-0001").type_of("discharge_summary.pdf") == (None, "")
+
+    at.run()
+    assert not at.exception, at.exception
+    assert not [e for e in store.events("DEMO01-0001") if e["type"] == "document.labelled"]
+    assert "Set by the site." not in [c.value for c in at.caption]
+    kind = next(s for s in at.selectbox if s.label == "Document type")
+    assert kind.value is None
