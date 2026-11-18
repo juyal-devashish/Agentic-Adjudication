@@ -116,6 +116,18 @@ def study_config() -> dict[str, Any]:
     return yaml.safe_load((paths().study_config(STUDY) / "study.yaml").read_text())
 
 
+def my_review(user_id: str, case_id: str) -> str | None:
+    """'open' or 'signed' for the review this person holds in the case's current pass, or
+    None when they hold none (never assigned, or reassigned away)."""
+    from adjud.flow3 import Flow3, current_round
+
+    store = pipeline().store
+    slot = Flow3(store, paths().config, STUDY).slot_of(case_id, user_id)
+    if slot is None:
+        return None
+    return "signed" if slot in current_round(store, case_id).signed else "open"
+
+
 def case_header(ctx: Context, here: str) -> None:
     """Case heading with its key facts, the lifecycle rail and the next step for whoever is
     looking, with a link to the page where they take it. `here` is the current page file,
@@ -141,6 +153,7 @@ def case_header(ctx: Context, here: str) -> None:
     ]
     if cs.flags:
         facts.append(("Flags", theme.status(theme.flag_words(cs.flags), "bad")))
+    review = my_review(ctx.actor, ctx.case_id) if ctx.role == "adjudicator" else None
     with st.container(key="case_head"):
         theme.case_heading(ctx.case_id, snap["ae_term"], facts)
         theme.lifecycle(cs.state)
@@ -152,9 +165,10 @@ def case_header(ctx: Context, here: str) -> None:
                 requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
                 ready=submission_status(pipe.store, ctx.case_id).ready,
                 has_files=bool(documents_of(pipe.store, ctx.case_id).files),
+                review=review,
             )
         )
-        target = next_page(ctx.role, cs.state)
+        target = next_page(ctx.role, cs.state, review=review)
         if target and target[0] != here:
             st.page_link(target[0], label=target[1], icon=target[2])
 

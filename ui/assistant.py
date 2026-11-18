@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import theme
-from common import doc_label, pipeline, site_name, study_config
+from common import doc_label, my_review, pipeline, site_name, study_config
 from wording import IMPORT_OUTCOME, import_summary, in_sentence, next_step
 
 from adjud.documents import documents_of
@@ -265,6 +265,7 @@ class Assistant:
             requested=[doc_label(r) for r in study_config().get("requested_documents", [])],
             ready=submission_status(self.store, case_id).ready,
             has_files=bool(documents_of(self.store, case_id).files),
+            review=my_review(self.user["id"], case_id) if self.role == "adjudicator" else None,
         )
         lines = [
             f"**{case_id}**: {snap['ae_term']}, subject {snap['subject_id']} at "

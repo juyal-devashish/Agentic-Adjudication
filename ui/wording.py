@@ -108,9 +108,17 @@ def doc_list(requested: list[str]) -> str:
 
 
 def next_step(
-    role: str, state: State, *, site: str, requested: list[str], ready: bool, has_files: bool
+    role: str,
+    state: State,
+    *,
+    site: str,
+    requested: list[str],
+    ready: bool,
+    has_files: bool,
+    review: str | None = None,
 ) -> str:
-    """One sentence: what the person looking at this case should do now."""
+    """One sentence: what the person looking at this case should do now. `review` is an
+    adjudicator's own review in the current pass: "open", "signed" or None (they hold none)."""
     if state == State.WITHDRAWN:
         return "This case was withdrawn. No action is needed."
     if role == "site":
@@ -164,13 +172,17 @@ def next_step(
         State.READY_FOR_ADJUDICATION: "Ready for adjudication. The reviews are assigned "
         "automatically.",
         State.ADJ_REVIEW: (
-            "Your independent review may be open: complete and sign the form."
-            if role == "adjudicator"
-            else "Two adjudicators are reviewing independently."
+            "Two adjudicators are reviewing independently."
+            if role != "adjudicator"
+            else "Your independent review is open: complete and sign the form."
+            if review == "open"
+            else "You signed your review. Waiting for the other review."
+            if review == "signed"
+            else "You hold no review on this case."
         ),
         State.ADJ3_REVIEW: (
-            "Adjudicator 3 reviews the disputed fields: if that is you, sign the form."
-            if role == "adjudicator"
+            "The reviews disagree on some fields: as Adjudicator 3, review them and sign the form."
+            if role == "adjudicator" and review == "open"
             else "The reviews disagree on some fields; Adjudicator 3 is reviewing them."
         ),
         State.CEC_MEETING: (
@@ -194,10 +206,11 @@ ADJ_PAGE, COMMITTEE_PAGE = "views/adjudication.py", "views/committee.py"
 ASSIGN_PAGE = "views/assignments.py"
 
 
-def next_page(role: str, state: State) -> tuple[str, str, str] | None:
+def next_page(role: str, state: State, *, review: str | None = None) -> tuple[str, str, str] | None:
     """Where the person looking at this case acts next: (page, link text, icon), or None
     when there is nothing for them to do. Matches next_step(): only states in which this
-    role has an action of its own get a link."""
+    role has an action of its own get a link; an adjudicator's form only while their review
+    is open."""
     if role == "site":
         return {
             State.AWAITING_DOCUMENTS: (DOCUMENTS_PAGE, "Upload documents", ":material/upload:"),
@@ -214,9 +227,10 @@ def next_page(role: str, state: State) -> tuple[str, str, str] | None:
             State.NARRATIVE_REVIEW: (QC_PAGE, "Complete the narrative", ":material/rule:"),
         }.get(state)
     if role == "adjudicator":
+        if state in (State.ADJ_REVIEW, State.ADJ3_REVIEW):
+            return (ADJ_PAGE, "Open the adjudication form", ":material/gavel:") if (
+                review == "open") else None  # fmt: skip
         return {
-            State.ADJ_REVIEW: (ADJ_PAGE, "Open the adjudication form", ":material/gavel:"),
-            State.ADJ3_REVIEW: (ADJ_PAGE, "Open the adjudication form", ":material/gavel:"),
             State.CEC_MEETING: (COMMITTEE_PAGE, "Committee", ":material/groups:"),
         }.get(state)
     if role == "cec_coordinator":

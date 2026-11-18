@@ -300,3 +300,30 @@ def test_the_site_sees_only_that_the_case_is_with_adjudication(reviewing):
     assert "With adjudication" in shown
     for word in ("Adjudicator 3", "adjudicator 3", "committee", "Committee"):
         assert word not in shown, word
+
+
+def test_the_status_line_follows_the_adjudicators_own_review(reviewing, monkeypatch):
+    """B33: after signing, or after being reassigned away, an adjudicator is not told to
+    complete and sign the form; only the one with an open review is, with a link to it."""
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    runner, store, cid = reviewing
+    rnd = current_round(store, cid)
+    a1, a2 = rnd.holders["1"], rnd.holders["2"]
+    a3 = next(a for a in ("adj.okafor", "adj.lindqvist", "adj.reyes") if a not in (a1, a2))
+    runner.flow3.sign_review(cid, a1, "demo", answers())
+    runner.flow3.reassign(cid, "cec.sofia", "2", a3, "On leave")
+
+    expected = {
+        a1: "You signed your review. Waiting for the other review.",
+        a2: "You hold no review on this case.",
+        a3: "Your independent review is open: complete and sign the form.",
+    }
+    for uid, line in expected.items():
+        reply = Assistant(USERS[uid]).handle(f"/status {cid}").text
+        assert line in reply and "may be open" not in reply, (uid, reply)
+        at = as_user(uid, "views/results.py", cid)
+        assert line in html_text(at) and "may be open" not in html_text(at), uid
+        links = [p.proto.label for p in at.get("page_link")]
+        assert ("Open the adjudication form" in links) == (uid == a3), (uid, links)
