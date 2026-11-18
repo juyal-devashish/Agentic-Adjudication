@@ -269,6 +269,24 @@ def test_environment_overrides_master_and_agent_modes_separately(case, monkeypat
     assert gw.cfg.enabled("slack_agent") and gw.cfg.budget_usd == 100
 
 
+def test_a_mistyped_agent_mode_turns_the_agent_off_and_never_stops_the_workflow(
+    case, monkeypatch, caplog
+):
+    """`ADJUD_AGENT_MODE` concerns only the Slack Agent, but `for_study` also builds the
+    Quality Check gateway (runner, Quality check page): a typo must not stop them."""
+    store, _ = case
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setenv("ADJUD_AGENT_MODE", "on")
+    with caplog.at_level("WARNING", logger="adjud.ai"):
+        gw = Gateway.for_study(store, CONFIG)
+    assert (gw.cfg.mode_for("narrative"), gw.cfg.mode_for("slack_agent")) == ("replay", "off")
+    assert "ADJUD_AGENT_MODE" in caplog.text and "'on'" in caplog.text
+    monkeypatch.setenv("ADJUD_AGENT_MODE", " LIVE ")
+    assert Gateway.for_study(store, CONFIG).cfg.mode_for("slack_agent") == "live"
+    monkeypatch.setenv("ADJUD_AGENT_MODE", "  ")  # blank: as if unset
+    assert Gateway.for_study(store, CONFIG).cfg.mode_for("slack_agent") == "off"
+
+
 def test_a_function_on_replay_replays_even_when_the_master_mode_is_live(case, tmp_path):
     store, cid = case
     client = FakeClient()

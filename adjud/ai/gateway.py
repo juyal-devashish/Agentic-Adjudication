@@ -42,11 +42,11 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from adjud.ai.config import SLACK_AGENT_NAME, AiConfig
+from adjud.ai.config import SLACK_AGENT_NAME, AiConfig, Mode
 from adjud.ai.functions import SLACK_AGENT, AgentFunction
 from adjud.ai.tools import Toolbox, ToolError
 from adjud.chain import ChainedLog
@@ -191,18 +191,22 @@ class Gateway:
     ) -> Gateway:
         """Settings from `<config>/<study>/study.yaml`; replays from its `ai_replays/`.
         `ADJUD_AI_MODE` in the environment overrides the master mode (off / replay / live);
-        `ADJUD_AGENT_MODE` overrides the Slack Agent's own mode (P-58)."""
+        `ADJUD_AGENT_MODE` overrides the Slack Agent's own mode (P-58). This gateway also
+        serves the Quality Check, so a mistyped Agent mode turns only the Agent off, with a
+        warning, instead of stopping the runner and the Quality check page."""
         import yaml
 
         folder = Path(config_dir) / study
         raw = dict((yaml.safe_load((folder / "study.yaml").read_text()) or {}).get("ai") or {})
         if os.environ.get("ADJUD_AI_MODE"):  # operational override, e.g. a replay demo
             raw["mode"] = os.environ["ADJUD_AI_MODE"]
-        if os.environ.get("ADJUD_AGENT_MODE"):  # e.g. the Agent live, QC on replay
-            raw["modes"] = {
-                **(raw.get("modes") or {}),
-                SLACK_AGENT_NAME: os.environ["ADJUD_AGENT_MODE"],
-            }
+        agent_mode = os.environ.get("ADJUD_AGENT_MODE", "").strip().lower()
+        if agent_mode:  # e.g. the Agent live, QC on replay
+            if agent_mode not in get_args(Mode):
+                log.warning("ADJUD_AGENT_MODE=%r is not off, replay or live; the Agent is off",
+                            os.environ["ADJUD_AGENT_MODE"])  # fmt: skip
+                agent_mode = "off"
+            raw["modes"] = {**(raw.get("modes") or {}), SLACK_AGENT_NAME: agent_mode}
         cfg = AiConfig.model_validate(raw)
         return cls(store, cfg, folder / "ai_replays", **kw)
 
