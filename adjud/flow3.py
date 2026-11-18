@@ -401,13 +401,16 @@ class Flow3:
                      "draft": {"path": rel, "sha256": sha}})  # fmt: skip
 
     def draft(self, case_id: str, user_id: str) -> dict[str, Any]:
-        """This person's latest draft in the current pass (never anyone else's, ASN-07)."""
+        """This person's latest draft for the review they hold in the current pass (never
+        anyone else's, nor one saved for another review, ASN-07)."""
         rnd = current_round(self.store, case_id)
-        if rnd is None:
+        slot = self.slot_of(case_id, user_id)
+        if rnd is None or slot is None:
             return {}
         e = next((e for e in reversed(self.store.events(case_id))
                   if e["type"] == "adjudication.draft_saved" and e["actor"] == user_id
-                  and e["data"]["round"] == rnd.number and e["data"]["pass"] == rnd.passes),
+                  and e["data"]["round"] == rnd.number and e["data"]["pass"] == rnd.passes
+                  and e["data"]["slot"] == slot),
                  None)  # fmt: skip
         return self.store.get_json(case_id, e["data"]["draft"]["path"]) if e else {}
 

@@ -385,6 +385,23 @@ def test_reassignment_needs_a_reason_and_hides_the_old_draft(assigned, monkeypat
     assert a1 not in f3.pool(cid)
 
 
+def test_a_draft_only_fills_the_review_it_was_saved_for(assigned):
+    """A reassigned Adjudicator 1 who later holds another review never gets their old
+    draft back in it (P-46, ASN-07)."""
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    third = next(a for a in ADJS if a not in (a1, a2))
+    f3.save_draft(cid, a1, {"event_confirmed": "yes", "mi_type": "type_4"})
+    f3.reassign(cid, COORD, "1", third, "Conflict of interest declared")
+    f3.sign_review(cid, third, "demo", answers(mi_type="type_1"))
+    f3.sign_review(cid, a2, "demo", answers(mi_type="type_2"))
+    runner.run_case_steps()
+    a3 = current_round(store, cid).holders.get("3")
+    assert f3.draft(cid, a1) == {}
+    assert a3 is None or f3.draft(cid, a3) == {}
+
+
 def racing(monkeypatch, other, module=None):
     """Run `other` while the first signature is being checked (the slow bcrypt step), as a
     second tab or the Coordinator would; return what it raised, or None."""
