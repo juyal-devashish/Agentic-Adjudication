@@ -1,9 +1,9 @@
-"""The Slack app (plan P-55, ADR 0003, ADR 0004): where work starts.
+"""The Slack app (plan P-55, P-58, ADR 0003, ADR 0005): where work starts.
 
 Slack shows each person their Tasks (App Home), a DM for each notice and an `/adj`
 command for tasks, cases, status and import. Every signed step and every step that needs
-Clinical Content is finished in the app through an *Open in the app* button; nothing here
-signs, and nothing sent to Slack carries Clinical Content.
+Clinical Content beyond what the Agent may show is finished in the app through an *Open
+in the app* button; nothing here signs, and nothing sent to Slack carries PHI (ADR 0005).
 
     core.py    Tasks, cases, status, Acting As and the Slack actions log; no Slack library
     blocks.py  what Slack shows (Block Kit), built only from core.py's clinical-free facts

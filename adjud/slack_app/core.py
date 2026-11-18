@@ -1,4 +1,5 @@
-"""What the Slack app knows, with no Slack library and no Clinical Content (ADR 0004).
+"""What the Slack app knows, with no Slack library and no Clinical Content (written under
+ADR 0004; ADR 0005 now draws the line at PHI, and these facts stay inside it).
 
 Everything here is built from case IDs, workflow states, site names, people's names and
 counts: never from the AE snapshot, documents, queries, narratives or answers. A Task
@@ -46,7 +47,7 @@ FLAG_WORDS = {
     "possible_duplicate": "a possible duplicate",
 }
 # The Suggested Outcome (computed by code in flow2.py) as the one word Slack may show
-# (ADR 0004): never its reasons or any AI text.
+# in a notice: never its reasons or any AI text (the Agent shows those, ADR 0005).
 NOTHING_NEXT = "Nothing more for you on this case now."
 SUGGESTED_WORDS = {"pass": "pass", "query": "query", "unclear": "none"}
 
@@ -338,7 +339,7 @@ class Workspace:
 
     def import_queued(self, person: dict[str, Any]) -> tuple[str, list[str]]:
         """Import the queued AE files as this person. Returns a summary in counts and case
-        IDs only, and the cases created: no subject or AE IDs (ADR 0004)."""
+        IDs only, and the cases created: no subject or AE IDs."""
         if person["role"] != "data_manager":
             raise PermissionError("Importing AE records is the data manager's step.")
         if not self.waiting_files():
@@ -388,8 +389,8 @@ def import_as(ws: Workspace, actions: SlackActionsLog, slack_user: str, person: 
 
 
 def summarise_import(results: list[ImportResult]) -> tuple[str, list[str]]:
-    """An import in counts and case IDs only, and the cases created: no subject or AE IDs
-    (ADR 0004)."""
+    """An import in counts and case IDs only, and the cases created: no subject or AE
+    IDs."""
     outcomes = [o for r in results for o in r.outcomes]
     created = [o["case_id"] for o in outcomes if o.get("outcome") == "created"]
     others = len(outcomes) - len(created)

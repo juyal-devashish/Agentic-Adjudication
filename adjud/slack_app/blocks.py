@@ -1,4 +1,5 @@
-"""What Slack shows (Block Kit), built only from core.py's clinical-free facts (ADR 0004).
+"""What Slack shows (Block Kit), built only from core.py's clinical-free facts (ADR 0005:
+no PHI; the Agent's answers are gated in agent.py).
 
 Every block here carries case IDs, workflow words, site and people's names, counts,
 buttons and links into the app; nothing else is passed in. Limits respected: a Home view
@@ -94,7 +95,7 @@ def home(ws: Workspace, person: dict[str, Any] | None, note: str | None = None) 
 
 def not_a_case_block(ws: Workspace, person: dict[str, Any]) -> dict[str, Any] | None:
     """The data manager's count of AE records that are not a case, with a button to AE
-    import, where the records and the reasons are. A count only (ADR 0004)."""
+    import, where the records and the reasons are. A count only."""
     n = ws.records_not_a_case(person)
     if not n:
         return None

@@ -4,7 +4,8 @@
 A notice goes to the Slack user of each person behind its recipient: their own
 `slack_user_id` in users.yaml (real use), else the demo presenter (the Slack account that
 chose someone to act as). People who share one Slack account get one DM naming them all.
-Same content as the e-mail, never Clinical Content (ADR 0004). A failure is a recorded
+Same content as the e-mail, except that the site's Site Query DM carries the query
+text (P-58, Q13); never PHI (ADR 0005). A failure is a recorded
 Delivery Attempt (adjud.delivery) and never holds up e-mail or the workflow.
 
 Each DM's channel and `ts` are recorded in `data/slack/dm_sent.jsonl` with its case, so
