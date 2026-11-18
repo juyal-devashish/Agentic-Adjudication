@@ -210,3 +210,27 @@ def replay(events: list[dict[str, Any]]) -> CaseState:
         state = new
     assert state is not None
     return CaseState(**cs, state=state, seq=events[-1]["seq"], last_hash=events[-1]["hash"])
+
+
+# A state in words, for people: the app and the Slack app (P-55) say the same.
+STATE_WORDS = {
+    State.EVENT_CREATED: "Case created",
+    State.AWAITING_DOCUMENTS: "Waiting for documents",
+    State.DEIDENTIFYING: "Removing identifiers",
+    State.AWAITING_SITE_CONFIRMATION: "Waiting for site review",
+    State.SUBMITTED: "Submitted",
+    State.QC_CHECKS: "Quality check running",
+    State.QC_REVIEW: "Waiting for QC review",
+    State.QUERY_OPEN: "Query open with the site",
+    State.NARRATIVE: "Narrative being drafted",
+    State.NARRATIVE_REVIEW: "Waiting for narrative review",
+    State.READY_FOR_ADJUDICATION: "Ready for adjudication",
+    State.ADJ_REVIEW: "Independent reviews",
+    State.ADJ3_REVIEW: "Adjudicator 3 review",
+    State.CEC_MEETING: "Waiting for the committee",
+    State.MORE_DATA: "More data requested",
+    State.OUTCOME: "Outcome being derived",
+    State.EXPORT: "Exporting to the EDC",
+    State.CLOSED: "Closed",
+    State.WITHDRAWN: "Withdrawn",
+}

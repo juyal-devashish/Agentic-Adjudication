@@ -9,6 +9,7 @@ import html
 
 import streamlit as st
 
+from adjud import workflow
 from adjud.workflow import State
 
 INK, MUTED, VIOLET = "#1C2833", "#5A6B78", "#4A3AA0"
@@ -160,27 +161,7 @@ RAIL_STEP = {
     State.MORE_DATA: State.ADJ_REVIEW,
     State.EXPORT: State.OUTCOME,
 }
-STATE_WORDS = {
-    State.EVENT_CREATED: "Case created",
-    State.AWAITING_DOCUMENTS: "Waiting for documents",
-    State.DEIDENTIFYING: "Removing identifiers",
-    State.AWAITING_SITE_CONFIRMATION: "Waiting for site review",
-    State.SUBMITTED: "Submitted",
-    State.QC_CHECKS: "Quality check running",
-    State.QC_REVIEW: "Waiting for QC review",
-    State.QUERY_OPEN: "Query open with the site",
-    State.NARRATIVE: "Narrative being drafted",
-    State.NARRATIVE_REVIEW: "Waiting for narrative review",
-    State.READY_FOR_ADJUDICATION: "Ready for adjudication",
-    State.ADJ_REVIEW: "Independent reviews",
-    State.ADJ3_REVIEW: "Adjudicator 3 review",
-    State.CEC_MEETING: "Waiting for the committee",
-    State.MORE_DATA: "More data requested",
-    State.OUTCOME: "Outcome being derived",
-    State.EXPORT: "Exporting to the EDC",
-    State.CLOSED: "Closed",
-    State.WITHDRAWN: "Withdrawn",
-}
+STATE_WORDS = workflow.STATE_WORDS  # shared with the Slack app (P-55)
 FLAG_WORDS = {
     "source_changed": "AE changed in the EDC",
     "no_longer_eligible": "No longer meets the rules",
