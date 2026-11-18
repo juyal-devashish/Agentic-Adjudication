@@ -17,7 +17,7 @@ from adjud.slack_app.core import SlackActionsLog, Workspace
 from adjud.slack_app.dm import SlackSettings
 from adjud.workflow import State
 from tests.test_slack import PRESENTER, FakeClient
-from tests.test_slack_app import forbidden
+from tests.test_slack_agent_demo import phi_in
 from tools.reset_demo import DEMO_AES, reset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,8 +120,7 @@ def test_the_slack_demo_runs_from_the_import_to_the_assignment(tmp_path, monkeyp
          "Your independent review (round 1)", "adjudicate"),
     ]  # fmt: skip
 
-    sent = json.dumps(client.posts).lower()
-    assert not {w for w in forbidden(ws) if w in sent}  # ADR 0004
+    assert not phi_in(client.posts)  # ADR 0005: Clinical Content may go to Slack, PHI never
 
 
 def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp_path):
