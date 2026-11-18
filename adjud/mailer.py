@@ -95,8 +95,8 @@ def compose(
 ) -> EmailMessage:
     """A short letter: who it is for, the task, the case and a link. No clinical content."""
     msg = EmailMessage()
-    case = note.get("case_id") or "-"
-    msg["Subject"] = f"[{note['study']}] {note['subject']}: case {case}"
+    case = note.get("case_id")
+    msg["Subject"] = f"[{note['study']}] {note['subject']}" + (f": case {case}" if case else "")
     msg["From"] = s.sender
     msg["To"] = s.redirect_to or formataddr((user["name"], user["email"]))
     link = f"{s.base_url}{note['link']}" if note.get("link") else s.base_url
@@ -104,9 +104,11 @@ def compose(
     lines = [
         f"Dear {user['name']},",
         "",
-        f"Case {case}: {note['subject'][:1].lower()}{note['subject'][1:]}.",
+        f"Case {case}: {note['subject'][:1].lower()}{note['subject'][1:]}."
+        if case
+        else f"{note['subject']}.",
         "",
-        f"Open the case: {link}",
+        f"Open the case: {link}" if case else f"Open the app: {link}",
         *(
             ["You can also put all documents for this case in one ZIP file in its upload folder."]
             if zip_hint

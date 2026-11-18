@@ -195,14 +195,24 @@ def notice(
     """A notice as a DM: the same content as the e-mail (study, case, task, for whom), the
     recipient's next step in Task words (P-57) and an *Open in the app* button. Returns
     (fallback text, blocks)."""
-    case = note.get("case_id") or "-"
+    case = note.get("case_id")
     task = note["subject"][:1].lower() + note["subject"][1:]
-    text = f"[{note['study']}] Case {case}: {task}"
+    text = (
+        f"[{note['study']}] Case {case}: {task}" if case else f"[{note['study']}] {note['subject']}"
+    )
+    in_slack = note["template"] == "ae_file_waiting"  # the import runs here (ADR 0003)
+    if in_slack:
+        next_step = "Import queued files, here in Slack, or check them on AE import first"
     body = f"*{esc(text)}*\nFor: {esc(who)}"
     if next_step:
         body += f"\nNext: {esc(next_step)}"
     blocks: list[dict[str, Any]] = [_text(body)]
-    if url:
-        blocks.append({"type": "actions", "elements": [open_button(url, action_id="open_app_dm")]})
+    buttons = [open_button(url, action_id="open_app_dm")] if url else []
+    if in_slack:
+        label = {"type": "plain_text", "text": "Import queued files"}
+        buttons.insert(0, {"type": "button", "style": "primary", "action_id": "import_queued",
+                           "text": label})  # fmt: skip
+    if buttons:
+        blocks.append({"type": "actions", "elements": buttons})
     blocks.append(_context(SYNTHETIC))
     return text, blocks

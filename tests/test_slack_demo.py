@@ -139,3 +139,47 @@ def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp
     reset(fresh, only=DEMO_AES)
     assert (fresh.config / "users.yaml").read_text() == "users: []\n"
     assert sorted(p.name for p in (ROOT / "data").iterdir()) == before
+
+
+def test_rahul_is_told_in_slack_when_ae_records_wait_and_imports_from_the_dm(tmp_path, monkeypatch):
+    """P-57: a queued AE file is a notice to the data manager, once per file, as a DM with
+    an Import queued files button (the import runs in Slack) and as an e-mail."""
+    monkeypatch.setenv("NOTIFY_CHANNELS", "outbox,slack")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test-secret-token")
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    client = FakeClient()
+    monkeypatch.setattr(SlackSettings, "client", lambda self: client)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True, only=DEMO_AES)
+    ws = Workspace(paths)
+    ws.people.act_as(PRESENTER, "dm.dana")
+    runner = Runner(paths)
+    runner.tick(0)
+    runner.tick(1)  # still waiting: no second notice
+    (dm,) = client.posts
+    body = json.dumps(dm["blocks"])
+    assert dm["text"] == "[DEMO01] AE records are waiting to be imported"
+    assert "For: Rahul Mehta (Data manager)" in body and "Case -" not in body
+    buttons = [e for b in dm["blocks"] if b["type"] == "actions" for e in b["elements"]]
+    assert buttons[0]["action_id"] == "import_queued"  # done here, in Slack
+    assert buttons[1]["url"] == "http://localhost:8501/import?role=data_manager"
+    assert not store_cases(runner)  # nothing imported until Rahul clicks
+
+    handlers = SlackHandlers(ws, SlackActionsLog(paths))
+    replies: list[dict] = []
+    handlers.on_import_button(lambda *a, **k: None,
+                              {"user": {"id": PRESENTER}, "response_url": "https://x"},
+                              FakeHomeClient(), lambda **k: replies.append(k))  # fmt: skip
+    assert store_cases(runner) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
+    assert "3 new cases" in replies[0]["text"]
+    (paths.inbox / "02_more.csv").write_text((paths.processed / "01_initial.csv").read_text())
+    runner.tick(2)  # a new file: a new notice
+    assert [p["text"] for p in client.posts].count(dm["text"]) == 2
+
+
+def store_cases(runner: Runner) -> list[str]:
+    return sorted(runner.pipeline.store.list_cases())

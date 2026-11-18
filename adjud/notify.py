@@ -18,6 +18,7 @@ from adjud.paths import DataPaths
 from adjud.store import write_atomic
 
 TEMPLATES = {
+    "ae_file_waiting": "AE records are waiting to be imported",
     "documents_requested": "Documents requested for an adjudication case",
     "processing_failed": "A document could not be processed",
     "ready_for_review": "Redacted documents are ready for your review",
@@ -53,8 +54,10 @@ def link(
     role on the case record (or on `page`), one person (with their `role`) on their own
     page for the case (ui/app.py reads role, user and case from the query string). A
     mailbox gets no link."""
-    if not case_id or to.startswith("mailbox:"):
+    if to.startswith("mailbox:") or not (case_id or page):
         return None
+    if not case_id:  # a notice about no case, e.g. AE records waiting: that page alone
+        return f"/{page}?role={to.removeprefix('role:')}"
     if to.startswith("user:") and role:
         page = page or ROLE_LANDING.get(role, "record")
         return f"/{page}?role={role}&user={to.removeprefix('user:')}&case={case_id}"

@@ -128,3 +128,20 @@ def test_one_person_and_a_mailbox_are_recipients(pipe):
     pv = next(m for t, m in to.items() if "pharmacovigilance@techobserver.com" in t)
     assert "Open the case: http://localhost:8501\n" in pv.get_content()
     assert "related" not in pv.get_content().lower()  # no clinical content
+
+
+def test_a_notice_about_no_case_names_no_case(tmp_path):
+    """P-57: AE records waiting for the data manager is about no case yet."""
+    from adjud.mailer import compose
+    from adjud.notify import Outbox
+    from adjud.paths import DataPaths
+
+    note = Outbox(DataPaths(tmp_path), "DEMO01").queue(
+        None, "role:data_manager", "ae_file_waiting", page="import"
+    )
+    user = {"name": "Rahul Mehta", "email": "rahul@example.org"}
+    msg = compose(note, user, SETTINGS)
+    assert msg["Subject"] == "[DEMO01] AE records are waiting to be imported"
+    body = msg.get_content()
+    assert "case -" not in body.lower() and "Case None" not in body
+    assert "Open the app: http://localhost:8501/import?role=data_manager" in body
