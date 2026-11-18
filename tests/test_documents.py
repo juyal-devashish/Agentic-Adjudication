@@ -183,6 +183,31 @@ def test_removing_a_file_while_identifiers_are_removed_is_refused_plainly(setup)
         delete_document(pipe.store, cid, "notizen.txt", "site104.coord")
 
 
+def test_a_file_uploaded_during_a_run_is_processed_before_the_site_review(setup, monkeypatch):
+    """An upload from another tab while a run is going used to be left out: the case went
+    to site review with the late file "not processed yet" and no run to process it."""
+    import adjud.documents as D
+
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-101-0001", "AE-001")
+    folder = "DEMO01-101-0001_AE-001"
+    upload(pipe.store, cid, files(folder, "discharge_summary.pdf"), "site101.coord")
+    real, late = D.deidentify_case, files(folder, "ecg_report.pdf")
+
+    def upload_during_run(*args, **kwargs):
+        if late:
+            upload(pipe.store, cid, [late.pop()], "site101.coord")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(D, "deidentify_case", upload_during_run)
+    summary = proc.process_case(cid)
+    assert pipe.store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    assert set(summary["files"]) == {"discharge_summary.pdf", "ecg_report.pdf"}
+    assert set(documents_of(pipe.store, cid).processed) == {"discharge_summary.pdf",
+                                                            "ecg_report.pdf"}  # fmt: skip
+    assert all(r.ok for r in verify_all(pipe.paths))
+
+
 def test_two_runs_of_one_case_at_once_do_not_both_run(setup, monkeypatch):
     """ "Remove identifiers now" in two tabs (or a tab and the runner) used to start two
     runs: the second crashed with TransitionRefused and left unreferenced files."""

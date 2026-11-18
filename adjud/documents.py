@@ -180,6 +180,10 @@ def seeded_values(identities: dict[str, Any], subject: str) -> list[str]:
     return [v for v in values if v]
 
 
+class _UploadedDuringRun(Exception):
+    pass
+
+
 class DeidBusy(Exception):
     """The case is being de-identified by another tab or the runner right now."""
 
@@ -240,13 +244,28 @@ class DocumentProcessor:
             raise DeidBusy(f"{case_id} is already being de-identified") from None
 
     def _run(self, case_id: str) -> dict[str, Any]:
+        """Runs until one covers every uploaded file: a file uploaded during a run (another
+        tab, the upload folder) leaves that run unfinished and starts the next one."""
+        while (summary := self._run_once(case_id)) is None:
+            pass
+        return summary
+
+    def _run_once(self, case_id: str) -> dict[str, Any] | None:
+        """One run; None if files were uploaded while it ran (it is then not completed)."""
         store = self.store
         cs = store.state(case_id)
         if cs.state != State.DEIDENTIFYING:
             raise ValueError(f"{case_id} is {cs.state}, not DEIDENTIFYING")
         docs = documents_of(store, case_id)
         run = docs.runs + 1
-        self._event(case_id, "deid.started", {"run": run, "files": sorted(docs.files)})
+        started = store.append_event(case_id, EventDraft(
+            type="deid.started", actor=SYSTEM, data={"run": run, "files": sorted(docs.files)}
+        ))["seq"]  # fmt: skip
+
+        def no_late_upload(prior: list[dict[str, Any]]) -> None:
+            if any(e["type"] == "documents.uploaded" and e["seq"] > started for e in prior):
+                raise _UploadedDuringRun
+
         limits = self.study_cfg.get("upload_limits", {})
         inputs = [
             DocInput(
@@ -291,12 +310,16 @@ class DocumentProcessor:
                    "all_verified": bool(statuses) and all(
                        s == "verified" for s in statuses.values())}  # fmt: skip
         processed = [s for s in statuses.values() if s in ("verified", "blocked")]
-        if any(s == "rejected" for s in statuses.values()):
-            self._notify(case_id, site, "processing_failed")
-        if not processed:
-            self._event(case_id, "deid.failed", summary)
-        else:
-            self._event(case_id, "deid.completed", summary)
+        try:
+            no_late_upload(store.events(case_id))  # before telling the site anything
+            end = EventDraft(type="deid.completed" if processed else "deid.failed",
+                             actor=SYSTEM, data=summary)  # fmt: skip
+            if any(s == "rejected" for s in statuses.values()):
+                self._notify(case_id, site, "processing_failed")
+            store.append_event(case_id, end, expect=no_late_upload)  # checked under the lock
+        except _UploadedDuringRun:
+            return None
+        if processed:
             if not self._after_site_correction(case_id):
                 self._notify(case_id, site, "ready_for_review")
         return summary
