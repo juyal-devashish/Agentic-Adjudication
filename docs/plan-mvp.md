@@ -350,13 +350,13 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 
 ### Step 29 — Slack app: where work starts (P-55, ADR 0003, ADR 0004) on branch `feat/slack-workflow`
 
-- [ ] Manifest for the demo workspace (`docs/slack-app-manifest.yaml`)
-- [ ] `adjud/slack_app/`: Socket Mode app, Acting As, the Slack actions log
-- [ ] `/adj act-as`, `tasks`, `cases`, `status`, `import`, `help` (replies visible only to the caller)
-- [ ] App Home per role: Tasks with *Open in the app*; the data manager's *Import queued files*
-- [ ] Notices as DMs with *Open in the app*, replacing the webhook
-- [ ] Tests with a fake Slack client, including a check of every payload against ADR 0004's forbidden list
-- [ ] Run sheet: setting up and showing the Slack app
+- [x] Manifest for the demo workspace (`docs/slack-app-manifest.yaml`)
+- [x] `adjud/slack_app/`: Socket Mode app, Acting As, the Slack actions log
+- [x] `/adj act-as`, `tasks`, `cases`, `status`, `import`, `help` (replies visible only to the caller)
+- [x] App Home per role: Tasks with *Open in the app*; the data manager's *Import queued files*
+- [x] Notices as DMs with *Open in the app*, replacing the webhook
+- [x] Tests with a fake Slack client, including a check of every payload against ADR 0004's forbidden list
+- [x] Run sheet: setting up and showing the Slack app
 
 **Done when:** in the demo workspace, acting as each role, App Home lists that person's Tasks and opens the right page in the app; `/adj import` creates cases and DMs arrive with working buttons; no payload carries Clinical Content; with Slack off nothing changes; full suite and kit pass; `verify_log` covers the Slack actions log.
 

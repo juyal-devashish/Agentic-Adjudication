@@ -60,20 +60,23 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 
 Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
 
-## Trying Slack (P-54, ADR 0002)
+## Slack app (P-55, ADR 0003, ADR 0004)
 
-The full test plan, with failure drills and the record table, is [slack-test-plan.md](slack-test-plan.md).
+Slack is where work starts; the app is where it is read and signed. Slack shows case IDs, statuses, tasks and buttons, never Clinical Content, and no signature is taken there. E-mail and every app screen carry on as before. Synthetic data only. The test plan is [slack-test-plan.md](slack-test-plan.md).
 
-Slack runs alongside e-mail, never instead of it, until it meets the reliability bar. Synthetic data only.
+1. **Set up once** (a separate free demo workspace, never the company's; you its only member).
+   - At api.slack.com/apps: **Create New App → From a manifest**, pick the demo workspace, paste [slack-app-manifest.yaml](slack-app-manifest.yaml), create.
+   - **Basic Information → App-Level Tokens → Generate**, scope `connections:write`: that is `SLACK_APP_TOKEN`.
+   - **Install App → Install to Workspace**, then copy the **Bot User OAuth Token**: that is `SLACK_BOT_TOKEN`.
+   - In `.env`: `NOTIFY_CHANNELS=outbox,smtp,slack`, `SLACK_BOT_TOKEN=…`, `SLACK_APP_TOKEN=…`. Never commit them or paste them into a chat.
+2. **Start.** `uv run python -m tools.reset_demo --preload`, then three processes with `--env-file .env`: the runner, the UI, and `uv run --env-file .env python -m adjud.slack_app`. Run one Slack app process only.
+3. **Show it.**
+   - In Slack, type `/adj act-as rahul` (or `/adj act-as` for a list). Open the app's **Home** tab: *Acting as Rahul Mehta (Data manager)*, one task: *1 AE file waiting to be imported*. Click **Import queued files**. Three cases are created; Home shows the summary.
+   - The sites' notices arrive as DMs in the app's **Messages** tab, each saying who it is for, with **Open in the app**. E-mail still arrives in Mailpit.
+   - `/adj act-as priya`: Home lists DEMO01-0001's task, *Upload the documents*. **Open in the app** opens the Documents page as Priya Nair. Upload and sign there, as before.
+   - `/adj act-as anna` after the site signs: *Review the Quality Check and sign* opens the Quality check page. Say it plainly: the decision and the signature are in the app, because Slack must not ask for passwords and must not hold Clinical Content.
+   - `/adj status 0001` answers with the status and the next step, visible only to you.
+   - The Case record's *Notifications* shows e-mail and Slack status per notice.
+4. **If Slack misbehaves on stage,** carry on from the e-mail link or the app; nothing in the workflow waits for Slack.
 
-1. **Set up once.**
-   - Create a separate free Slack workspace for the demo, never the company's, with a channel such as `#adjudication-demo`. Keep yourself its only member: it shows every recipient's notices, including who adjudicates which case.
-   - Create a Slack app *from scratch* in that workspace, turn on **Incoming Webhooks**, add one for the channel and copy its URL.
-2. **Switch it on.** In `.env`, set `NOTIFY_CHANNELS=outbox,smtp,slack` and `SLACK_WEBHOOK_URL=<the URL>`. The URL is a secret: never commit it or paste it into chat. Restart the runner. Only notices queued from then on are posted; a later restart keeps that starting point, and a demo reset clears it.
-3. **One reliability run.**
-   - `tools.reset_demo --preload`, restart the runner, then follow this run sheet through all four flows: an agreed case, a disputed case through the committee, one more-data request and one re-adjudication.
-   - When the runner has caught up, run `uv run python -m tools.notify_parity`. **CLEAN** means every notice was posted exactly once, with no failed attempt and as many e-mails as Slack posts.
-   - Record the date and the report in the plan's step 28.
-4. **The bar.** Five clean runs in a row with 0 failed Slack attempts. Meeting it only allows a new decision on making Slack a default; e-mail stays.
-
-A failed post shows on the Case record as *Slack message failed* with its reason, and it is retried twice on the next ticks. E-mail and the case carry on regardless.
+Acting As is simulated, as the app's sidebar is. Every Slack action is in `data/slack/actions.jsonl` (hash-chained; `tools.verify_log` checks it) with your Slack user and whom you acted as. A demo reset clears that log but keeps whom you act as, so DMs keep reaching you.
