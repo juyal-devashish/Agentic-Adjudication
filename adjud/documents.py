@@ -26,7 +26,7 @@ from adjud.deid.pipeline import DocInput, deidentify_case
 from adjud.deid.policy import Policy
 from adjud.events import EventDraft
 from adjud.notify import Outbox
-from adjud.store import FileCaseStore, json_bytes
+from adjud.store import CaseBusy, FileCaseStore, json_bytes
 from adjud.workflow import State
 
 SYSTEM = "system:deid"
@@ -180,6 +180,10 @@ def seeded_values(identities: dict[str, Any], subject: str) -> list[str]:
     return [v for v in values if v]
 
 
+class DeidBusy(Exception):
+    """The case is being de-identified by another tab or the runner right now."""
+
+
 @dataclass
 class DocumentProcessor:
     store: FileCaseStore
@@ -226,7 +230,16 @@ class DocumentProcessor:
         return checklist.keyword_type(first_page_text(output, rel_path), spreadsheet=spreadsheet)
 
     def process_case(self, case_id: str) -> dict[str, Any]:
-        """One de-identification run over all current documents of a DEIDENTIFYING case."""
+        """One de-identification run over all current documents of a DEIDENTIFYING case.
+        Raises DeidBusy while another process runs it ("Remove identifiers now" in two
+        tabs, or a tab and the runner): one run at a time per case."""
+        try:
+            with self.store.exclusive(case_id, "deid"):
+                return self._run(case_id)
+        except CaseBusy:
+            raise DeidBusy(f"{case_id} is already being de-identified") from None
+
+    def _run(self, case_id: str) -> dict[str, Any]:
         store = self.store
         cs = store.state(case_id)
         if cs.state != State.DEIDENTIFYING:

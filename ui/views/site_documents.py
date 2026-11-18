@@ -13,7 +13,7 @@ from boxdraw import page_box
 from common import case_header, case_list, context, doc_label, doc_types, pipeline, processor
 from preview import pdf_page, show_sheets
 
-from adjud.documents import documents_of, upload
+from adjud.documents import DeidBusy, documents_of, upload
 from adjud.flow2 import QUERY_CODES, query_of
 from adjud.review import (
     SUBMIT_MEANING,
@@ -117,10 +117,16 @@ if can_upload:
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("Uploads are processed automatically within a few seconds. To see the result now:")
     if st.button("Remove identifiers now", type="primary"):
-        with st.spinner("Finding and removing identifiers. Scanned pages take a few seconds each."):
-            summary = processor().process_case(cid)
-        st.toast(f"Identifiers removed from {len(summary['files'])} file(s)")
-        st.rerun()
+        try:
+            with st.spinner(
+                "Finding and removing identifiers. Scanned pages take a few seconds each."
+            ):
+                summary = processor().process_case(cid)
+        except DeidBusy:  # another tab or the runner is on it: wait for its result
+            wait_for_redaction("Identifiers are already being removed. Waiting for it.", 60)
+        else:
+            st.toast(f"Identifiers removed from {len(summary['files'])} file(s)")
+            st.rerun()
 
 # --- files ------------------------------------------------------------------------------------
 docs = documents_of(store, cid)

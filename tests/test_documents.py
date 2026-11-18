@@ -181,3 +181,29 @@ def test_removing_a_file_while_identifiers_are_removed_is_refused_plainly(setup)
     assert pipe.store.state(cid).state == State.DEIDENTIFYING
     with pytest.raises(ReviewRefused, match="identifiers"):
         delete_document(pipe.store, cid, "notizen.txt", "site104.coord")
+
+
+def test_two_runs_of_one_case_at_once_do_not_both_run(setup, monkeypatch):
+    """ "Remove identifiers now" in two tabs (or a tab and the runner) used to start two
+    runs: the second crashed with TransitionRefused and left unreferenced files."""
+    import adjud.documents as D
+
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-101-0001", "AE-001")
+    upload(pipe.store, cid, files("DEMO01-101-0001_AE-001", "ecg_report.pdf"), "site101.coord")
+    real, inner = D.deidentify_case, []
+
+    def second_click_during_run(*args, **kwargs):
+        if not inner:
+            with pytest.raises(D.DeidBusy):
+                inner.append(proc.process_case(cid))
+            inner.append("refused")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(D, "deidentify_case", second_click_during_run)
+    assert proc.process_case(cid)["run"] == 1
+    assert inner == ["refused"]
+    started = [e for e in pipe.store.events(cid) if e["type"] == "deid.started"]
+    assert len(started) == 1
+    assert pipe.store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    assert not (pipe.store.case_dir(cid) / "documents" / "redacted" / "r2").exists()

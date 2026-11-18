@@ -19,7 +19,7 @@ from typing import Any
 import yaml
 
 from adjud.delivery import EMAIL, SLACK, Deliverer, DeliveryLog, channels_from_env
-from adjud.documents import DocumentProcessor
+from adjud.documents import DeidBusy, DocumentProcessor
 from adjud.events import Clock, format_time, utc_now
 from adjud.flow2 import Flow2
 from adjud.flow3 import Flow3
@@ -147,6 +147,8 @@ class Runner:
                 log.info("de-identified %s run %s: %s", cs.case_id, summary["run"],
                          summary["files"])  # fmt: skip
                 done += 1
+            except DeidBusy:  # "Remove identifiers now" on the page is running it
+                log.info("%s is being de-identified elsewhere; skipped", cs.case_id)
             except Exception:
                 log.exception("de-identification failed for %s", cs.case_id)
         for case_id in pending_handoffs(self.pipeline.store):
