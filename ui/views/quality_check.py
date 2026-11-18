@@ -13,7 +13,7 @@ import html
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, case_list, context, paths, pipeline
+from common import case_header, case_list, context, paths, pipeline, your_tasks
 from preview import show_file
 
 from adjud.dossier import latest_dossier
@@ -28,10 +28,12 @@ flow2 = Flow2(store, paths().config)
 
 if ctx.case_id is None:
     st.title("Quality check")
+    your_tasks(ctx, "qc")
     case_list(ctx, "Select a case to see its quality check and narrative.")
     st.stop()
 
 cid = ctx.case_id
+your_tasks(ctx, "qc")
 case_header(ctx, "views/quality_check.py")
 state = store.state(cid).state
 events = store.events(cid)

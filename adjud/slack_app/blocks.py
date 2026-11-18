@@ -74,6 +74,8 @@ def home(ws: Workspace, person: dict[str, Any] | None, note: str | None = None) 
         blocks.append(task_block(ws, person, task, i))
     if len(tasks) > MAX_ROWS:
         blocks.append(_context(f"And {len(tasks) - MAX_ROWS} more: see the app."))
+    if block := not_a_case_block(ws, person):
+        blocks.append(block)
 
     cases = ws.cases(person)
     blocks.append({"type": "divider"})
@@ -88,6 +90,19 @@ def home(ws: Workspace, person: dict[str, Any] | None, note: str | None = None) 
         open_button(ws.link(person, "record"), "Open the app", "open_app_home")]})  # fmt: skip
     blocks.append(_context(SYNTHETIC))
     return {"type": "home", "blocks": blocks}
+
+
+def not_a_case_block(ws: Workspace, person: dict[str, Any]) -> dict[str, Any] | None:
+    """The data manager's count of AE records that are not a case, with a button to AE
+    import, where the records and the reasons are. A count only (ADR 0004)."""
+    n = ws.records_not_a_case(person)
+    if not n:
+        return None
+    line = f"{n} record is not a case." if n == 1 else f"{n} records are not a case."
+    block = _text(f"{line} The reasons are on AE import.")
+    block["accessory"] = open_button(ws.link(person, "import"), "Open AE import",
+                                     "open_app_import")  # fmt: skip
+    return block
 
 
 def tasks_reply(ws: Workspace, person: dict[str, Any]) -> list[dict[str, Any]]:
@@ -121,6 +136,7 @@ HELP = (
     "• `/adj cases`: your cases and where each is\n"
     "• `/adj status 0001`: one case, and your next step\n"
     "• `/adj import`: import the queued AE files (data manager)\n"
+    "• `/adj pull`: pull the AE records from the EDC now (data manager)\n"
     "• `/adj act-as anna`: choose whom you act as (demo); `/adj act-as` opens a list\n"
     "Signing and anything clinical happen in the app, through *Open in the app*."
 )

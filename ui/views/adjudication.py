@@ -12,7 +12,7 @@ from datetime import date
 
 import streamlit as st
 import theme
-from common import case_header, case_list, context, paths, pipeline
+from common import case_header, case_list, context, paths, pipeline, your_tasks
 
 from adjud.flow3 import Flow3, Flow3Refused, current_round
 from adjud.signatures import SignatureRefused
@@ -28,10 +28,12 @@ if ctx.role != "adjudicator":
     st.stop()
 if ctx.case_id is None:
     st.title("Adjudication")
+    your_tasks(ctx, "adjudicate")
     case_list(ctx, "Your cases. Select one to open its review.")
     st.stop()
 
 cid = ctx.case_id
+your_tasks(ctx, "adjudicate")
 case_header(ctx, "views/adjudication.py")
 rnd = current_round(store, cid)
 if rnd is None:

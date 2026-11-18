@@ -9,7 +9,7 @@ import mail_toasts
 import streamlit as st
 import theme
 from common import Context, demo_ready, organisation, paths, pipeline, site_name, users
-from wording import ROLE_NAMES, ROLE_PAGES
+from wording import PAGES, ROLE_NAMES, ROLE_PAGES
 
 st.set_page_config(
     page_title="Clinical event adjudication", layout="wide", initial_sidebar_state="auto"
@@ -56,7 +56,7 @@ with st.sidebar:
     # The chosen role lives in session state, copied there by the picker's callback before
     # the rerun: switching role can send the person to another page, and a page switch
     # drops a widget's new value, so the role snapped back. Unkeyed, the picker lost the
-    # second switch in a row when no page switch happened (both land on the Assistant).
+    # second switch in a row when no page switch happened.
     roles = list(ROLE_NAMES)
 
     def _pick_role() -> None:
@@ -115,16 +115,8 @@ else:
 # Every page stays registered, so links in e-mails and the next-step box always resolve;
 # the menu is drawn here with the role's pages only, and a page that is not the role's
 # (a typed URL, or a role switched while on it) sends the person to their own first page.
-PAGES = {
-    "assistant": ("views/assistant.py", "Assistant", ":material/forum:"),
-    "import": ("views/edc_input.py", "AE import", ":material/move_to_inbox:"),
-    "documents": ("views/site_documents.py", "Documents", ":material/description:"),
-    "qc": ("views/quality_check.py", "Quality check", ":material/rule:"),
-    "assignments": ("views/assignments.py", "Assignments", ":material/assignment_ind:"),
-    "adjudicate": ("views/adjudication.py", "Adjudication", ":material/gavel:"),
-    "committee": ("views/committee.py", "Committee", ":material/groups:"),
-    "record": ("views/results.py", "Case record", ":material/fact_check:"),
-}
+# The Assistant chat is not registered (P-56): its old URL, /assistant, opens the default
+# page below, which hands over to the role's first page like any other address.
 
 
 def landing() -> None:

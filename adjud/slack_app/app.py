@@ -22,7 +22,7 @@ from adjud.slack_app.core import SlackActionsLog, Workspace
 
 log = logging.getLogger("adjud.slack_app")
 EPHEMERAL = "ephemeral"
-SUBCOMMANDS = {"help", "act-as", "tasks", "cases", "status", "import"}
+SUBCOMMANDS = {"help", "act-as", "tasks", "cases", "status", "import", "pull"}
 
 
 @dataclass
@@ -91,6 +91,9 @@ class SlackHandlers:
         elif sub == "import":
             reply(self._import(slack_user, person))
             self.publish_home(client, slack_user)
+        elif sub == "pull":
+            reply(self._import(slack_user, person, "pull"))
+            self.publish_home(client, slack_user)
         else:
             self._record(slack_user, "command:unknown", result="refused", reason="unknown")
             reply([blocks._text("I don't know that one.\n" + blocks.HELP)], "Unknown command")
@@ -114,17 +117,20 @@ class SlackHandlers:
         reply(f"You now act as {self.people.describe(person)}. Your App Home shows their tasks.")
         self.publish_home(client, slack_user)
 
-    def _import(self, slack_user: str, person: dict[str, Any]) -> str:
+    def _import(self, slack_user: str, person: dict[str, Any], action: str = "import") -> str:
+        """The data manager's import of the queued files ("import") or EDC pull ("pull"),
+        the same calls as the app's buttons."""
+        run = self.ws.pull_from_edc if action == "pull" else self.ws.import_queued
         try:
-            summary, created = self.ws.import_queued(person)
+            summary, created = run(person)
         except PermissionError as exc:
-            self._record(slack_user, "import", result="refused", reason="not the data manager")
+            self._record(slack_user, action, result="refused", reason="not the data manager")
             return str(exc)
         except Exception as exc:  # e.g. the runner took the same file: say so, log it
-            log.exception("import from Slack failed")
-            self._record(slack_user, "import", result="failed", reason=type(exc).__name__)
-            return "The import did not finish. Try again, or use AE import in the app."
-        self._record(slack_user, "import", cases=created)
+            log.exception("%s from Slack failed", action)
+            self._record(slack_user, action, result="failed", reason=type(exc).__name__)
+            return f"The {action} did not finish. Try again, or use AE import in the app."
+        self._record(slack_user, action, cases=created)
         self.notes[slack_user] = summary
         return summary + (" The sites are notified now." if created else "")
 

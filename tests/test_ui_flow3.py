@@ -1,6 +1,6 @@
 """Flows 3 and 4 in the UI (plan P-41 to P-53): the adjudicator's blind form, the
 committee page, the Coordinator's assignments, blinding on the case record and in the
-Assistant. AI is off; nothing here calls an API."""
+task lists (P-56). AI is off; nothing here calls an API."""
 
 from __future__ import annotations
 
@@ -197,7 +197,7 @@ def test_the_chair_cannot_sign_a_meeting_record_he_has_not_seen(reviewing):
     assert signed[0]["data"]["meeting"]["path"].endswith("meeting_v2.json")
 
 
-def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
+def test_the_coordinator_reassigns_and_the_new_holder_sees_the_task(reviewing):
     runner, store, cid = reviewing
     rnd = current_round(store, cid)
     a1 = rnd.holders["1"]
@@ -210,9 +210,13 @@ def test_the_coordinator_reassigns_and_the_assistant_lists_tasks(reviewing):
     assert current_round(store, cid).holders["1"] != a1
 
     me = current_round(store, cid).holders["1"]
-    at = as_user(me, "views/assistant.py")
-    assert f"Adjudicate {cid}" in [b.label for b in at.button]
-    assert "independent review is open" in text(at)
+    at = as_user(me, "views/adjudication.py")  # the adjudicator's landing page lists it
+    rows = [m.value for m in at.markdown]
+    assert rows[rows.index(f"**{cid}**") + 1] == "Your independent review (round 1)"
+    next(b for b in at.button if b.label == f"Open {cid}").click().run()
+    assert not at.exception, at.exception
+    assert at.session_state["case_id"] == cid and "You are Adjudicator 1" in text(at)
+    assert f"**{cid}**" not in [m.value for m in as_user(a1, "views/adjudication.py").markdown]
 
 
 def test_a_stale_reassign_form_does_not_move_the_other_review(reviewing):
@@ -251,8 +255,10 @@ def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewin
     shown = "\n".join(w.value for w in at.warning)
     assert "Query from the adjudication" in shown and "The angiography report." in shown
     assert USERS[a1]["name"] not in shown + text(at)
-    at = as_user(SITE, "views/assistant.py")
-    assert "more information is needed for the adjudication" in text(at)
+    at = as_user(SITE, "views/site_documents.py")  # the site's landing page lists it
+    rows = [m.value for m in at.markdown]
+    assert rows[rows.index(f"**{cid}**") + 1] == "Answer the query (read it in the app)"
+    assert USERS[a1]["name"] not in text(at)
 
     upload(store, cid, [("angio.pdf", pdf("ANGIOGRAPHY REPORT\nOccluded artery."))], SITE)
     runner.run_case_steps()
@@ -279,11 +285,12 @@ def test_the_site_sees_only_that_the_case_is_with_adjudication(reviewing):
 
     def site_sees() -> str:
         shown = []
-        for page in ("views/results.py", "views/site_documents.py", "views/assistant.py"):
+        for page in ("views/results.py", "views/site_documents.py"):
             at = as_user(SITE, page, cid)
             assert not at.exception, at.exception
             case = next(s for s in at.selectbox if s.label == "Case")
             shown += [text(at), tables(at), "\n".join(str(o) for o in case.options)]
+        shown.append(text(as_user(SITE, "views/site_documents.py")))  # with its task list
         shown.append(tables(as_user(SITE, "views/results.py")))  # the case list
         generic = "Adjudication is done by an independent committee."  # in every state
         return "\n".join(shown).replace(generic, "")

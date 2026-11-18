@@ -10,7 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 import theme
-from common import case_header, context, paths, pipeline, users
+from common import case_header, context, paths, pipeline, users, your_tasks
 
 from adjud.flow3 import Flow3, Flow3Refused, current_round
 from adjud.flow4 import Flow4, Flow4Refused
@@ -37,6 +37,7 @@ def holder(rnd, slot: str) -> str:
 
 if ctx.case_id is None:
     st.title("Assignments")
+    your_tasks(ctx, "assignments")
     rows = []
     for cs in store.list_case_states():
         rnd = current_round(store, cs.case_id)
@@ -66,6 +67,7 @@ if ctx.case_id is None:
     st.stop()
 
 cid = ctx.case_id
+your_tasks(ctx, "assignments")
 case_header(ctx, "views/assignments.py")
 rnd = current_round(store, cid)
 state = store.state(cid).state
