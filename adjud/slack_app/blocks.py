@@ -189,13 +189,19 @@ def act_as_modal(people: Directory, current: str | None) -> dict[str, Any]:
     }
 
 
-def notice(note: dict[str, Any], who: str, url: str | None) -> tuple[str, list[dict]]:
-    """A notice as a DM: the same content as the e-mail (study, case, task, for whom) and
-    an *Open in the app* button. Returns (fallback text, blocks)."""
+def notice(
+    note: dict[str, Any], who: str, url: str | None, next_step: str | None = None
+) -> tuple[str, list[dict]]:
+    """A notice as a DM: the same content as the e-mail (study, case, task, for whom), the
+    recipient's next step in Task words (P-57) and an *Open in the app* button. Returns
+    (fallback text, blocks)."""
     case = note.get("case_id") or "-"
     task = note["subject"][:1].lower() + note["subject"][1:]
     text = f"[{note['study']}] Case {case}: {task}"
-    blocks: list[dict[str, Any]] = [_text(f"*{esc(text)}*\nFor: {esc(who)}")]
+    body = f"*{esc(text)}*\nFor: {esc(who)}"
+    if next_step:
+        body += f"\nNext: {esc(next_step)}"
+    blocks: list[dict[str, Any]] = [_text(body)]
     if url:
         blocks.append({"type": "actions", "elements": [open_button(url, action_id="open_app_dm")]})
     blocks.append(_context(SYNTHETIC))

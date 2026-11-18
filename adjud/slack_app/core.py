@@ -45,6 +45,7 @@ FLAG_WORDS = {
 }
 # The Suggested Outcome (computed by code in flow2.py) as the one word Slack may show
 # (ADR 0004): never its reasons or any AI text.
+NOTHING_NEXT = "Nothing more for you on this case now."
 SUGGESTED_WORDS = {"pass": "pass", "query": "query", "unclear": "none"}
 
 
@@ -285,6 +286,14 @@ class Workspace:
                     and meeting["data"]["quorum_met"]):  # fmt: skip
                 return Task(cid, "Sign the committee's consensus", "committee")
         return None
+
+    def next_step(self, person: dict[str, Any], case_id: str) -> str:
+        """What this person does next on this case, worded as their Task on App Home, or
+        that nothing more is waiting for them there (P-57: a DM guides, not just notifies)."""
+        for task in self.tasks(person):
+            if task.case_id == case_id:
+                return task.words
+        return NOTHING_NEXT
 
     def suggested(self, case_id: str) -> str:
         """The latest Quality Check round's Suggested Outcome as one word, read from the

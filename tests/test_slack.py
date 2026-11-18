@@ -285,3 +285,27 @@ def test_a_restart_keeps_the_time_slack_was_switched_on(pipe):  # noqa: F811
     a, _ = queue_two(pipe)
     log.record(a, SLACK, ACTOR, "failed", [], "timeout")
     assert slack_since(log, pipe.clock) == a["created_at"] >= first
+
+
+def test_each_dm_says_what_the_recipient_does_next(pipe):  # noqa: F811
+    """P-57: a DM guides as well as notifies. Its Next: line is the recipient's Task on
+    the case when the DM is sent, worded as on App Home; else nothing more to do."""
+    import shutil
+
+    from adjud.slack_app.core import Workspace
+
+    shutil.copytree(CONFIG, pipe.store.paths.root / "config")
+    shutil.copytree(
+        ROOT / "data" / "flow1-testkit" / "edc_mock", pipe.store.paths.root / "edc_mock"
+    )
+    ws = Workspace(DataPaths(pipe.store.paths.root), clock=pipe.clock)
+    since = format_time(pipe.clock())
+    out = Outbox(pipe.store.paths, "DEMO01", clock=pipe.clock)
+    out.queue("DEMO01-0001", "site:101", "documents_requested")
+    out.queue("DEMO01-0001", "role:safety_specialist", "source_changed")
+    client = FakeClient()
+    channel = SlackDmChannel(directory(pipe), SETTINGS, client, next_step=ws.next_step)
+    Deliverer(pipe.store, CONFIG, channel, ACTOR, since, pipe.clock).deliver_pending()
+    site, ss = (json.dumps(p["blocks"]) for p in client.posts)
+    assert "Next: Upload the documents" in site
+    assert "Next: Nothing more for you on this case now." in ss

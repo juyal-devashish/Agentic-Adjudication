@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -71,6 +71,8 @@ class SlackDmChannel:
     directory: Directory
     settings: SlackSettings
     client: PostClient
+    # (person, case ID) -> their next step in Task words, e.g. Workspace.next_step (P-57)
+    next_step: Callable[[dict[str, Any], str], str] | None = None
     name: str = SLACK
 
     def send(self, note: dict[str, Any], people: list[dict[str, Any]]) -> None:
@@ -86,9 +88,17 @@ class SlackDmChannel:
         for slack_user, group in targets.items():
             if slack_user in reached:  # sent on an earlier try that failed for someone else
                 continue
-            text, blocks = notice(note, for_whom(note["to"], group, self.directory), url)
+            text, blocks = notice(note, for_whom(note["to"], group, self.directory), url,
+                                  self._next(note, group[0]))  # fmt: skip
             self._post(channel=slack_user, text=text, blocks=blocks)
             self._mark(note["id"], slack_user)
+
+    def _next(self, note: dict[str, Any], person: dict[str, Any]) -> str | None:
+        """Worked out when the DM is sent, so it says where the case is now. None for a
+        mailbox, a notice with no case, or a channel built without a next_step."""
+        if self.next_step is None or not note.get("case_id") or "role" not in person:
+            return None
+        return self.next_step(person, note["case_id"])
 
     @property
     def sent_path(self) -> Path:
