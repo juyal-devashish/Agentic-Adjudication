@@ -351,6 +351,70 @@ def test_reassignment_needs_a_reason_and_hides_the_old_draft(assigned, monkeypat
     assert a1 not in f3.pool(cid)
 
 
+def racing(monkeypatch, other):
+    """Run `other` while the first signature is being checked (the slow bcrypt step), as a
+    second tab or the Coordinator would; return what it raised, or None."""
+    import adjud.flow3
+
+    real, outcome = adjud.flow3.sign, {}
+
+    def sign(*args, **kw):
+        if not outcome:
+            outcome["raised"] = None
+            try:
+                other()
+            except Flow3Refused as exc:
+                outcome["raised"] = exc
+        return real(*args, **kw)
+
+    monkeypatch.setattr(adjud.flow3, "sign", sign)
+    return outcome
+
+
+def signed_slots(store, cid) -> list[str]:
+    return [e["data"]["slot"] for e in store.events(cid) if e["type"] == "adjudication.signed"]
+
+
+def test_one_review_takes_one_signature_from_two_tabs(assigned, monkeypatch):
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, _ = holders(store, cid)
+    outcome = racing(monkeypatch, lambda: f3.sign_review(cid, a1, "demo", answers()))
+    with pytest.raises(Flow3Refused, match="already signed"):
+        f3.sign_review(cid, a1, "demo", answers())
+    assert outcome["raised"] is None and signed_slots(store, cid) == ["1"]
+
+
+def test_a_review_reassigned_while_signing_is_not_signed(assigned, monkeypatch):
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    third = next(a for a in ADJS if a not in (a1, a2))
+    outcome = racing(monkeypatch, lambda: f3.reassign(cid, COORD, "1", third, "On leave"))
+    with pytest.raises(Flow3Refused, match="no open review"):
+        f3.sign_review(cid, a1, "demo", answers())
+    assert outcome["raised"] is None and signed_slots(store, cid) == []
+    assert holders(store, cid) == (third, a2)
+
+
+def test_a_review_signed_while_reassigning_is_not_reassigned(assigned, monkeypatch):
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    third = next(a for a in ADJS if a not in (a1, a2))
+    orig = store.append_event
+
+    def append_event(case_id, event, **kw):  # the signature lands after the checks, before
+        if event.type == "adjudication.reassigned" and not signed_slots(store, cid):  # append
+            f3.sign_review(cid, a1, "demo", answers())
+        return orig(case_id, event, **kw)
+
+    monkeypatch.setattr(store, "append_event", append_event)
+    with pytest.raises(Flow3Refused, match="not open"):
+        f3.reassign(cid, COORD, "1", third, "On leave")
+    assert signed_slots(store, cid) == ["1"] and holders(store, cid) == (a1, a2)
+
+
 def test_readjudication_opens_a_new_round_and_supersedes_the_old_outcome(assigned):
     runner, store, cid = assigned
     f3, f4 = runner.flow3, runner.flow4

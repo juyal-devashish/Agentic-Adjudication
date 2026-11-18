@@ -232,7 +232,12 @@ class FileCaseStore:
         path = self._safe_path(case_id, rel_path)
         if path.exists() and path.read_bytes() == content:
             return sha256_bytes(content)
-        return self.put_file(case_id, rel_path, content)
+        try:
+            return self.put_file(case_id, rel_path, content)
+        except FileExistsError:  # written at the same moment by a concurrent attempt
+            if path.read_bytes() != content:
+                raise
+            return sha256_bytes(content)
 
     # --- reads -----------------------------------------------------------------------
 

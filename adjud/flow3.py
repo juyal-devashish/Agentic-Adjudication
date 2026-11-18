@@ -30,6 +30,7 @@ and the earlier signed reviews stay in the record, superseded.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -42,7 +43,7 @@ from adjud.forms import Form, FormRefused
 from adjud.notify import Outbox
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SYSTEM_CEC = "system:cec"
 REVIEW_MEANING = "Adjudication assessment"
@@ -80,7 +81,11 @@ class Round:
 
 def current_round(store: FileCaseStore, case_id: str) -> Round | None:
     """The latest round and pass of a case, or None before the first assignment."""
-    events = store.events(case_id)
+    return round_of(store.events(case_id))
+
+
+def round_of(events: list[dict[str, Any]]) -> Round | None:
+    """current_round from a list of events, such as the prior events under the lock."""
     starts = [i for i, e in enumerate(events) if e["type"] == "adjudication.assigned"]
     if not starts:
         return None
@@ -108,6 +113,20 @@ def current_round(store: FileCaseStore, case_id: str) -> Round | None:
         elif e["type"] == "meeting.recorded":
             rnd.meeting = e
     return rnd
+
+
+def _slot(rnd: Round | None, state: State, user_id: str) -> str | None:
+    if rnd is None:
+        return None
+    if state == State.ADJ_REVIEW:
+        return next((s for s in SLOTS if rnd.holders.get(s) == user_id), None)
+    if state == State.ADJ3_REVIEW and rnd.holders.get("3") == user_id:
+        return "3"
+    return None
+
+
+def _open_slots(state: State) -> tuple[str, ...]:
+    return SLOTS if state == State.ADJ_REVIEW else ("3",) if state == State.ADJ3_REVIEW else ()
 
 
 COMMITTEE_EVENTS = ("adj3.unresolved", "comparison.to_committee", "committee.resumed")
@@ -169,8 +188,11 @@ class Flow3:
                      if u["role"] == "adjudicator" and u.get("chair")), None)  # fmt: skip
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
+               expect: Callable[[list[dict[str, Any]]], None] | None = None,
                **kw: Any) -> None:  # fmt: skip
-        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw))
+        """Append one event; `expect(prior events)` re-checks under the case lock."""
+        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw),
+                                expect=expect)  # fmt: skip
 
     def _notify(self, case_id: str, to: str, template: str, actor: str) -> None:
         role = None
@@ -350,15 +372,7 @@ class Flow3:
 
     def slot_of(self, case_id: str, user_id: str) -> str | None:
         """The review this person holds in the current pass, if it is open."""
-        rnd = current_round(self.store, case_id)
-        state = self._state(case_id)
-        if rnd is None:
-            return None
-        if state == State.ADJ_REVIEW:
-            return next((s for s in SLOTS if rnd.holders.get(s) == user_id), None)
-        if state == State.ADJ3_REVIEW and rnd.holders.get("3") == user_id:
-            return "3"
-        return None
+        return _slot(current_round(self.store, case_id), self._state(case_id), user_id)
 
     def fields_for(self, case_id: str, slot: str) -> list[str]:
         """Adjudicators 1 and 2 answer the whole form; Adjudicator 3 the disputed fields."""
@@ -415,11 +429,20 @@ class Flow3:
                    {"name": "flow3 manifest", **rnd.manifest}]  # fmt: skip
         meaning = ADJ3_MEANING if slot == "3" else REVIEW_MEANING
         signature = sign(user, password, meaning, records)
+
+        def still_open(prior: list[dict[str, Any]]) -> None:  # another tab, a reassignment
+            now = round_of(prior)
+            if (now is None or (now.number, now.passes) != (rnd.number, rnd.passes)
+                    or _slot(now, replay(prior).state, user_id) != slot):  # fmt: skip
+                raise Flow3Refused("you have no open review on this case")
+            if slot in now.signed:
+                raise Flow3Refused("you have already signed this review")
+
         self.store.put_json_once(case_id, rel, clean)
         self._event(case_id, "adj3.signed" if slot == "3" else "adjudication.signed", user_id,
                     {"round": rnd.number, "pass": rnd.passes, "slot": slot,
                      "answers": {"path": rel, "sha256": sha}},
-                    signature=signature)  # fmt: skip
+                    signature=signature, expect=still_open)  # fmt: skip
 
     def request_more_data(self, case_id: str, user_id: str, password: str, text: str) -> None:
         """An assigned adjudicator during review, or the Coordinator for the committee
@@ -460,17 +483,28 @@ class Flow3:
             raise Flow3Refused("give a reason for the reassignment")
         rnd = current_round(self.store, case_id)
         state = self._state(case_id)
-        open_slots = SLOTS if state == State.ADJ_REVIEW else (
-            ("3",) if state == State.ADJ3_REVIEW else ())  # fmt: skip
-        if slot not in open_slots or slot in rnd.signed:
-            raise Flow3Refused("that review is not open")
+
+        def check(now: Round | None, state: State) -> None:
+            if now is None or slot not in _open_slots(state) or slot in now.signed:
+                raise Flow3Refused("that review is not open")
+            if to in now.holders.values():
+                raise Flow3Refused("that person already holds a review on this case")
+
+        check(rnd, state)
         if to not in self.pool(case_id):
             raise Flow3Refused("that person may not review this case")
-        if to in rnd.holders.values():
-            raise Flow3Refused("that person already holds a review on this case")
+
+        def unchanged(prior: list[dict[str, Any]]) -> None:  # a signature, another reassignment
+            now = round_of(prior)
+            check(now, replay(prior).state)
+            if ((now.number, now.passes) != (rnd.number, rnd.passes)
+                    or now.holders[slot] != rnd.holders[slot]):  # fmt: skip
+                raise Flow3Refused("that review is not open")
+
         self._event(case_id, "adjudication.reassigned", coordinator_id,
                     {"round": rnd.number, "pass": rnd.passes, "slot": slot,
-                     "from": rnd.holders[slot], "to": to}, reason=reason.strip())  # fmt: skip
+                     "from": rnd.holders[slot], "to": to}, unchanged,
+                    reason=reason.strip())  # fmt: skip
         self._notify(
             case_id,
             f"user:{to}",
