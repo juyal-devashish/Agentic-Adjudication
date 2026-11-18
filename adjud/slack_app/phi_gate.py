@@ -17,8 +17,9 @@ and without their title), their institutions, the study's site names and the rol
 are allowed, and so are the few ordinary words in `study.yaml: slack_phi_gate.allow`
 that NER takes for a name ("Discharged home ..."). All by span: a finding is cut where
 it overlaps one, and what is left of it still holds the text ("Anna Bell" minus the
-user name "Anna" leaves "Bell"). Seeded and site-added values are never cut: a patient
-named like a user is still caught.
+user name "Anna" leaves "Bell"). Seeded and site-added values, and names after a patient
+or next-of-kin label ("Patient: Tom Weber"), are never cut: a patient named like a user
+is still caught.
 
 A text the gate cannot check (a detector raised) is held too. Verdicts carry categories
 and counts only, never the text found.
@@ -44,6 +45,7 @@ log = logging.getLogger("adjud.slack_app")
 HOLD_TEXT = "That answer may contain identifiers; open it in the app."
 # Slack mrkdwn marks, read as spaces: `Smith_John.pdf` is checked as "Smith John.pdf"
 _MARKS = str.maketrans(dict.fromkeys("*_`~", " "))
+PATIENT_LABELS = frozenset({"PATIENT_NAME", "NEXT_OF_KIN"})
 APP_WORDS = ("Quality Check", "Quality check", "AI Suggestion", "Site Query", "Adjudication Demo")
 
 
@@ -99,7 +101,8 @@ class PhiGate:
         unit = TextUnit.from_string(text.translate(_MARKS))
         allowed = [span for term in self.allowed for span in find_all(unit.text, term)]
         found = [piece for f in detect(unit, self.policy, KnownValues(), language="en")
-                 for piece in (_subtract(f, allowed, unit.text) if allowed else [f])]  # fmt: skip
+                 for piece in (_subtract(f, allowed, unit.text)
+                               if allowed and not _labelled_patient(f) else [f])]  # fmt: skip
         for value, category in self._case_values(case_ids):
             found += [Finding(s, e, category, "seeded", unit.text[s:e])
                       for s, e in find_all(unit.text, value)]  # fmt: skip
@@ -136,6 +139,12 @@ class PhiGate:
         names = {str(s.get("last") or "") for subject, s in self.identities.items()
                  if subject not in in_turn}  # fmt: skip
         return sorted(n for n in names if len(n) >= 3)
+
+
+def _labelled_patient(f: Finding) -> bool:
+    """A name after a patient or next-of-kin label ("Patient: Tom Weber") is never cut
+    by the users' names: a user's name words are allowed in prose, not as a patient's."""
+    return f.detector == "label" and f.category in PATIENT_LABELS
 
 
 def allowed_terms(ws: Workspace) -> list[str]:

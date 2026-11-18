@@ -195,3 +195,14 @@ def test_the_gate_passes_ordinary_answers_and_the_apps_people(ws):
     # a patient named like a user is still caught: only the user's own name is allowed
     assert gate.check("The next of kin is Anna Bell.", []).held
     assert gate.check("Dr Rupert Okafor signed the letter.", []).held  # not Dr. Daniel Okafor
+
+
+def test_a_labelled_patient_or_next_of_kin_named_like_a_user_is_still_held(ws):
+    # the users' name words are allowed in prose, never as a labelled patient or next of kin
+    gate = PhiGate.for_workspace(ws)
+    for text in ("Patient Anna Nair was admitted.", "Patient: Tom Weber", "Next of kin: Tom Weber",
+                 "Patient: Rahul Hollis", "The patient, Priya Okafor, was admitted",
+                 "Patient Weber was admitted.", "Next of kin: Okafor"):  # fmt: skip
+        for cases in (["DEMO01-0001"], []):
+            assert gate.check(text, cases).held, (text, cases)
+    assert not gate.check("Reported by Priya Nair; Dr. Anna Weber signs.", []).held
