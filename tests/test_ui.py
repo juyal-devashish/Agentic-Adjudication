@@ -78,7 +78,7 @@ def test_import_now_from_page_1_creates_cases(demo):
     ],
 )
 def test_each_role_sees_only_its_own_pages(demo, role, own):
-    """The menu lists only the role's pages and no Assistant (P-56), it lands on its own
+    """The menu lists only the role's pages (P-58 deleted the Assistant), it lands on its own
     first page, and another role's page or the old Assistant address (a typed URL) sends
     it back there without an error."""
     titles = {"edc_input": "AE import", "site_documents": "Documents",

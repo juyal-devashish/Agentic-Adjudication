@@ -115,8 +115,8 @@ else:
 # Every page stays registered, so links in e-mails and the next-step box always resolve;
 # the menu is drawn here with the role's pages only, and a page that is not the role's
 # (a typed URL, or a role switched while on it) sends the person to their own first page.
-# The Assistant chat is not registered (P-56): its old URL, /assistant, opens the default
-# page below, which hands over to the role's first page like any other address.
+# The old Assistant chat is gone (P-58 replaced it with the Agent in Slack): its URL,
+# /assistant, opens the default page below, which hands over to the role's first page.
 
 
 def landing() -> None:

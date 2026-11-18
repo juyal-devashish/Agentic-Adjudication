@@ -130,9 +130,9 @@ The step-by-step table, with the trigger, component and actor for each step, is 
 - A **narrative agent** drafts facts-only statements, each quoting a dossier page, before the review. Code checks that every quote is found and no forbidden wording (causality, relatedness, allocation) is used. The Safety Specialist edits it at the same stop and signs it with the QC pass; the Case record shows what changed from the draft.
 - A versioned, hashed **Flow 3 handoff manifest**. It never lists anything from `documents/original/`.
 
-**Assistant (P-40)**
-- Everyone lands on a **guided chat**: what is waiting for them, where a case is, the quality check and the AI Suggestion in a few lines, why a record is not a case, and the data manager's import, by starter button, slash action or plain question. Updates on their cases appear as they happen.
-- Answers come from the case records, written by code; AI-written parts are labelled. Every manual step is a button to its page; the chat never signs or decides.
+**The Agent in Slack (P-58)**
+- Each person talks to one Claude **Agent** in the Slack app's Messages tab. It acts as that person, with that role's tools only, and sees exactly what the person sees in the app. A reply to a notice is about that notice's case.
+- It does the steps that need no signature (import, upload, drafts); every signed step gets an *Open in the app* button. A PHI gate checks every reply before it is posted, and every turn goes to a hash-chained conversation log ([ADR 0005](docs/adr/0005-phi-never-leaves-the-app-slack-mirrors-teams.md)).
 
 **Platform**
 - An **event-sourced audit trail**: each case's only source of truth is an append-only, hash-chained `events.jsonl`. Any edited line or modified file is detected, and the state is rebuilt by replaying events.
@@ -209,11 +209,12 @@ The roles are simulated in the sidebar: data manager, site user and Safety Speci
 | Setting | Where | Notes |
 |---|---|---|
 | AI mode | `ai.mode` in `data/config/DEMO01/study.yaml`, or `ADJUD_AI_MODE` in `.env` | `off` (default), `replay` (recorded answers, no API calls) or `live` |
+| The Slack Agent's AI mode | `ai.modes.slack_agent` in `study.yaml`, or `ADJUD_AGENT_MODE` in `.env` | `off` (default), `replay` or `live`. Its own mode: the Agent can run live while the Quality Check agents stay on `replay` (P-58) |
 | API key | `ANTHROPIC_API_KEY` in the environment or `.env` | Environment only, never in config or logs. `live` without a key falls back to `off` and says so |
 | Model, effort, thresholds, budget, prices | `ai:` in `study.yaml` | Pinned `claude-opus-5-5`; minimum gate confidence 0.8 |
 | Agent switches | `ai.functions` | `document_type`, `qc_suggestion`, `narrative` (`event_match` retired by P-39); `phi_detection` (AI-1) is off by default because it sends **unredacted** synthetic page images |
 | E-mail | `SMTP_*` in `.env` | `docker compose --profile mail up` starts Mailpit on http://localhost:8025 |
-| Slack app (where work starts; signing stays in the app) | `NOTIFY_CHANNELS=smtp,slack`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` in `.env`; `uv run --env-file .env python -m adjud.slack_app` | Manifest in `docs/slack-app-manifest.yaml`; see the run sheet's *Slack app*, ADR 0003 and ADR 0004 |
+| Slack app (where work starts; signing stays in the app) | `NOTIFY_CHANNELS=smtp,slack`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` in `.env`; `uv run --env-file .env python -m adjud.slack_app` | Manifest in `docs/slack-app-manifest.yaml`; see the run sheet's *Slack app*, ADR 0003 and ADR 0005 |
 | Upload folders | `ADJUD_UPLOAD_DIR` | One folder per case waiting for documents |
 | Study rules and policies | `data/config/DEMO01/*.yaml` | Eligibility, de-identification policy, document checklist, forbidden narrative wording |
 
