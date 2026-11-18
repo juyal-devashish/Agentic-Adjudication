@@ -581,6 +581,58 @@ class Flow2:
                     signature=signature)  # fmt: skip
         self._notify(case_id, _site(self.store, case_id), "query_opened", user_id)
 
+    # -- unsigned drafts at the Quality Check (P-58, Q4) ---------------------------------
+
+    def _draft_round(self, case_id: str, user_id: str) -> tuple[int, dict[str, Any]]:
+        """The QC round a draft belongs to, and its results. Only the Safety Specialist
+        drafts, and only while the case waits for their review."""
+        user = load_users(self.config_dir).get(user_id)
+        if user is None or user["role"] != "safety_specialist":
+            raise Flow2Refused("only the Safety Specialist drafts at the Quality Check")
+        if self.store.state(case_id).state != State.QC_REVIEW:
+            raise Flow2Refused("the case is not waiting for a QC review")
+        result = self.store.get_json(case_id, self._checks_ref(case_id)["path"])
+        return int(result["round"]), result
+
+    def save_narrative_draft(self, case_id: str, user_id: str, text: str,
+                             via: str | None = None) -> dict[str, Any]:  # fmt: skip
+        """The narrative as the Safety Specialist edited it, unsigned (P-58, Q4): it
+        pre-fills the Quality check page, where the one signature stays (P-39). The AI or
+        template draft is kept as it was, so the signature still records the edit. Never
+        moves the case."""
+        rnd, result = self._draft_round(case_id, user_id)
+        if result.get("narrative") is None:
+            raise Flow2Refused("this round has no narrative draft")
+        if not text.strip():
+            raise Flow2Refused("the narrative is empty")
+        n = _rounds(self.store, case_id, "narrative.draft_edited") + 1
+        rel = f"narrative/edit_v{n}.md"
+        sha = self.store.put_file(case_id, rel, text.strip().encode() + b"\n")
+        data: dict[str, Any] = {"round": rnd, "draft": {"path": rel, "sha256": sha}}
+        if via:
+            data["via"] = via
+        waiting = _still_in(State.QC_REVIEW, "the case is not waiting for a QC review")
+        self._event(case_id, "narrative.draft_edited", user_id, data, waiting)
+        return data
+
+    def save_query_draft(self, case_id: str, user_id: str, codes: list[str], text: str,
+                         via: str | None = None) -> dict[str, Any]:  # fmt: skip
+        """A Site Query drafted, unsigned (P-58, Q4, Q13): it pre-fills the query on the
+        Quality check page. Nothing reaches the site until it is signed there (ADR 0001)."""
+        rnd, _ = self._draft_round(case_id, user_id)
+        unknown = [c for c in codes if c not in QC_QUERY_CODES]
+        if unknown:
+            raise Flow2Refused(f"unknown query reasons: {', '.join(unknown)}")
+        if not codes and not text.strip():
+            raise Flow2Refused("the query draft is empty")
+        data: dict[str, Any] = {"round": rnd, "codes": list(dict.fromkeys(codes)),
+                                "text": text.strip()}  # fmt: skip
+        if via:
+            data["via"] = via
+        waiting = _still_in(State.QC_REVIEW, "the case is not waiting for a QC review")
+        self._event(case_id, "query.drafted", user_id, data, waiting)
+        return data
+
     def sign_narrative(self, case_id: str, user_id: str, password: str, text: str) -> None:
         """Cases from before P-39, waiting in NARRATIVE_REVIEW."""
         if self.store.state(case_id).state != State.NARRATIVE_REVIEW:
@@ -611,3 +663,41 @@ def query_of(store: FileCaseStore, case_id: str) -> dict[str, Any] | None:
         return None
     e = _latest(store, case_id, "query.opened")
     return e["data"] if e else None
+
+
+@dataclass(frozen=True)
+class QcDrafts:
+    """The latest unsigned drafts of the current QC round (P-58): what the Quality check
+    page starts from instead of the AI or template draft and an empty query."""
+
+    narrative: str | None = None
+    narrative_by: str | None = None
+    narrative_at: str | None = None
+    query_codes: list[str] = field(default_factory=list)
+    query_text: str | None = None
+    query_by: str | None = None
+    query_at: str | None = None
+    latest: str | None = None  # "narrative" or "query": the draft saved last
+
+
+def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
+    """The latest narrative and query drafts of the latest QC round; drafts of an earlier
+    round (before a query went to the site) never carry over."""
+    events = store.events(case_id)
+    rounds = [e for e in events if e["type"] == "qc.checks_completed"]
+    if not rounds:
+        return QcDrafts()
+    rnd, since = rounds[-1]["data"].get("round"), rounds[-1]["seq"]
+    out: dict[str, Any] = {}
+    for e in events:
+        if e["seq"] <= since or (e.get("data") or {}).get("round") != rnd:
+            continue
+        if e["type"] == "narrative.draft_edited":
+            out |= {"narrative": store.get_file(case_id, e["data"]["draft"]["path"]).decode(),
+                    "narrative_by": e["actor"], "narrative_at": e["at"],
+                    "latest": "narrative"}  # fmt: skip
+        elif e["type"] == "query.drafted":
+            out |= {"query_codes": list(e["data"].get("codes") or []),
+                    "query_text": e["data"].get("text") or "", "query_by": e["actor"],
+                    "query_at": e["at"], "latest": "query"}  # fmt: skip
+    return QcDrafts(**out)
