@@ -134,8 +134,9 @@ class SlackAgent:
         case_id = self._thread_case(person, channel, thread)
         context = AgentContext(person=person["id"], name=person["name"], role=person["role"],
                                site=person.get("site"), case_id=case_id)  # fmt: skip
-        messages = self._history(client, event, channel, thread)
-        turn = self._turn_of(event, client)
+        earlier_files: list[dict[str, Any]] = []
+        messages = self._history(client, event, channel, thread, earlier_files)
+        turn = self._turn_of(event, client, earlier_files)
         if messages and messages[-1].role == "user":
             toolbox = agent_toolbox(self.ws, person, turn)
             reply = self._gateway().converse(context, messages, toolbox)
@@ -147,8 +148,8 @@ class SlackAgent:
                    "simulated": reply.simulated, "tools": reply.tool_calls,
                    "ai_call": _call_ref(context.case_id, reply.call),
                    "note": reply.note or None}  # fmt: skip
-        if turn.attachments:
-            record["attachments"] = len(turn.attachments)
+        if event.get("files"):
+            record["attachments"] = len(event["files"])
         if turn.done:  # what the Agent did as this person (the case events say it too)
             record["done"] = turn.done
         if reply.ok:
@@ -157,7 +158,13 @@ class SlackAgent:
                                 cases=cases, label=reply.label)  # fmt: skip
             self._record_said(record, verdict, reply.text, source="ai")
             return
-        if turn.attachments:  # without the AI no file is added: say so, and where to
+        done = done_text(turn.done)
+        if done:  # a tool acted, then the turn failed: say what was done, from code
+            verdict = self._say(client, channel, thread, done, person, about,
+                                cases=set(filter(None, [about])))  # fmt: skip
+            self._record_said(record, verdict, done, source="code")
+            return
+        if event.get("files"):  # without the AI no file is added: say so, and where to
             verdict = self._say(client, channel, thread, NO_FILES, person, about)
             self._record_said(record, verdict, NO_FILES, source="code")
             return
@@ -166,14 +173,19 @@ class SlackAgent:
                             extra=task_blocks)  # fmt: skip
         self._record_said(record, verdict, text, source="code")
 
-    def _turn_of(self, event: dict[str, Any], client: Any) -> Turn:
-        """What this message gives the acting tools: the Slack user and its files."""
+    def _turn_of(self, event: dict[str, Any], client: Any,
+                 earlier_files: list[dict[str, Any]]) -> Turn:  # fmt: skip
+        """What this message gives the acting tools: the Slack user and the files the
+        person attached in this conversation (this message's and earlier ones')."""
         study = yaml.safe_load((self.ws.paths.config / self.ws.study / "study.yaml").read_text())
         limits = (study or {}).get("upload_limits") or {}
         files = SlackFiles(client, int(limits.get("max_file_mb", 50)),
                            int(limits.get("max_pdf_pages", 200)), self.opener)  # fmt: skip
+        attachments: dict[str, dict[str, Any]] = {}
+        for f in [*earlier_files, *(event.get("files") or [])]:
+            attachments.setdefault(str(f.get("id")), f)
         return Turn(slack_user=event["user"], actions=self.actions,
-                    attachments=list(event.get("files") or []), files=files)  # fmt: skip
+                    attachments=list(attachments.values()), files=files)  # fmt: skip
 
     def _failed(self, event: dict[str, Any], client: Any, channel: str, thread: str,
                 error: str) -> None:  # fmt: skip
@@ -309,10 +321,11 @@ class SlackAgent:
         case_id = notice_case(self.ws.paths.root / "slack", channel, thread)
         return self.ws.find_case(person, case_id) if case_id else None
 
-    def _history(self, client: Any, event: dict[str, Any], channel: str,
-                 thread: str) -> list[ChatMessage]:  # fmt: skip
+    def _history(self, client: Any, event: dict[str, Any], channel: str, thread: str,
+                 files: list[dict[str, Any]]) -> list[ChatMessage]:  # fmt: skip
         """The thread so far (the person's messages and the app's), then this message.
-        Consecutive messages of one side are joined; it starts with the person."""
+        Consecutive messages of one side are joined; it starts with the person. The files
+        the person attached earlier in the thread are added to `files`."""
         earlier: list[tuple[str, str]] = []
         if thread != event["ts"]:
             try:
@@ -324,6 +337,7 @@ class SlackAgent:
                         earlier.append(("assistant", _text_of(m)))
                     elif m.get("user") == event["user"] and m.get("subtype") in ANSWERED_SUBTYPES:
                         earlier.append(("user", _text_of(m)))
+                        files += m.get("files") or []
             except Exception as exc:  # answer this message alone
                 log.warning("reading the thread failed: %s", type(exc).__name__)
         turns = [*earlier[-MAX_HISTORY:], ("user", _text_of(event))]
@@ -355,6 +369,28 @@ class SlackAgent:
         ids = set(CASE_RE.findall(text))
         subjects = set(SUBJECT_RE.findall(text))
         return {cs.case_id for cs in states if cs.case_id in ids or cs.subject in subjects}
+
+
+def done_text(done: list[dict[str, Any]]) -> str:
+    """What the Agent's tools did in a turn whose answer then failed, in words: the
+    person learns that it happened, never only that something went wrong."""
+    lines = []
+    for d in done:
+        action, case = d.get("action"), d.get("case")
+        if action == "upload" and d.get("files"):
+            lines.append(f"Added {d['files']} file{'s' if d['files'] > 1 else ''} to {case}. "
+                         "Identifiers are being removed now; review and sign the redacted "
+                         "pages in the app.")  # fmt: skip
+        elif action in ("import", "pull") and d.get("result") == "done":
+            n = len(d.get("cases") or [])
+            lines.append(f"The {action} is done: {n} new case{'s' if n != 1 else ''}"
+                         + (f" ({', '.join(d['cases'])})." if n else "."))  # fmt: skip
+        elif action == "narrative_draft":
+            lines.append(f"Saved the narrative draft of {case}, unsigned. Sign it in the app.")
+        elif action == "query_draft":
+            lines.append(f"Saved the Site Query draft of {case}, unsigned. Nothing goes to the "
+                         "site until it is signed in the app.")  # fmt: skip
+    return "\n".join(lines)
 
 
 def _call_ref(case_id: str | None, call: dict[str, str] | None) -> dict[str, Any] | None:

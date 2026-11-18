@@ -177,6 +177,36 @@ def test_a_site_adds_the_files_attached_to_its_message_to_its_case(ws, tmp_path)
     assert len(uploads(ws, CID)) == 1
 
 
+def test_a_file_attached_earlier_in_the_thread_is_added_and_said_even_if_the_answer_fails(
+    ws, tmp_path
+):
+    """The site attaches a file, is asked which case, and names it: the file of the earlier
+    message is added. The recorded answer then turns out differently (as a live error
+    after the tool would): code still says what was added, never only that it failed."""
+    ws.people.act_as(ME, "site101.coord")
+    ecg = pdf("ECG REPORT\nST elevation.")
+    files = [attached("F3", "ecg.pdf", ecg)]
+    agent = replay_agent(ws, tmp_path)
+    agent.opener = Downloads({files[0]["url_private_download"]: ecg})
+    first = "1700000100.000100"
+    thread = [
+        {"user": ME, "text": "", "files": files, "subtype": "file_share", "ts": first},
+        {"bot_id": "B0APP", "text": "Which case is it for?", "ts": "1700000101.0"},
+    ]
+    answer(agent, "site101.coord", ["(attached 1 file)", "Which case is it for?", "0001"],
+           "Added ecg.pdf to DEMO01-0001.",
+           [{"tool": "upload_attached_files", "input": {"case": "0001"},
+             "error": True}])  # fmt: skip
+    client = FilesSlack(thread)
+    agent.on_message(message("0001", ts="1700000102.0", thread_ts=first), client)
+    (up,) = uploads(ws, CID)
+    assert up["data"]["via"] == {"slack_files": ["F3"]}
+    assert client.texts == ["Added 1 file to DEMO01-0001. Identifiers are being removed now; "
+                            "review and sign the redacted pages in the app."]  # fmt: skip
+    entry = log_of(ws.paths)[-1]
+    assert (entry["source"], entry["outcome"], entry["done"][0]["files"]) == ("code", "posted", 1)
+
+
 def test_an_upload_is_refused_for_another_site_a_closed_case_or_a_file_it_cannot_take(ws):
     content = pdf("DISCHARGE SUMMARY\nChest pain.")
     good = attached("F1", "summary.pdf", content)
@@ -286,6 +316,7 @@ def test_drafts_from_slack_never_move_the_case_nor_sign(ws, in_qc_review, tmp_pa
     assert (drafts.query_codes, drafts.query_text) == (["missing_document"],
                                                        "Please send the ECG report.")  # fmt: skip
     assert call(tools, "narrative_draft", case="0001")["edited_unsigned"] is True
+    assert all(r.ok for r in verify_all(ws.paths))  # the edit's file is referenced by hash
     url = client.posts[-1]["blocks"][-2]["elements"][0]["url"]  # sign it there
     assert "/qc?" in url and "user=ss.anna" in url and f"case={CID}" in url
 

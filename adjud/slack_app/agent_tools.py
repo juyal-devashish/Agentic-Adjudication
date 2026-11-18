@@ -89,7 +89,7 @@ class Turn:
 
     slack_user: str = ""
     actions: SlackActionsLog | None = None  # the Slack actions log, as for /adj import
-    attachments: list[dict[str, Any]] = field(default_factory=list)  # this message's files
+    attachments: list[dict[str, Any]] = field(default_factory=list)  # files in the thread
     files: SlackFiles | None = None  # fetches and deletes them
     done: list[dict[str, Any]] = field(default_factory=list)  # for the conversation log
 
@@ -156,8 +156,8 @@ class AgentTools:
                            "how many remain or were kept. Counts only.", CASE_ARG,
                            self.redaction_results),
                 query,
-                self._tool("upload_attached_files", "Add the files attached to the person's "
-                           "latest message to one case of their site, as this person; "
+                self._tool("upload_attached_files", "Add the files the person attached in "
+                           "this conversation to one case of their site, as this person; "
                            "identifiers are then removed automatically. Only when they ask "
                            "for it or answer a query with files.", CASE_ARG,
                            self.upload_attached_files),
@@ -435,16 +435,16 @@ class AgentTools:
             raise ToolError(f"{case_id} does not take documents now "
                             f"({state_words(state, self.role)})")  # fmt: skip
         if not self.turn.attachments or self.turn.files is None:
-            raise ToolError("no file is attached to the person's latest message")
+            raise ToolError("no file is attached in this conversation")
         events = self.ws.store.events(case_id)
         before = {i for e in events if e["type"] == "documents.uploaded"
                   for i in ((e["data"].get("via") or {}).get("slack_files") or [])}  # fmt: skip
+        fresh = [f for f in self.turn.attachments if f.get("id") not in before]
+        if not fresh:
+            raise ToolError("the files attached in this conversation are already in the case")
         got: list[tuple[str, bytes, str]] = []
         refused = []
-        for n, f in enumerate(self.turn.attachments, 1):
-            if f.get("id") in before:
-                refused.append({"attachment": n, "why": "it is already in the case"})
-                continue
+        for n, f in enumerate(fresh, 1):
             try:
                 name, content = self.turn.files.fetch(f)
             except FileRefused as exc:
