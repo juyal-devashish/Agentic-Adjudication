@@ -389,7 +389,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 ### Step 32 — The Slack Agent (P-58, ADR 0003, ADR 0005) on branch `feat/slack-agent`
 
 - [x] Records: ADR 0005 (supersedes ADR 0004), ADR 0003 revised, GLOSSARY (Agent, Conversation, Clinical Content), P-58, the installed manifest in [slack-app-manifest.yaml](slack-app-manifest.yaml)
-- [ ] The Agent's own AI mode (`ai.modes.slack_agent`, `ADJUD_AGENT_MODE`, default off), budget $100, a conversation entry point in the gateway and prompt `slack_agent_v1`; tests with a fake client and replay
+- [x] The Agent's own AI mode (`ai.modes.slack_agent`, `ADJUD_AGENT_MODE`, default off), budget $100, a conversation entry point in the gateway and prompt `slack_agent_v1`; tests with a fake client and replay (calls about no case are saved to `data/ai/calls/`, referenced from the usage ledger and checked by `tools.verify_log`)
 - [ ] Role-scoped tools, enforced in code (Q5, Q11), reading only redacted outputs, EDC snapshots and case records
 - [ ] The PHI gate on every reply (Q17), users' and sites' names allowed; tests with the kit's seeded PHI
 - [ ] The conversation log `data/slack/conversations.jsonl` (Q18), covered by `tools.verify_log` and the demo reset

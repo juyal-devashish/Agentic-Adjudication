@@ -55,11 +55,31 @@ def case_dirs(paths: DataPaths) -> list[Path]:
 def verify_all(paths: DataPaths) -> list[VerifyReport]:
     reports = [verify_case_log(d) for d in case_dirs(paths)]
     slack = ChainedLog(paths.root / "slack" / "actions.jsonl")  # Slack app (P-55, ADR 0003)
-    for chained in (intake_log(paths), ChainedLog(paths.ai / "usage.jsonl"), slack):
+    ledger = ChainedLog(paths.ai / "usage.jsonl")
+    for chained in (intake_log(paths), ledger, slack):
         if chained.path.exists():
             check = check_chain(chained)
-            reports.append(VerifyReport(chained.path, check.records, list(check.problems)))
+            report = VerifyReport(chained.path, check.records, list(check.problems))
+            if chained is ledger and check.ok:
+                report.problems.extend(_ledger_call_problems(paths, ledger))
+            reports.append(report)
     return reports
+
+
+def _ledger_call_problems(paths: DataPaths, ledger: ChainedLog) -> list[str]:
+    """Calls about no case (the Slack Agent, P-58) are referenced from the ledger by their
+    path in the data folder and SHA-256; each must exist unchanged."""
+    problems = []
+    for i, rec in enumerate(ledger.records(), start=1):
+        ref = rec.get("call")
+        if not ref:
+            continue
+        path = paths.root / ref["path"]
+        if not path.exists():
+            problems.append(f"line {i}: referenced file missing: {ref['path']}")
+        elif sha256_bytes(path.read_bytes()) != ref["sha256"]:
+            problems.append(f"line {i}: referenced file changed: {ref['path']}")
+    return problems
 
 
 @dataclass

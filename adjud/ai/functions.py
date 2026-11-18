@@ -15,6 +15,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from adjud.ai.config import SLACK_AGENT_NAME
+
 PROMPTS = Path(__file__).parent / "prompts"
 
 
@@ -106,9 +108,11 @@ class PhiOutput(BaseModel):
 
 @dataclass(frozen=True)
 class AgentFunction:
+    """`output_model` None: the answer is plain text, not JSON (the Slack Agent, P-58)."""
+
     name: str
     prompt_version: int
-    output_model: type[BaseModel]
+    output_model: type[BaseModel] | None = None
 
     @property
     def prompt_id(self) -> str:
@@ -118,6 +122,8 @@ class AgentFunction:
         return (PROMPTS / f"{self.prompt_id}.md").read_text(encoding="utf-8")
 
     def output_schema(self) -> dict[str, Any]:
+        if self.output_model is None:
+            raise ValueError(f"{self.name} answers in text and has no output schema")
         return inline_schema(self.output_model.model_json_schema())
 
 
@@ -142,6 +148,8 @@ EVENT_MATCH = AgentFunction("event_match", 1, EventMatchOutput)
 NARRATIVE = AgentFunction("narrative", 1, NarrativeOutput)
 PHI_DETECTION = AgentFunction("phi_detection", 1, PhiOutput)
 QC_SUGGESTION = AgentFunction("qc_suggestion", 1, QcSuggestionOutput)
+# The Agent in Slack (P-58): a conversation, answered in text; Gateway.converse runs it
+SLACK_AGENT = AgentFunction(SLACK_AGENT_NAME, 1)
 FUNCTIONS = {
     f.name: f for f in (DOCUMENT_TYPE, EVENT_MATCH, NARRATIVE, PHI_DETECTION, QC_SUGGESTION)
 }

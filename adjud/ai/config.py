@@ -13,8 +13,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Mode = Literal["off", "replay", "live"]
-SLACK_AGENT = "slack_agent"  # the Agent in Slack (P-58)
-OWN_MODE = frozenset({SLACK_AGENT})
+SLACK_AGENT_NAME = "slack_agent"  # the Agent in Slack (P-58)
+OWN_MODE = frozenset({SLACK_AGENT_NAME})
 
 
 class Prices(BaseModel):

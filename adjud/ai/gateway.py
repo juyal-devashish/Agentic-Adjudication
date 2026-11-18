@@ -1,6 +1,7 @@
 """The only module that talks to the Anthropic API (AGENTS.md, plan step 12).
 
     Gateway(store, cfg, replay_dir).run(case_id, FUNCTION, input, toolbox) -> AiResult
+    Gateway(store, cfg, replay_dir).converse(context, messages, toolbox) -> AgentReply
 
 Modes (`study.yaml` → `ai.mode`, plan P-27; per function `ai.modes`, P-58):
   off     no call; the step continues without AI (people handle the judgement)
@@ -15,6 +16,16 @@ an `ai.called` event, and its tokens and cost go to the hash-chained ledger
 `data/ai/usage.jsonl`. Live calls stop when the ledger reaches `ai.budget_usd`.
 A schema-invalid answer is re-asked up to `ai.max_retries` times; then the step continues
 without AI. Nothing here moves a case: the gates and the runner do.
+
+The Slack Agent (P-58) is a conversation, not a JSON function: `converse` sends the
+conversation so far with the person it acts for, runs the same tool loop over that
+person's toolbox and returns the reply text and the tools it called. A turn about a case
+is saved like any call (`cases/<id>/ai/`, `ai.called`); a turn about no case is saved to
+`data/ai/calls/<date>/`, referenced by path and SHA-256 from its ledger line, which
+`tools.verify_log` checks. Replay is keyed by the input hash of the whole turn (prompt
+version, model, the person, the messages, the tool definitions); a recorded turn's tool
+calls are run again through the toolbox, so its actions happen and the role limits of
+the tools still apply.
 """
 
 from __future__ import annotations
@@ -24,20 +35,21 @@ import hashlib
 import json
 import logging
 import os
+import secrets
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
-from adjud.ai.config import SLACK_AGENT, AiConfig
-from adjud.ai.functions import AgentFunction
+from adjud.ai.config import SLACK_AGENT_NAME, AiConfig
+from adjud.ai.functions import SLACK_AGENT, AgentFunction
 from adjud.ai.tools import Toolbox, ToolError
 from adjud.chain import ChainedLog
-from adjud.events import EventDraft, canonical_json
-from adjud.store import FileCaseStore, json_bytes
+from adjud.events import EventDraft, canonical_json, format_time, sha256_bytes
+from adjud.store import FileCaseStore, json_bytes, write_atomic
 
 log = logging.getLogger("adjud.ai")
 ACTOR = "system:ai-gateway"
@@ -62,6 +74,87 @@ class AiResult:
     def label(self) -> str:
         """How the UI names the source of a result."""
         return "Simulated AI" if self.simulated else "AI"
+
+
+class ChatMessage(BaseModel):
+    """One message of a conversation with the Slack Agent, as text (P-58)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    role: Literal["user", "assistant"]
+    text: str
+
+
+class AgentContext(BaseModel):
+    """Who the Slack Agent acts for, and the case the conversation is about, if any."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    person: str  # user id in users.yaml
+    name: str
+    role: str  # role id in users.yaml, e.g. site, safety_specialist
+    site: str | None = None
+    case_id: str | None = None
+
+    def prompt_text(self) -> str:
+        """The part of the system prompt that changes with the conversation."""
+        who = f"{self.name} (user `{self.person}`), role `{self.role}`"
+        lines = ["## This conversation", "", f"- You act for: {who}"]
+        if self.site:
+            lines.append(f"- Their site: {self.site}")
+        lines.append(
+            f"- About case: {self.case_id}" if self.case_id else "- About no particular case"
+        )
+        return "\n".join(lines) + "\n"
+
+
+@dataclass
+class AgentReply:
+    """The Slack Agent's answer to one turn. `status` unavailable: no AI this time (off,
+    no key, budget reached, nothing recorded); the caller answers without it."""
+
+    mode: str  # off | replay | live
+    status: str  # ok | unavailable | error
+    text: str = ""
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    simulated: bool = False
+    note: str = ""
+    call: dict[str, str] | None = None  # the saved call record, as for AiResult
+    cost_usd: float = 0.0
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "ok"
+
+    @property
+    def label(self) -> str:
+        return "Simulated AI" if self.simulated else "AI"
+
+
+def conversation_hash(
+    function: AgentFunction,
+    model: str,
+    context: AgentContext,
+    messages: list[ChatMessage],
+    tools: list[dict[str, Any]],
+) -> str:
+    """Input hash of one Agent turn: replay finds the recorded answer by it."""
+    return hashlib.sha256(canonical_json(_conversation_input(
+        function, model, context, messages, tools)).encode()).hexdigest()  # fmt: skip
+
+
+def _conversation_input(
+    function: AgentFunction,
+    model: str,
+    context: AgentContext,
+    messages: list[ChatMessage],
+    tools: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "function": function.prompt_id,
+        "model": model,
+        "context": context.model_dump(),
+        "messages": [m.model_dump() for m in messages],
+        "tools": tools,
+    }
 
 
 def input_hash(function: AgentFunction, model: str, payload: dict[str, Any]) -> str:
@@ -104,7 +197,10 @@ class Gateway:
         if os.environ.get("ADJUD_AI_MODE"):  # operational override, e.g. a replay demo
             raw["mode"] = os.environ["ADJUD_AI_MODE"]
         if os.environ.get("ADJUD_AGENT_MODE"):  # e.g. the Agent live, QC on replay
-            raw["modes"] = {**(raw.get("modes") or {}), SLACK_AGENT: os.environ["ADJUD_AGENT_MODE"]}
+            raw["modes"] = {
+                **(raw.get("modes") or {}),
+                SLACK_AGENT_NAME: os.environ["ADJUD_AGENT_MODE"],
+            }
         cfg = AiConfig.model_validate(raw)
         return cls(store, cfg, folder / "ai_replays", **kw)
 
@@ -127,6 +223,8 @@ class Gateway:
     ) -> AiResult:
         """`images`: PNG pages sent with the request (AI-1). Their SHA-256 must be in
         `payload` so that the input hash, and therefore replay, covers them."""
+        if function.output_model is None:
+            raise ValueError(f"{function.name} is a conversation: use converse()")
         if not self.cfg.enabled(function.name):
             return AiResult(function.name, "off", "unavailable", note="AI is off")
         h = input_hash(function, self.cfg.model, payload)
@@ -271,14 +369,8 @@ class Gateway:
                         "Your answer did not match the response schema: "
                         f"{exc.errors(include_url=False)[:3]}. Reply with the JSON object only."
                     )})  # fmt: skip
-        except anthropic.APIConnectionError:
-            note = "could not reach the API"
-        except anthropic.RateLimitError:
-            note = "rate limited by the API"
-        except anthropic.APIStatusError as exc:
-            # the API's own explanation (it names the problem, not the request content)
-            err = (exc.body or {}).get("error", {}) if isinstance(exc.body, dict) else {}
-            note = f"API error {exc.status_code}: {str(err.get('message', ''))[:200]}".rstrip(": ")
+        except anthropic.APIError as exc:
+            note = _api_error_note(exc)
         cost = self.cfg.cost(usage)
         record = {
             "function": function.name,
@@ -301,6 +393,162 @@ class Gateway:
             log.warning("AI %s on %s: %s", function.name, case_id, note or status)
         result = AiResult(function.name, "live", status, output, False, note, cost_usd=cost)
         return self._save(case_id, record, result)
+
+    # -- the Slack Agent (P-58) ------------------------------------------------------------
+
+    def converse(
+        self, context: AgentContext, messages: list[ChatMessage], toolbox: Toolbox
+    ) -> AgentReply:
+        """One turn of the Agent: `messages` is the conversation so far, ending with the
+        person's message. Never raises for AI trouble: the reply says what happened."""
+        fn = SLACK_AGENT
+        if not messages or messages[-1].role != "user":
+            raise ValueError("a conversation turn ends with the person's message")
+        mode = self.cfg.mode_for(fn.name)
+        if not self.cfg.enabled(fn.name):
+            return AgentReply("off", "unavailable", note="the Agent's AI is off")
+        tools = toolbox.definitions()
+        payload = _conversation_input(fn, self.cfg.model, context, messages, tools)
+        h = conversation_hash(fn, self.cfg.model, context, messages, tools)
+        if mode == "replay":
+            return self._converse_replay(fn, context, payload, h, toolbox)
+        if not self.env.get("ANTHROPIC_API_KEY") and self.client is None:
+            return AgentReply("off", "unavailable", note="no API key in the environment")
+        if self.spent_usd() >= self.cfg.budget_usd:
+            return AgentReply(
+                "off", "unavailable", note=f"AI budget of ${self.cfg.budget_usd:.2f} reached"
+            )
+        return self._converse_live(fn, context, messages, payload, h, toolbox)
+
+    def _converse_replay(
+        self,
+        fn: AgentFunction,
+        context: AgentContext,
+        payload: dict[str, Any],
+        h: str,
+        toolbox: Toolbox,
+    ) -> AgentReply:
+        path = self.replay_dir / fn.name / f"{h}.json"
+        if not path.exists():
+            self.missing.append((fn.name, h, payload))
+            return AgentReply("replay", "unavailable", note="no recorded answer for this turn")
+        rec = json.loads(path.read_text())
+        simulated = bool(rec.get("simulated", True))
+        tool_calls: list[dict[str, Any]] = []
+        uses = [
+            _RecordedUse(f"replay_{i}", c["tool"], c.get("input") or {})
+            for i, c in enumerate(rec.get("tool_calls", []))
+        ]
+        if uses:
+            self._run_tools(uses, toolbox, tool_calls)
+        text = str(rec.get("text") or "")
+        status, note = ("ok", "") if text.strip() else ("error", "recorded answer has no text")
+        record = {
+            "function": fn.name,
+            "prompt": fn.prompt_id,
+            "mode": "replay",
+            "simulated": simulated,
+            "model": rec.get("model", self.cfg.model),
+            "input_hash": h,
+            "input": payload,
+            "output": {"text": text},
+            "valid": status == "ok",
+            "tool_calls": tool_calls,
+            "usage": {},
+            "cost_usd": 0.0,
+            "latency_ms": 0,
+            "note": note,
+        }
+        reply = AgentReply("replay", status, text, tool_calls, simulated, note)
+        reply.call = self._record(context.case_id, record)
+        return reply
+
+    def _converse_live(
+        self,
+        fn: AgentFunction,
+        context: AgentContext,
+        messages: list[ChatMessage],
+        payload: dict[str, Any],
+        h: str,
+        toolbox: Toolbox,
+    ) -> AgentReply:
+        import anthropic
+
+        client = self._client()
+        system = [
+            {"type": "text", "text": fn.system_prompt()},
+            {"type": "text", "text": context.prompt_text()},
+        ]
+        convo: list[dict[str, Any]] = [{"role": m.role, "content": m.text} for m in messages]
+        usage = dict.fromkeys(
+            ("input_tokens", "output_tokens", "cache_creation_input_tokens",
+             "cache_read_input_tokens"), 0,
+        )  # fmt: skip
+        tool_calls: list[dict[str, Any]] = []
+        requests, status, text, note = 0, "error", "", ""
+        started = time.monotonic()
+        try:
+            while True:
+                if requests > self.cfg.max_tool_turns:
+                    note = "too many tool turns without an answer"
+                    break
+                requests += 1
+                tools = toolbox.definitions()
+                response = client.messages.create(
+                    model=self.cfg.model,
+                    max_tokens=self.cfg.max_tokens,
+                    system=system,
+                    messages=convo,
+                    **({"tools": tools} if tools else {}),
+                    output_config={"effort": self.cfg.effort},
+                )
+                for k, v in _usage_dict(response.usage).items():
+                    usage[k] += v
+                if response.stop_reason == "refusal":
+                    note = "the model declined the request"
+                    break
+                if response.stop_reason == "max_tokens":
+                    note = "the answer was cut off (max_tokens)"
+                    break
+                # the whole content goes back, thinking blocks included (preserved thinking)
+                convo.append({"role": "assistant", "content": response.content})
+                uses = [b for b in response.content if b.type == "tool_use"]
+                if uses:
+                    convo.append(
+                        {"role": "user", "content": self._run_tools(uses, toolbox, tool_calls)}
+                    )
+                    continue
+                text = "\n\n".join(
+                    b.text.strip() for b in response.content if b.type == "text" and b.text.strip()
+                )
+                status, note = ("ok", "") if text else ("error", "the answer had no text")
+                break
+        except anthropic.APIError as exc:
+            note = _api_error_note(exc)
+        cost = self.cfg.cost(usage)
+        record = {
+            "function": fn.name,
+            "prompt": fn.prompt_id,
+            "mode": "live",
+            "simulated": False,
+            "model": self.cfg.model,
+            "input_hash": h,
+            "input": payload,
+            "output": {"text": text} if status == "ok" else None,
+            "valid": status == "ok",
+            "tool_calls": tool_calls,
+            "usage": usage,
+            "requests": requests,
+            "cost_usd": round(cost, 6),
+            "latency_ms": int((time.monotonic() - started) * 1000),
+            "note": note,
+        }
+        if status != "ok":
+            log.warning("AI %s for %s: %s", fn.name, context.person, note or status)
+        reply = AgentReply("live", status, text if status == "ok" else "", tool_calls,
+                           False, note, cost_usd=cost)  # fmt: skip
+        reply.call = self._record(context.case_id, record)
+        return reply
 
     @staticmethod
     def _run_tools(
@@ -325,11 +573,27 @@ class Gateway:
     # -- records -----------------------------------------------------------------------------
 
     def _save(self, case_id: str, record: dict[str, Any], result: AiResult) -> AiResult:
+        result.call = self._record(case_id, record)
+        return result
+
+    def _record(self, case_id: str | None, record: dict[str, Any]) -> dict[str, str]:
+        """Save the call record, reference it, and add its cost to the ledger. About a case:
+        `cases/<id>/ai/NNNN_<function>.json` and an `ai.called` event. About no case (the
+        Slack Agent, P-58): `data/ai/calls/<date>/<time>_<function>_<random>.json`,
+        referenced from the ledger line by its path in the data folder."""
+        if case_id is None:
+            return self._record_without_case(record)
+        content = json_bytes(record)
         folder = self.store.case_dir(case_id) / "ai"
         n = len(list(folder.glob("*.json"))) + 1 if folder.exists() else 1
-        rel = f"ai/{n:04d}_{record['function']}.json"
-        sha = self.store.put_file(case_id, rel, json_bytes(record))
-        result.call = {"path": rel, "sha256": sha}
+        while True:  # another process (the runner, the Slack app) may take a number first
+            rel = f"ai/{n:04d}_{record['function']}.json"
+            try:
+                sha = self.store.put_file(case_id, rel, content)
+                break
+            except FileExistsError:
+                n += 1
+        call = {"path": rel, "sha256": sha}
         self.store.append_event(
             case_id,
             EventDraft(
@@ -342,7 +606,7 @@ class Gateway:
                     "simulated": record["simulated"],
                     "valid": record["valid"],
                     "cost_usd": record["cost_usd"],
-                    "call": result.call,
+                    "call": call,
                 },
             ),
         )
@@ -351,4 +615,42 @@ class Gateway:
             "model": record["model"], "valid": record["valid"], "usage": record["usage"],
             "cost_usd": record["cost_usd"],
         })  # fmt: skip
-        return result
+        return call
+
+    def _record_without_case(self, record: dict[str, Any]) -> dict[str, str]:
+        content = json_bytes(record)
+        stamp = format_time(self.store.clock())
+        name = f"{stamp[11:19].replace(':', '')}_{record['function']}_{secrets.token_hex(4)}"
+        rel = f"ai/calls/{stamp[:10]}/{name}.json"  # random part: two turns at once never clash
+        write_atomic(self.store.paths.root / rel, content, overwrite=False)
+        call = {"path": rel, "sha256": sha256_bytes(content)}
+        self.ledger.append({
+            "case_id": None, "function": record["function"], "mode": record["mode"],
+            "model": record["model"], "valid": record["valid"], "usage": record["usage"],
+            "cost_usd": record["cost_usd"], "call": call,
+        })  # fmt: skip
+        return call
+
+
+@dataclass(frozen=True)
+class _RecordedUse:
+    """A tool call from a recorded turn, shaped like the API's tool_use block."""
+
+    id: str
+    name: str
+    input: dict[str, Any]
+
+
+def _api_error_note(exc: Exception) -> str:
+    """What went wrong with an API call, in a few words (never the request content)."""
+    import anthropic
+
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "could not reach the API"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "rate limited by the API"
+    if isinstance(exc, anthropic.APIStatusError):
+        # the API's own explanation (it names the problem, not the request content)
+        err = (exc.body or {}).get("error", {}) if isinstance(exc.body, dict) else {}
+        return f"API error {exc.status_code}: {str(err.get('message', ''))[:200]}".rstrip(": ")
+    return f"API error: {type(exc).__name__}"
