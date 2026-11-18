@@ -8,6 +8,8 @@ here (as in the Slack actions log): people may type identifiers. A held reply is
 recorded by the categories the gate found, never its text. Actions the Agent takes are
 ordinary case events as that person; `done` says what they were, in counts and case IDs
 (for an upload from Slack: how many files, and whether Slack kept the originals).
+`attached` lists the Slack file ids of the message, so a file attached earlier in a
+thread is uploaded only as the person the Agent acted as when it was attached.
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ class ConversationLog:
         note: str | None = None,
         attachments: int = 0,
         done: list[dict[str, Any]] | None = None,
+        attached: list[str] | None = None,  # Slack file ids attached to the message
     ) -> None:
         entry: dict[str, Any] = {
             "slack_user": slack_user,
@@ -75,6 +78,15 @@ class ConversationLog:
             entry["note"] = note
         if attachments:  # files attached to the message, counted (names may identify)
             entry["attachments"] = attachments
+        if attached:  # ids only: whom the Agent acted as when each file was attached
+            entry["attached"] = attached
         if done:
             entry["done"] = done
         self.log.append(entry)
+
+    def attached_by(self, slack_user: str, person: str) -> set[str]:
+        """The Slack files this Slack user attached while the Agent acted as `person`:
+        only those may be uploaded later in a thread as that person (Q5)."""
+        return {fid for e in self.log.records()
+                if e.get("slack_user") == slack_user and e.get("acting_as") == person
+                for fid in e.get("attached") or []}  # fmt: skip

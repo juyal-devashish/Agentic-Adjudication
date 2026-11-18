@@ -441,12 +441,14 @@ class AgentTools:
                             f"({state_words(state, self.role)})")  # fmt: skip
         if not self.turn.attachments or self.turn.files is None:
             raise ToolError("no file is attached in this conversation")
-        events = self.ws.store.events(case_id)
-        before = {i for e in events if e["type"] == "documents.uploaded"
+        # a Slack file goes into one case once: never again, to this case or another
+        before = {i for cid in self.ws.store.list_cases() for e in self.ws.store.events(cid)
+                  if e["type"] == "documents.uploaded"
                   for i in ((e["data"].get("via") or {}).get("slack_files") or [])}  # fmt: skip
         fresh = [f for f in self.turn.attachments if f.get("id") not in before]
         if not fresh:
-            raise ToolError("the files attached in this conversation are already in the case")
+            raise ToolError("the files attached in this conversation are already in the case "
+                            "they were added to")  # fmt: skip
         got: list[tuple[str, bytes, str]] = []
         refused = []
         for n, f in enumerate(fresh, 1):

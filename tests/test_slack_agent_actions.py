@@ -25,6 +25,7 @@ from adjud.integrity import verify_all
 from adjud.runner import Runner
 from adjud.slack_app.agent import NO_FILES
 from adjud.slack_app.agent_tools import AgentTools, Turn, agent_toolbox
+from adjud.slack_app.conversations import ConversationLog
 from adjud.slack_app.core import Directory, SlackActionsLog, Workspace
 from adjud.slack_app.dm import QueryInDm, SlackDmChannel, SlackSettings
 from adjud.slack_app.files import SlackFiles
@@ -32,7 +33,7 @@ from adjud.slack_app.phi_gate import HOLD_TEXT, PhiGate
 from adjud.workflow import State
 from tests import test_slack_agent_tools as with_cases
 from tests.test_flow3 import pdf, to_qc_review
-from tests.test_slack_agent import ME, FakeSlack, answer, log_of, message, replay_agent
+from tests.test_slack_agent import DM, ME, FakeSlack, answer, log_of, message, replay_agent
 
 ROOT = Path(__file__).resolve().parents[1]
 data, ws = with_cases.data, with_cases.ws  # fixtures: the demo's three cases, imported
@@ -82,6 +83,13 @@ def acting(ws: Workspace, person_id: str, files: list[dict], downloads: Download
     turn = Turn(ME, SlackActionsLog(ws.paths), files,
                 SlackFiles(client or FilesSlack(), opener=downloads))  # fmt: skip
     return AgentTools(ws, ws.people.by_id[person_id], turn)
+
+
+def attached_as(ws: Workspace, person_id: str, thread: str, file_ids: list[str]) -> None:
+    """The record of an earlier turn whose message carried these files."""
+    ConversationLog(ws.paths).record(slack_user=ME, acting_as=person_id, channel=DM,
+                                     thread=thread, kind="turn", outcome="posted",
+                                     attachments=len(file_ids), attached=file_ids)  # fmt: skip
 
 
 def call(tools: AgentTools, name: str, **args) -> dict:
@@ -193,6 +201,7 @@ def test_a_file_attached_earlier_in_the_thread_is_added_and_said_even_if_the_ans
         {"user": ME, "text": "", "files": files, "subtype": "file_share", "ts": first},
         {"bot_id": "B0APP", "text": "Which case is it for?", "ts": "1700000101.0"},
     ]
+    attached_as(ws, "site101.coord", first, ["F3"])  # the first message's turn
     answer(agent, "site101.coord", ["(attached 1 file)", "Which case is it for?", "0001"],
            "Added ecg.pdf to DEMO01-0001.",
            [{"tool": "upload_attached_files", "input": {"case": "0001"},
@@ -406,3 +415,39 @@ def test_after_the_signature_the_agent_shows_the_signed_narrative(ws, in_qc_revi
     signed = call(tools, "narrative_draft", case="0001")
     assert signed["approved"] is True and signed["edited_unsigned"] is False
     assert signed["text"].strip() == edited  # the signed file, not the earlier draft
+
+
+def test_a_slack_file_goes_into_one_case_only(ws):
+    """A file added to one case earlier in the thread is not added to the next case too."""
+    a, b = pdf("DISCHARGE SUMMARY\nChest pain."), pdf("ECG REPORT\nST elevation.")
+    f1, f2 = attached("F1", "a.pdf", a), attached("F2", "b.pdf", b)
+    downloads = Downloads({f1["url_private_download"]: a, f2["url_private_download"]: b})
+    call(acting(ws, "site101.coord", [f1], downloads), "upload_attached_files", case=CID)
+    call(acting(ws, "site101.coord", [f1, f2], downloads), "upload_attached_files",
+         case="DEMO01-0003")  # fmt: skip
+    (up,) = uploads(ws, "DEMO01-0003")
+    assert [f["name"] for f in up["data"]["files"]] == ["b.pdf"]
+    with pytest.raises(ToolError, match="already in the case"):
+        call(acting(ws, "site101.coord", [f1, f2], downloads), "upload_attached_files",
+             case="DEMO01-0003")  # fmt: skip
+
+
+def test_a_file_attached_as_one_site_is_not_uploaded_as_another(ws, tmp_path):
+    """Acting As switched from site 101 to site 102 in the same thread: the file attached
+    as site 101 is not offered to site 102's upload (Q5); back as site 101, it is."""
+    agent = replay_agent(ws, tmp_path)
+    first = "1700000100.000100"
+    f5 = attached("F5", "letter.pdf", pdf("LETTER"))
+    attached_as(ws, "site101.coord", first, ["F5"])
+    client = FilesSlack([{"user": ME, "text": "", "files": [f5], "subtype": "file_share",
+                          "ts": first}])  # fmt: skip
+    event = message("for my case", ts="1700000102.0", thread_ts=first)
+
+    def offered(person_id: str) -> list[str]:
+        earlier: list[dict] = []
+        agent._history(client, event, DM, first, earlier)
+        turn = agent._turn_of(event, client, earlier, ws.people.by_id[person_id])
+        return [f["id"] for f in turn.attachments]
+
+    assert offered("site102.coord") == []
+    assert offered("site101.coord") == ["F5"]

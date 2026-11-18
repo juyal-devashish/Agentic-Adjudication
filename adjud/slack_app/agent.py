@@ -145,7 +145,7 @@ class SlackAgent:
                                site=person.get("site"), case_id=case_id)  # fmt: skip
         earlier_files: list[dict[str, Any]] = []
         messages = self._history(client, event, channel, thread, earlier_files)
-        turn = self._turn_of(event, client, earlier_files)
+        turn = self._turn_of(event, client, earlier_files, person)
         if messages and messages[-1].role == "user":
             toolbox = agent_toolbox(self.ws, person, turn)
             reply = self._gateway().converse(context, messages, toolbox)
@@ -159,6 +159,7 @@ class SlackAgent:
                    "note": reply.note or None}  # fmt: skip
         if event.get("files"):
             record["attachments"] = len(event["files"])
+            record["attached"] = _file_ids(event)
         if turn.done:  # what the Agent did as this person (the case events say it too)
             record["done"] = turn.done
         if reply.ok:
@@ -182,10 +183,14 @@ class SlackAgent:
                             extra=task_blocks)  # fmt: skip
         self._record_said(record, said, text, source="code")
 
-    def _turn_of(self, event: dict[str, Any], client: Any,
-                 earlier_files: list[dict[str, Any]]) -> Turn:  # fmt: skip
+    def _turn_of(self, event: dict[str, Any], client: Any, earlier_files: list[dict[str, Any]],
+                 person: dict[str, Any]) -> Turn:  # fmt: skip
         """What this message gives the acting tools: the Slack user and the files the
-        person attached in this conversation (this message's and earlier ones')."""
+        person attached in this conversation: this message's, and earlier ones' only if
+        attached while the Agent acted as the same person (a switch of Acting As from one
+        site to another must not carry a site's original across, Q5)."""
+        mine = self.conversations.attached_by(event["user"], person["id"])
+        earlier_files = [f for f in earlier_files if str(f.get("id")) in mine]
         study = yaml.safe_load((self.ws.paths.config / self.ws.study / "study.yaml").read_text())
         limits = (study or {}).get("upload_limits") or {}
         files = SlackFiles(client, int(limits.get("max_file_mb", 50)),
@@ -204,6 +209,7 @@ class SlackAgent:
             self.conversations.record(
                 slack_user=event["user"], acting_as=person["id"] if person else None,
                 channel=channel, thread=thread, kind="turn", outcome="failed", note=error,
+                attachments=len(event.get("files") or []), attached=_file_ids(event),
             )  # fmt: skip
         except Exception:
             log.exception("answering a failed turn failed too")
@@ -386,6 +392,10 @@ class SlackAgent:
         ids = set(CASE_RE.findall(text))
         subjects = set(SUBJECT_RE.findall(text))
         return {cs.case_id for cs in states if cs.case_id in ids or cs.subject in subjects}
+
+
+def _file_ids(event: dict[str, Any]) -> list[str]:
+    return [str(f.get("id")) for f in event.get("files") or [] if f.get("id")]
 
 
 def done_text(done: list[dict[str, Any]]) -> str:
