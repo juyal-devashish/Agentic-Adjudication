@@ -323,3 +323,24 @@ def test_forbidden_wording_is_flagged_in_the_draft_the_specialist_corrects(
     signed = next(e for e in store.events(cid) if e["type"] == "quality_check.signed")["data"]
     assert signed["source"] == "ai" and signed["edited"]
     assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+
+
+def test_a_wrong_password_at_the_pass_writes_nothing_and_the_next_try_signs(tmp_path, fixtures):
+    """Signed first: a wrong password leaves no narrative file behind, so the retry with
+    the right password is not blocked by a name an earlier attempt already took."""
+    import re
+
+    from adjud.flow2 import Flow2
+    from adjud.signatures import SignatureRefused
+
+    store, cid = run_scenario(tmp_path, fixtures, "complete")
+    assert store.state(cid).state == State.QC_REVIEW
+    _, draft = draft_of(store, cid)
+    text = re.sub(r"\[Add[^\]]*\]", "Chest pain treated with a stent.", draft)
+    flow2 = Flow2(store, CONFIG)
+    with pytest.raises(SignatureRefused):
+        flow2.sign_qc_pass(cid, "ss.anna", "wrong", text, "Documents present")
+    assert not list(store.case_dir(cid).glob("narrative/narrative_v*.md"))
+    flow2.sign_qc_pass(cid, "ss.anna", "demo", text, "Documents present")
+    assert store.state(cid).state == State.READY_FOR_ADJUDICATION
+    no_decision_without_a_person(store, cid)

@@ -225,7 +225,10 @@ class FileCaseStore:
     def put_json_once(self, case_id: str, rel_path: str, obj: Any) -> str:
         """Like put_json, but a re-run after a crash (file written, event not yet) reuses
         an identical file. A different file of that name is still refused."""
-        content = json_bytes(obj)
+        return self.put_file_once(case_id, rel_path, json_bytes(obj))
+
+    def put_file_once(self, case_id: str, rel_path: str, content: bytes) -> str:
+        """Like put_file, but reuses an identical file left by an earlier attempt."""
         path = self._safe_path(case_id, rel_path)
         if path.exists() and path.read_bytes() == content:
             return sha256_bytes(content)

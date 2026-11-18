@@ -508,13 +508,15 @@ class Flow2:
             + 1
         )
         rel = f"narrative/narrative_v{n}.md"
-        sha = self.store.put_file(case_id, rel, narrative.strip().encode() + b"\n")
+        content = narrative.strip().encode() + b"\n"
+        sha = sha256_bytes(content)  # signed first: a wrong password writes nothing
         manifest = _latest(self.store, case_id, "qc.started")["data"]["manifest"]
         dossier = {k: result["dossier"][k] for k in ("path", "sha256")}
         records = [{"name": "qc results", **checks}, {"name": "flow2 manifest", **manifest},
                    {"name": "dossier", **dossier}, {"name": "narrative", "path": rel,
                                                      "sha256": sha}]  # fmt: skip
         signature = sign(user, password, REVIEW_MEANING, records)
+        self.store.put_file_once(case_id, rel, content)
         original = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip()
         self._event(case_id, "quality_check.signed", user_id,
                     {"outcome": "pass", "results": checks,
@@ -551,9 +553,11 @@ class Flow2:
         n = _rounds(self.store, case_id, "narrative.signed") + 1
         draft = _latest(self.store, case_id, "narrative.drafted")["data"]
         rel = f"narrative/narrative_v{n}.md"
-        sha = self.store.put_file(case_id, rel, text.strip().encode() + b"\n")
+        content = text.strip().encode() + b"\n"
+        sha = sha256_bytes(content)  # signed first: a wrong password writes nothing
         signature = sign(user, password, NARRATIVE_MEANING,
                          [{"name": "narrative", "path": rel, "sha256": sha}])  # fmt: skip
+        self.store.put_file_once(case_id, rel, content)
         edited = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip() != (
             text.strip()
         )
