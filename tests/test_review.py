@@ -158,6 +158,29 @@ def test_m4_submission_signature_and_handoff_manifest(ctx):
     assert {"submission_received", "documents_received"} <= set(templates)
 
 
+def test_one_submission_takes_one_signature_from_two_tabs(ctx, monkeypatch):
+    """B15: a second tab signing at the same moment is refused with a message, not a
+    TransitionRefused; one submission.signed is written."""
+    import adjud.review
+
+    store, proc, cid = ctx
+    upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY. Chest pain."))], SITE)
+    proc.process_case(cid)
+    real, raced = adjud.review.sign, []
+
+    def sign(*args, **kw):  # the other tab signs while this one checks the password
+        if not raced:
+            raced.append(True)
+            submit(store, cid, SITE, "demo", CONFIG)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(adjud.review, "sign", sign)
+    with pytest.raises(ReviewRefused, match="not waiting"):
+        submit(store, cid, SITE, "demo", CONFIG)
+    assert [e["type"] for e in store.events(cid)].count("submission.signed") == 1
+    assert store.state(cid).state == State.SUBMITTED
+
+
 def test_rejected_file_must_be_deleted_before_submission(ctx):
     store, proc, cid = ctx
     upload(

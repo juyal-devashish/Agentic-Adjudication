@@ -12,6 +12,7 @@ import pymupdf
 import pytest
 
 from adjud.documents import upload
+from adjud.flow2 import Flow2Refused
 from adjud.flow3 import Flow3Refused, assigned_cases, current_round
 from adjud.flow4 import Flow4Refused, outcomes
 from adjud.integrity import rebuild_all, verify_all
@@ -38,9 +39,9 @@ def answers(**kw) -> dict:
     return {**base, **kw}
 
 
-def through_qc(runner, store, cid) -> None:
-    """De-identification, the site's signature and the Quality Check, up to READY and the
-    first adjudication step (the runner assigns in the same pass as the Flow 3 handoff)."""
+def to_qc_review(runner, store, cid) -> str:
+    """De-identification, the site's signature and the QC round: return the narrative the
+    Safety Specialist would sign."""
     runner.run_case_steps()  # de-identification
     submit(store, cid, SITE, "demo", store.paths.config)
     runner.run_case_steps()  # Flow 2 handoff, QC start
@@ -48,14 +49,20 @@ def through_qc(runner, store, cid) -> None:
     assert store.state(cid).state == State.QC_REVIEW
     latest = max(store.case_dir(cid).glob("qc/checks_v*.json"), key=lambda p: p.stat().st_mtime)
     draft = store.get_file(cid, json.loads(latest.read_text())["narrative"]["draft"]["path"])
-    text = re.sub(r"\[Add[^\]]*\]", "Chest pain treated with a stent.", draft.decode())
+    return re.sub(r"\[Add[^\]]*\]", "Chest pain treated with a stent.", draft.decode())
+
+
+def through_qc(runner, store, cid) -> None:
+    """De-identification, the site's signature and the Quality Check, up to READY and the
+    first adjudication step (the runner assigns in the same pass as the Flow 3 handoff)."""
+    text = to_qc_review(runner, store, cid)
     runner.flow2.sign_qc_pass(cid, SS, "demo", text, "Documents present")
     runner.run_case_steps()  # Flow 3 handoff
     runner.run_case_steps()  # the reviews are assigned
 
 
 @pytest.fixture
-def assigned(tmp_path, clock):
+def uploaded(tmp_path, clock):
     from adjud.paths import DataPaths
     from tools.reset_demo import reset
 
@@ -70,6 +77,12 @@ def assigned(tmp_path, clock):
     cid = runner.pipeline.case_for("DEMO01|DEMO01-101-0001|AE-001")
     upload(store, cid, [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain.")),
                         ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE)  # fmt: skip
+    return runner, store, cid
+
+
+@pytest.fixture
+def assigned(uploaded):
+    runner, store, cid = uploaded
     through_qc(runner, store, cid)
     assert store.state(cid).state == State.ADJ_REVIEW
     return runner, store, cid
@@ -351,24 +364,29 @@ def test_reassignment_needs_a_reason_and_hides_the_old_draft(assigned, monkeypat
     assert a1 not in f3.pool(cid)
 
 
-def racing(monkeypatch, other):
+def racing(monkeypatch, other, module=None):
     """Run `other` while the first signature is being checked (the slow bcrypt step), as a
     second tab or the Coordinator would; return what it raised, or None."""
     import adjud.flow3
 
-    real, outcome = adjud.flow3.sign, {}
+    module = module or adjud.flow3
+    real, outcome = module.sign, {}
 
     def sign(*args, **kw):
         if not outcome:
             outcome["raised"] = None
             try:
                 other()
-            except Flow3Refused as exc:
+            except Exception as exc:
                 outcome["raised"] = exc
         return real(*args, **kw)
 
-    monkeypatch.setattr(adjud.flow3, "sign", sign)
+    monkeypatch.setattr(module, "sign", sign)
     return outcome
+
+
+def count(store, cid, event_type: str) -> int:
+    return sum(e["type"] == event_type for e in store.events(cid))
 
 
 def signed_slots(store, cid) -> list[str]:
@@ -383,6 +401,33 @@ def test_one_review_takes_one_signature_from_two_tabs(assigned, monkeypatch):
     with pytest.raises(Flow3Refused, match="already signed"):
         f3.sign_review(cid, a1, "demo", answers())
     assert outcome["raised"] is None and signed_slots(store, cid) == ["1"]
+
+
+def test_different_answers_from_two_tabs_are_refused_not_crashed(assigned, monkeypatch):
+    """B15: the second tab's answers file name is taken; it says the review is signed."""
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, _ = holders(store, cid)
+    outcome = racing(monkeypatch, lambda: f3.sign_review(cid, a1, "demo", answers()))
+    with pytest.raises(Flow3Refused, match="already signed"):
+        f3.sign_review(cid, a1, "demo", answers(rationale="Second tab."))
+    assert outcome["raised"] is None and signed_slots(store, cid) == ["1"]
+
+
+def test_one_quality_check_takes_one_signature_from_two_tabs(uploaded, monkeypatch):
+    """B15: two tabs sign the QC pass with different narratives at the same moment."""
+    import adjud.flow2
+
+    runner, store, cid = uploaded
+    text = to_qc_review(runner, store, cid)
+    f2 = runner.flow2
+    outcome = racing(monkeypatch, lambda: f2.sign_qc_pass(cid, SS, "demo", text, "Tab 1"),
+                     adjud.flow2)  # fmt: skip
+    with pytest.raises(Flow2Refused, match="not waiting"):
+        f2.sign_qc_pass(cid, SS, "demo", text + "\nEdited in tab 2.", "Tab 2")
+    assert outcome["raised"] is None and count(store, cid, "quality_check.signed") == 1
+    assert state(store, cid) == State.READY_FOR_ADJUDICATION
+    assert all(r.ok for r in verify_all(store.paths))
 
 
 def test_a_review_reassigned_while_signing_is_not_signed(assigned, monkeypatch):
@@ -429,6 +474,38 @@ def test_a_reassignment_names_the_review_the_coordinator_saw(assigned):
     assert holders(store, cid) == (a1, a2)
     f3.reassign(cid, COORD, "2", third, "On leave", expected_from=a2)
     assert holders(store, cid) == (a1, third)
+
+
+def test_one_consensus_and_one_readjudication_from_two_tabs(assigned, monkeypatch):
+    """B15: the second tab is refused with a message, not a TransitionRefused."""
+    import adjud.flow4
+
+    runner, store, cid = assigned
+    f3, f4 = runner.flow3, runner.flow4
+    a1, a2 = holders(store, cid)
+    f3.sign_review(cid, a1, "demo", answers(mi_type="type_1", related_to_study_drug="related"))
+    f3.sign_review(cid, a2, "demo", answers(mi_type="type_2", related_to_study_drug="not_related"))
+    runner.run_case_steps()
+    a3 = current_round(store, cid).holders["3"]
+    f3.sign_review(cid, a3, "demo",
+                   {"mi_type": "type_1", "related_to_study_drug": "unable_to_assess"})  # fmt: skip
+    runner.run_case_steps()
+    f3.record_meeting(cid, COORD, held_on="2026-11-18", attendees=list(ADJS), summary="Done.",
+                      decisions={"related_to_study_drug": "not_related"})  # fmt: skip
+    seen = shown(store, cid)
+    outcome = racing(monkeypatch, lambda: f3.sign_consensus(cid, CHAIR, "demo", shown=seen))
+    with pytest.raises(Flow3Refused, match="no longer waiting"):
+        f3.sign_consensus(cid, CHAIR, "demo", shown=seen)
+    assert outcome["raised"] is None and count(store, cid, "consensus.signed") == 1
+    finish(runner)
+    assert state(store, cid) == State.CLOSED
+
+    outcome = racing(monkeypatch, lambda: f4.start_readjudication(cid, COORD, "demo", "Tab 1"),
+                     adjud.flow4)  # fmt: skip
+    with pytest.raises(Flow4Refused, match="closed"):
+        f4.start_readjudication(cid, COORD, "demo", "Tab 2")
+    assert outcome["raised"] is None and count(store, cid, "readjudication.started") == 1
+    assert all(r.ok for r in verify_all(store.paths))
 
 
 def test_readjudication_opens_a_new_round_and_supersedes_the_old_outcome(assigned):

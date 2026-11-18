@@ -438,7 +438,11 @@ class Flow3:
             if slot in now.signed:
                 raise Flow3Refused("you have already signed this review")
 
-        self.store.put_json_once(case_id, rel, clean)
+        try:
+            self.store.put_json_once(case_id, rel, clean)
+        except FileExistsError:  # another tab signed different answers first
+            still_open(self.store.events(case_id))
+            raise
         self._event(case_id, "adj3.signed" if slot == "3" else "adjudication.signed", user_id,
                     {"round": rnd.number, "pass": rnd.passes, "slot": slot,
                      "answers": {"path": rel, "sha256": sha}},
@@ -574,6 +578,8 @@ class Flow3:
         signature = sign(user, password, CONSENSUS_MEANING, [{"name": "meeting", **ref}])
 
         def same_meeting(prior: list[dict[str, Any]]) -> None:
+            if replay(prior).state != State.CEC_MEETING:  # signed in another tab meanwhile
+                raise Flow3Refused("the case is no longer waiting for the committee")
             recorded = [e for e in prior if e["type"] == "meeting.recorded"]
             if recorded[-1]["data"]["meeting"] != ref:
                 raise Flow3Refused(MEETING_CHANGED)

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ from adjud.flow3 import SLOTS, Flow3, current_round
 from adjud.forms import FormRefused
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes, write_atomic
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SYSTEM_OUTCOME = "system:outcome"
 SYSTEM_EDC = "system:edc-mock"
@@ -63,8 +64,11 @@ class Flow4:
         self.flow3 = Flow3(self.store, self.config_dir, self.study)
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
+               expect: Callable[[list[dict[str, Any]]], None] | None = None,
                **kw: Any) -> None:  # fmt: skip
-        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw))
+        """Append one event; `expect(prior events)` re-checks under the case lock."""
+        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw),
+                                expect=expect)  # fmt: skip
 
     # -- outcome -------------------------------------------------------------------------------
 
@@ -232,8 +236,13 @@ class Flow4:
         derived = self._latest(case_id, "outcome.derived")
         signature = sign(user, password, READJ_MEANING,
                          [{"name": "outcome", **derived["data"]["outcome"]}])  # fmt: skip
+
+        def still_closed(prior: list[dict[str, Any]]) -> None:  # started in another tab meanwhile
+            if replay(prior).state != State.CLOSED:
+                raise Flow4Refused("only a closed case can be re-adjudicated")
+
         self._event(case_id, "readjudication.started", user_id,
                     {"after_round": derived["data"]["round"],
-                     "outcome": derived["data"]["outcome"]},
+                     "outcome": derived["data"]["outcome"]}, still_closed,
                     reason=reason.strip(), signature=signature)  # fmt: skip
         self.flow3._notify(case_id, "role:safety_specialist", "readjudication_started", user_id)

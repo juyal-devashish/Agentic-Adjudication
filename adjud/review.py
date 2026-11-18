@@ -22,7 +22,7 @@ from adjud.documents import documents_of
 from adjud.events import EventDraft
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SUBMIT_MEANING = "Submitted — documents complete and de-identified"
 
@@ -167,6 +167,11 @@ def submit(
     if user is None or user["role"] != "site":
         raise SignatureRefused("only a site user can submit")
     signature = sign(user, password, SUBMIT_MEANING, status.records)
+
+    def still_waiting(prior: list[dict[str, Any]]) -> None:  # signed in another tab meanwhile
+        if replay(prior).state != State.AWAITING_SITE_CONFIRMATION:
+            raise ReviewRefused("the case is not waiting for site review")
+
     return store.append_event(
         case_id,
         EventDraft(
@@ -175,4 +180,5 @@ def submit(
             signature=signature,
             data={"files": status.records},
         ),
+        expect=still_waiting,
     )

@@ -19,6 +19,7 @@ A query sends the case back to the site; its answer goes through Flow 1 again
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -37,7 +38,7 @@ from adjud.qc import Checklist, run_checks
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes
 from adjud.suggestion import assess, event_from_fields, suggested_outcome
-from adjud.workflow import State
+from adjud.workflow import State, replay
 
 SYSTEM_QC = "system:qc"
 SYSTEM_NARRATIVE = "system:narrative"
@@ -78,6 +79,16 @@ def _latest(store: FileCaseStore, case_id: str, event_type: str) -> dict[str, An
     return next((e for e in reversed(store.events(case_id)) if e["type"] == event_type), None)
 
 
+def _still_in(state: State, message: str) -> Callable[[list[dict[str, Any]]], None]:
+    """An `expect` for a signature: refused if another tab moved the case on meanwhile."""
+
+    def check(prior: list[dict[str, Any]]) -> None:
+        if replay(prior).state != state:
+            raise Flow2Refused(message)
+
+    return check
+
+
 def _safety_specialist(config_dir: Path, user_id: str) -> dict[str, Any]:
     user = load_users(config_dir).get(user_id)
     if user is None or user["role"] != "safety_specialist":
@@ -105,8 +116,21 @@ class Flow2:
             self.gateway = Gateway.for_study(self.store, self.config_dir, self.study)
 
     def _event(self, case_id: str, type_: str, actor: str, data: dict[str, Any],
+               expect: Callable[[list[dict[str, Any]]], None] | None = None,
                **kw: Any) -> None:  # fmt: skip
-        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw))
+        """Append one event; `expect(prior events)` re-checks under the case lock."""
+        self.store.append_event(case_id, EventDraft(type=type_, actor=actor, data=data, **kw),
+                                expect=expect)  # fmt: skip
+
+    def _put_signed(self, case_id: str, rel: str, content: bytes,
+                    expect: Callable[[list[dict[str, Any]]], None]) -> None:  # fmt: skip
+        """Write a file about to be signed. Another tab that signed first wrote a different
+        file of that name: say the case moved on rather than fail on the file."""
+        try:
+            self.store.put_file_once(case_id, rel, content)
+        except FileExistsError:
+            expect(self.store.events(case_id))
+            raise
 
     def _notify(self, case_id: str, to: str, template: str, actor: str) -> None:
         note = self.outbox.queue(case_id, to, template)
@@ -516,7 +540,8 @@ class Flow2:
                    {"name": "dossier", **dossier}, {"name": "narrative", "path": rel,
                                                      "sha256": sha}]  # fmt: skip
         signature = sign(user, password, REVIEW_MEANING, records)
-        self.store.put_file_once(case_id, rel, content)
+        expect = _still_in(State.QC_REVIEW, "the case is not waiting for a QC review")
+        self._put_signed(case_id, rel, content, expect)
         original = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip()
         self._event(case_id, "quality_check.signed", user_id,
                     {"outcome": "pass", "results": checks,
@@ -524,7 +549,7 @@ class Flow2:
                      "narrative": {"path": rel, "sha256": sha}, "draft": draft["draft"],
                      "source": draft["source"], "simulated": bool(draft.get("simulated")),
                      "edited": original != narrative.strip()},
-                    signature=signature, reason=reason)  # fmt: skip
+                    expect, signature=signature, reason=reason)  # fmt: skip
 
     def open_query(self, case_id: str, codes: list[str], text: str, *,
                    user_id: str, password: str) -> None:  # fmt: skip
@@ -541,7 +566,9 @@ class Flow2:
         user = _safety_specialist(self.config_dir, user_id)
         signature = sign(user, password or "", QUERY_MEANING,
                          [{"name": "qc results", **data["results"]}])  # fmt: skip
-        self._event(case_id, "query.opened", user_id, data, signature=signature)
+        self._event(case_id, "query.opened", user_id, data,
+                    _still_in(State.QC_REVIEW, "the case is not waiting for a QC review"),
+                    signature=signature)  # fmt: skip
         self._notify(case_id, _site(self.store, case_id), "query_opened", user_id)
 
     def sign_narrative(self, case_id: str, user_id: str, password: str, text: str) -> None:
@@ -557,14 +584,15 @@ class Flow2:
         sha = sha256_bytes(content)  # signed first: a wrong password writes nothing
         signature = sign(user, password, NARRATIVE_MEANING,
                          [{"name": "narrative", "path": rel, "sha256": sha}])  # fmt: skip
-        self.store.put_file_once(case_id, rel, content)
+        expect = _still_in(State.NARRATIVE_REVIEW, "the case is not waiting for a narrative review")
+        self._put_signed(case_id, rel, content, expect)
         edited = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip() != (
             text.strip()
         )
         self._event(case_id, "narrative.signed", user_id,
                     {"narrative": {"path": rel, "sha256": sha}, "source": draft["source"],
                      "simulated": bool(draft.get("simulated")), "edited": edited},
-                    signature=signature)  # fmt: skip
+                    expect, signature=signature)  # fmt: skip
 
 
 def query_of(store: FileCaseStore, case_id: str) -> dict[str, Any] | None:
