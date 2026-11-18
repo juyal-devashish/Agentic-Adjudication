@@ -45,6 +45,8 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
 # Synthetic data only: verification also searches each output
 # for the generator's seeded identifiers of the case's subject. Relative to the data dir.
 seeded_identities: flow1-testkit/identities/identities_SYNTHETIC.json
+slack_phi_gate:              # P-58 (Q17): the check on everything the Slack Agent posts
+  allow: [Discharged]        # ordinary words NER takes for a name ("Discharged home ...")
 narrative:                   # plan step 17; checked by code in the narrative gate
   min_statements: 3
   # Wording a narrative must not contain (case-insensitive): opinion on cause or
