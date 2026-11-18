@@ -24,10 +24,15 @@ export ADJUD_DATA_DIR="$DEMO_DIR" ADJUD_AI_MODE=replay
 # the mode; the API key is only tested for being set, never read out.
 agent_mode() {
   local mode
-  mode=$(grep -E '^ADJUD_AGENT_MODE=' .env | tail -n 1 | cut -d= -f2- | tr -d "\"' \r" || true)
+  mode=$(grep -E '^ADJUD_AGENT_MODE=' .env | tail -n 1 | cut -d= -f2- | tr -d "\"' \r" | tr '[:upper:]' '[:lower:]' || true)
   if [[ -z "$mode" ]]; then
     if grep -q '^ANTHROPIC_API_KEY=.' .env; then mode=live; else mode=off; fi
   fi
+  case "$mode" in
+    off | replay | live) ;;
+    *) echo "warning: ADJUD_AGENT_MODE in .env is not off, replay or live: the Agent is off" >&2
+       mode=off ;;
+  esac
   echo "$mode"
 }
 

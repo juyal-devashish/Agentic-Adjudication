@@ -44,7 +44,7 @@ Repeat stages 2–4 after any change to `adjud/slack_app/`, `adjud/ai/gateway.py
 From a fresh `reset_demo --preload`, with Mailpit, the runner, the UI and `python -m adjud.slack_app` running, `ADJUD_AI_MODE=replay`, `ADJUD_AGENT_MODE=live` and a key in `.env`:
 
 - [ ] The Slack app logs that it connected (Socket Mode); no public URL or tunnel is used.
-- [ ] Opening the **Messages** tab before choosing anyone: the Agent asks whom you act as.
+- [ ] Before choosing anyone: Home says to choose, `/adj tasks` says the same (visible only to you), and opening the **Messages** tab, the Agent asks whom you act as.
 - [ ] `/adj act-as rahul`, then the Messages tab: the Agent greets you once as Rahul Mehta (Data manager). The *My tasks* suggested prompt answers with *1 AE file waiting to be imported*.
 - [ ] Type **import the AE file**: one reply, three new cases (or **Import queued files** on Home). The status shows *working* while it runs and is back to normal after the reply.
 - [ ] Edit a message you sent, or delete one: the Agent does not reply again.
@@ -52,7 +52,8 @@ From a fresh `reset_demo --preload`, with Mailpit, the runner, the UI and `pytho
 - [ ] `/adj act-as priya`: reply in the *documents requested* thread with the three files attached; they reach DEMO01-0001's *Documents*. The app records whether Slack let it delete them (a live test answered `cant_delete_file`).
 - [ ] As Priya, ask about DEMO01-0002 (site 102): the Agent says it cannot find that case.
 - [ ] After the site signs and QC runs, `/adj act-as anna`: **what does the QC say for 0001?** answers with the checks and the AI Suggestion; **change the last sentence of the narrative to "…"** updates the draft; **Open in the app** shows it pre-filled on *Quality check*. Nothing is signed in Slack.
-- [ ] `/adj status 0001`, `/adj cases`, `/adj help` answer privately.
+- [ ] `/adj status 0001`, `/adj cases`, `/adj help` answer privately; `/adj status 0002` as Priya says *Which case?*.
+- [ ] Whether `/adj` works inside the app's own DM (research left this open): note the answer here.
 - [ ] Case record → *Notifications*: *Slack* column *Sent*; `data/slack/actions.jsonl` and `data/slack/conversations.jsonl` have one entry per interaction and per turn; `uv run python -m tools.verify_log` is all OK.
 
 ## 3. Failure drills
@@ -78,7 +79,7 @@ From a fresh reset; after each, check the Case record, `data/outbox/delivery.jso
 After stage 2 with at least one case through the Quality Check:
 
 - [ ] Read every DM, Home view and Agent reply: no patient name, date of birth, record or phone number, address or other identifier the study's `deid_policy.yaml` removes. The AE term, event dates, subject ID, checks, AI Suggestion, narrative and query text may appear (ADR 0005).
-- [ ] Ask the Agent for something that would quote an identifier (e.g. *what is the patient's name in 0001?*): the reply is held with *Open in the app*, and the conversation log records the hold by category only.
+- [ ] Ask the Agent for something that would quote an identifier (e.g. *what is the patient's name in 0001?*): no identifier appears. Either the Agent has none to give (its tools never read originals), or the reply is held with *Open in the app* and the conversation log records the hold by category only.
 - [ ] No file from `documents/original/` and no unverified file was posted to Slack by the app. The only originals in Slack are the ones the site attached itself.
 - [ ] E-mails in Mailpit still carry only the case ID, the task and the link.
 - [ ] `grep -rI "xoxb-\|xapp-\|sk-ant-" data/ ; echo $?` prints `1`.
