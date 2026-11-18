@@ -10,12 +10,14 @@ Each file ends as one of:
   verified   output written, verification found nothing
   blocked    output written, but verification found a residual (or could not check
              image content yet); the site must act before submitting
-  rejected   no output (encrypted, corrupt, unsupported, too large)
+  rejected   no output (encrypted, corrupt, unsupported, too large, or processing it
+             raised: PROCESSING_ERROR, so one bad file never stops the others)
   pending    accepted, but no processor exists for its type
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import PurePath
@@ -32,8 +34,10 @@ from adjud.deid.pdf import (
     verify_pdf,
 )
 from adjud.deid.policy import Policy
-from adjud.deid.sniff import check_upload
+from adjud.deid.sniff import REJECT_MESSAGES, check_upload
 from adjud.deid.xlsx import learn_xlsx, redact_xlsx, verify_xlsx
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -103,12 +107,17 @@ def deidentify_case(
         if c.rejected:
             continue
         doc_known = KnownValues()
-        if c.kind == "pdf":
-            learn_pdf(d.content, policy, doc_known)
-        elif c.kind == "image":
-            learn_image(d.content, policy, doc_known)
-        elif c.kind == "xlsx":
-            learn_xlsx(d.content, policy, doc_known)
+        try:
+            if c.kind == "pdf":
+                learn_pdf(d.content, policy, doc_known)
+            elif c.kind == "image":
+                learn_image(d.content, policy, doc_known)
+            elif c.kind == "xlsx":
+                learn_xlsx(d.content, policy, doc_known)
+        except Exception:
+            log.exception("learning identifiers failed for one %s file", c.kind)
+            c.rejected = "PROCESSING_ERROR"
+            continue
         identities[d.name] = DocIdentity.of(doc_known)
         known.merge(doc_known)
     same_patient = conflicts(identities)
@@ -121,33 +130,47 @@ def deidentify_case(
         res.identity = same_patient.get(d.name, {"dob": [], "name": []})
         if c.rejected:
             res.status, res.reject_code, res.message = "rejected", c.rejected, c.message
-        elif c.kind in ("pdf", "image"):
-            redact = redact_pdf if c.kind == "pdf" else redact_image
-            detect = (
-                (lambda page, img, name=d.name: ai_detect(name, page, img)) if ai_detect else None
-            )
-            out = redact(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep,
-                         boxes=d.boxes, ai_detect=detect)  # fmt: skip
-            ver = verify_pdf(out.output, policy, known, keep=d.keep, seeded=seeded,
-                             extra_terms=d.extra_terms + out.ai_terms)  # fmt: skip
-            res.output, res.output_name = out.output, output_name(d.name, c.kind)
-            res.pages = out.pages
-            res.warnings += out.notes
-            if out.unverifiable_pages:
-                res.warnings.append(f"OCR unavailable: pages {out.unverifiable_pages} unchecked")
-            res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
-            res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
-            res.verification = ver.summary()
-            res.status = "verified" if ver.passed else "blocked"
-        elif c.kind == "xlsx":
-            out = redact_xlsx(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep)
-            ver = verify_xlsx(out.output, policy, known, extra_terms=d.extra_terms, keep=d.keep)
-            res.output, res.output_name = out.output, output_name(d.name, c.kind)
-            res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
-            res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
-            res.verification = ver.summary()
-            res.status = "verified" if ver.passed else "blocked"
         else:
-            res.message = f"No processor for {c.kind} files."
+            try:
+                _redact_and_verify(d, c.kind, res, policy, known, seeded, ai_detect)
+            except Exception:
+                log.exception("de-identification failed for one %s file", c.kind)
+                res.output = res.output_name = None
+                res.findings, res.residuals, res.verification = [], [], {}
+                res.status, res.reject_code = "rejected", "PROCESSING_ERROR"
+                res.message = REJECT_MESSAGES["PROCESSING_ERROR"]
         results.append(res)
     return results
+
+
+def _redact_and_verify(
+    d: DocInput, kind: str, res: DocResult, policy: Policy, known: KnownValues,
+    seeded: list[str] | None, ai_detect: Callable[[str, int, Any], list[tuple[str, str]]] | None,
+) -> None:  # fmt: skip
+    """Pass 2 for one accepted file: redact, verify from scratch, fill `res` in place."""
+    if kind in ("pdf", "image"):
+        redact = redact_pdf if kind == "pdf" else redact_image
+        detect = (lambda page, img, name=d.name: ai_detect(name, page, img)) if ai_detect else None
+        out = redact(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep,
+                     boxes=d.boxes, ai_detect=detect)  # fmt: skip
+        ver = verify_pdf(out.output, policy, known, keep=d.keep, seeded=seeded,
+                         extra_terms=d.extra_terms + out.ai_terms)  # fmt: skip
+        res.output, res.output_name = out.output, output_name(d.name, kind)
+        res.pages = out.pages
+        res.warnings += out.notes
+        if out.unverifiable_pages:
+            res.warnings.append(f"OCR unavailable: pages {out.unverifiable_pages} unchecked")
+        res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
+        res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
+        res.verification = ver.summary()
+        res.status = "verified" if ver.passed else "blocked"
+    elif kind == "xlsx":
+        out = redact_xlsx(d.content, policy, known, extra_terms=d.extra_terms, keep=d.keep)
+        ver = verify_xlsx(out.output, policy, known, extra_terms=d.extra_terms, keep=d.keep)
+        res.output, res.output_name = out.output, output_name(d.name, kind)
+        res.findings = [f.as_report(policy.requirement(f.category)) for f in out.findings]
+        res.residuals = [f.as_report(policy.requirement(f.category)) for f in ver.residuals]
+        res.verification = ver.summary()
+        res.status = "verified" if ver.passed else "blocked"
+    else:
+        res.message = f"No processor for {kind} files."

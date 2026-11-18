@@ -30,6 +30,7 @@ REJECT_MESSAGES = {
     "TOO_LARGE": "The file is larger than the upload limit.",
     "TOO_MANY_PAGES": "The PDF has more pages than the upload limit.",
     "EMPTY": "The file is empty.",
+    "PROCESSING_ERROR": "The file could not be processed. Please send it in another format.",
 }
 
 

@@ -232,3 +232,57 @@ def test_two_runs_of_one_case_at_once_do_not_both_run(setup, monkeypatch):
     assert len(started) == 1
     assert pipe.store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
     assert not (pipe.store.case_dir(cid) / "documents" / "redacted" / "r2").exists()
+
+
+def _tiff_dpi_1() -> bytes:
+    """A page scan as PIL saves a TIFF with no resolution set: its dpi tag reads (1, 1)."""
+    import io
+
+    from PIL import Image, ImageDraw
+
+    img = Image.new("L", (1240, 1754), 255)
+    ImageDraw.Draw(img).text((100, 100), "Discharge summary", fill=0)
+    buf = io.BytesIO()
+    img.save(buf, format="TIFF", dpi=(1, 1))
+    return buf.getvalue()
+
+
+def test_an_image_whose_resolution_tag_says_1_dpi_is_processed_at_300_dpi(setup):
+    """A TIFF whose dpi tag is 1 became a page 31 m wide; rendering it to verify crashed
+    the run, and the runner retried it every tick with the case stuck in DEIDENTIFYING."""
+    import pymupdf
+
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-101-0001", "AE-001")
+    good = files("DEMO01-101-0001_AE-001", "ecg_report.pdf")
+    upload(pipe.store, cid, [*good, ("scan.tiff", _tiff_dpi_1())], "site101.coord")
+    summary = proc.process_case(cid)
+    assert summary["files"]["ecg_report.pdf"] == "verified", summary
+    assert summary["files"]["scan.tiff"] in ("verified", "blocked"), summary
+    assert pipe.store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    out = pipe.store.get_file(cid, documents_of(pipe.store, cid).processed["scan.tiff"]
+                              ["output"]["path"])  # fmt: skip
+    with pymupdf.open(stream=out, filetype="pdf") as doc:
+        assert doc[0].rect.width == pytest.approx(1240 * 72 / 300, abs=1)
+
+
+def test_a_file_that_fails_to_process_is_rejected_and_the_others_finish(setup, monkeypatch):
+    """One file raising inside redaction used to abort the whole run: no result was
+    recorded for any file and the case never left DEIDENTIFYING."""
+    import adjud.deid.pipeline as P
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("cannot render")
+
+    monkeypatch.setattr(P, "redact_image", broken)
+    pipe, proc = setup
+    cid = case(pipe, "DEMO01-101-0001", "AE-001")
+    good = files("DEMO01-101-0001_AE-001", "ecg_report.pdf")
+    upload(pipe.store, cid, [*good, ("scan.tiff", _tiff_dpi_1())], "site101.coord")
+    summary = proc.process_case(cid)
+    assert summary["files"] == {"ecg_report.pdf": "verified", "scan.tiff": "rejected"}
+    assert pipe.store.state(cid).state == State.AWAITING_SITE_CONFIRMATION
+    assert documents_of(pipe.store, cid).processed["scan.tiff"]["reject_code"] == (
+        "PROCESSING_ERROR"
+    )
+    assert all(r.ok for r in verify_all(pipe.paths))
