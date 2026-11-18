@@ -13,6 +13,7 @@ sidebar does; simulated, not enforced. Real use maps each Slack user to one pers
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +31,7 @@ from adjud.paths import DataPaths
 from adjud.store import FileCaseStore, write_atomic
 from adjud.workflow import State, state_words
 
+log = logging.getLogger("adjud.slack_app")
 ROLE_WORDS = {
     "data_manager": "Data manager",
     "site": "Site user",
@@ -171,6 +173,7 @@ class SlackActionsLog:
         cases: list[str] | None = None,
         result: str = "done",
         reason: str | None = None,
+        detail: dict[str, Any] | None = None,
     ) -> None:
         entry: dict[str, Any] = {
             "slack_user": slack_user,
@@ -181,6 +184,8 @@ class SlackActionsLog:
         }
         if reason:
             entry["reason"] = reason
+        if detail:  # e.g. what Slack said when asked to delete an uploaded original (P-58)
+            entry["detail"] = detail
         self.log.append(entry)
 
 
@@ -350,6 +355,36 @@ class Workspace:
             raise PermissionError("Pulling AE records from the EDC is the data manager's step.")
         summary, created = summarise_import(pull(self.pipe, person["id"]))
         return "Pulled the AE records from the EDC. " + summary, created
+
+
+@dataclass(frozen=True)
+class ImportReply:
+    text: str  # counts and case IDs only
+    created: list[str]
+    result: str  # done | refused | failed, as recorded
+
+
+def import_as(ws: Workspace, actions: SlackActionsLog, slack_user: str, person: dict[str, Any],
+              action: str = "import", via: str = "") -> ImportReply:  # fmt: skip
+    """The data manager's import of the queued files ("import") or EDC pull ("pull"), the
+    same calls as the app's buttons, recorded in the Slack actions log as this person.
+    `via` names where in Slack it was asked ("agent" for the Agent, P-58)."""
+    run = ws.pull_from_edc if action == "pull" else ws.import_queued
+    name = f"{via}:{action}" if via else action
+    acting = person["id"]
+    try:
+        summary, created = run(person)
+    except PermissionError as exc:
+        actions.record(slack_user, acting, name, result="refused", reason="not the data manager")
+        return ImportReply(str(exc), [], "refused")
+    except Exception as exc:  # e.g. the runner took the same file: say so, log it
+        log.exception("%s from Slack failed", action)
+        actions.record(slack_user, acting, name, result="failed", reason=type(exc).__name__)
+        return ImportReply(f"The {action} did not finish. Try again, or use AE import in "
+                           "the app.", [], "failed")  # fmt: skip
+    actions.record(slack_user, acting, name, cases=created)
+    return ImportReply(summary + (" The sites are notified now." if created else ""), created,
+                       "done")  # fmt: skip
 
 
 def summarise_import(results: list[ImportResult]) -> tuple[str, list[str]]:

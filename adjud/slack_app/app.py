@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlparse
 from adjud.slack_app import blocks
 from adjud.slack_app.agent import SlackAgent
 from adjud.slack_app.conversations import ConversationLog
-from adjud.slack_app.core import SlackActionsLog, Workspace
+from adjud.slack_app.core import SlackActionsLog, Workspace, import_as
 
 log = logging.getLogger("adjud.slack_app")
 EPHEMERAL = "ephemeral"
@@ -37,7 +37,8 @@ class SlackHandlers:
 
     def __post_init__(self) -> None:
         if self.agent is None:
-            self.agent = SlackAgent(self.ws, ConversationLog(self.ws.paths))
+            self.agent = SlackAgent(self.ws, ConversationLog(self.ws.paths),
+                                    actions=self.actions)  # fmt: skip
 
     @property
     def people(self) -> Any:
@@ -128,19 +129,10 @@ class SlackHandlers:
     def _import(self, slack_user: str, person: dict[str, Any], action: str = "import") -> str:
         """The data manager's import of the queued files ("import") or EDC pull ("pull"),
         the same calls as the app's buttons."""
-        run = self.ws.pull_from_edc if action == "pull" else self.ws.import_queued
-        try:
-            summary, created = run(person)
-        except PermissionError as exc:
-            self._record(slack_user, action, result="refused", reason="not the data manager")
-            return str(exc)
-        except Exception as exc:  # e.g. the runner took the same file: say so, log it
-            log.exception("%s from Slack failed", action)
-            self._record(slack_user, action, result="failed", reason=type(exc).__name__)
-            return f"The {action} did not finish. Try again, or use AE import in the app."
-        self._record(slack_user, action, cases=created)
-        self.notes[slack_user] = summary
-        return summary + (" The sites are notified now." if created else "")
+        reply = import_as(self.ws, self.actions, slack_user, person, action)
+        if reply.result == "done":
+            self.notes[slack_user] = reply.text.removesuffix(" The sites are notified now.")
+        return reply.text
 
     # -- App Home ------------------------------------------------------------------------------
 

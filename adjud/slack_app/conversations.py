@@ -6,7 +6,8 @@ user, whom the Agent acted as, the case (if any), the tools called, and the repl
 posted or that it was held back by the PHI gate. What the person typed is never stored
 here (as in the Slack actions log): people may type identifiers. A held reply is
 recorded by the categories the gate found, never its text. Actions the Agent takes are
-ordinary case events as that person; this log only says that the turn happened.
+ordinary case events as that person; `done` says what they were, in counts and case IDs
+(for an upload from Slack: how many files, and whether Slack kept the originals).
 """
 
 from __future__ import annotations
@@ -48,6 +49,8 @@ class ConversationLog:
         held: dict[str, Any] | None = None,
         ai_call: dict[str, Any] | None = None,
         note: str | None = None,
+        attachments: int = 0,
+        done: list[dict[str, Any]] | None = None,
     ) -> None:
         entry: dict[str, Any] = {
             "slack_user": slack_user,
@@ -70,4 +73,8 @@ class ConversationLog:
             entry["ai_call"] = ai_call
         if note:
             entry["note"] = note
+        if attachments:  # files attached to the message, counted (names may identify)
+            entry["attachments"] = attachments
+        if done:
+            entry["done"] = done
         self.log.append(entry)

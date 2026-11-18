@@ -20,6 +20,13 @@ record in the conversation log (Q18).
 
 A reply in the thread of a DM notice is about that notice's case (Q12), if the person
 can still see it (Acting As may have changed since).
+
+The Agent also does a person's unsigned steps (Q4, `agent_tools`): the data manager's
+import and pull, a site's upload of the files attached to its message (`files.py`), the
+Safety Specialist's narrative and Site Query drafts. Files arrive with the message
+(subtype `file_share`); the `file_shared` event that Slack sends as well is only
+acknowledged, so a file is never added twice. Without the Agent's AI, attached files are
+not added and the reply says so, with the Documents page one click away.
 """
 
 from __future__ import annotations
@@ -30,12 +37,15 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import yaml
+
 from adjud.ai.gateway import AgentContext, AgentReply, ChatMessage, Gateway
 from adjud.slack_app import blocks
-from adjud.slack_app.agent_tools import agent_toolbox
+from adjud.slack_app.agent_tools import Turn, agent_toolbox
 from adjud.slack_app.conversations import ConversationLog
-from adjud.slack_app.core import Workspace
+from adjud.slack_app.core import SlackActionsLog, Workspace
 from adjud.slack_app.dm import notice_case
+from adjud.slack_app.files import Opener, SlackFiles, https_get
 from adjud.slack_app.phi_gate import HOLD_TEXT, PhiGate, Verdict
 
 log = logging.getLogger("adjud.slack_app")
@@ -51,6 +61,8 @@ NO_PERSON = "Choose whom you act as first: `/adj act-as` (demo)."
 NO_AI = "I can't answer questions right now. Here is what is waiting for you:"
 NOTHING = "I can't answer questions right now, and nothing is waiting for you."
 FAILED = "Something went wrong with that answer. Your tasks are in the app."
+NO_FILES = ("I can't take files right now, so nothing was added. Upload them on the "
+            "Documents page in the app.")  # fmt: skip
 MAX_HISTORY = 20  # earlier messages of the thread sent with each turn
 SECTION_CHARS = 2900  # Slack's limit for one section's text is 3000
 CASE_RE = re.compile(r"\b[A-Z][A-Z0-9]*-\d{4}\b")
@@ -77,6 +89,12 @@ class SlackAgent:
     gateway: Gateway | None = None  # from study.yaml and the environment on first use
     gate: PhiGate | None = None
     greeted: dict[str, str] = field(default_factory=dict)  # Slack user -> person greeted as
+    actions: SlackActionsLog | None = None  # where its imports and uploads are recorded
+    opener: Opener = field(default=https_get)  # downloads attached files; tests pass a fake
+
+    def __post_init__(self) -> None:
+        if self.actions is None:
+            self.actions = SlackActionsLog(self.ws.paths, clock=self.ws.clock)
 
     def _gateway(self) -> Gateway:
         if self.gateway is None:
@@ -117,8 +135,10 @@ class SlackAgent:
         context = AgentContext(person=person["id"], name=person["name"], role=person["role"],
                                site=person.get("site"), case_id=case_id)  # fmt: skip
         messages = self._history(client, event, channel, thread)
+        turn = self._turn_of(event, client)
         if messages and messages[-1].role == "user":
-            reply = self._gateway().converse(context, messages, agent_toolbox(self.ws, person))
+            toolbox = agent_toolbox(self.ws, person, turn)
+            reply = self._gateway().converse(context, messages, toolbox)
         else:  # nothing to answer (no words, no file): the Tasks, from code
             reply = AgentReply("off", "unavailable", note="an empty message")
         looked_at = self._cases_in_tools(person, reply)
@@ -127,16 +147,33 @@ class SlackAgent:
                    "simulated": reply.simulated, "tools": reply.tool_calls,
                    "ai_call": _call_ref(context.case_id, reply.call),
                    "note": reply.note or None}  # fmt: skip
+        if turn.attachments:
+            record["attachments"] = len(turn.attachments)
+        if turn.done:  # what the Agent did as this person (the case events say it too)
+            record["done"] = turn.done
         if reply.ok:
             cases = {*filter(None, [case_id]), *looked_at, *self._cases_named(reply.text)}
             verdict = self._say(client, channel, thread, reply.text, person, about,
                                 cases=cases, label=reply.label)  # fmt: skip
             self._record_said(record, verdict, reply.text, source="ai")
             return
+        if turn.attachments:  # without the AI no file is added: say so, and where to
+            verdict = self._say(client, channel, thread, NO_FILES, person, about)
+            self._record_said(record, verdict, NO_FILES, source="code")
+            return
         text, intro, task_blocks = self._fallback(person)
         verdict = self._say(client, channel, thread, text, person, about, shown=intro,
                             extra=task_blocks)  # fmt: skip
         self._record_said(record, verdict, text, source="code")
+
+    def _turn_of(self, event: dict[str, Any], client: Any) -> Turn:
+        """What this message gives the acting tools: the Slack user and its files."""
+        study = yaml.safe_load((self.ws.paths.config / self.ws.study / "study.yaml").read_text())
+        limits = (study or {}).get("upload_limits") or {}
+        files = SlackFiles(client, int(limits.get("max_file_mb", 50)),
+                           int(limits.get("max_pdf_pages", 200)), self.opener)  # fmt: skip
+        return Turn(slack_user=event["user"], actions=self.actions,
+                    attachments=list(event.get("files") or []), files=files)  # fmt: skip
 
     def _failed(self, event: dict[str, Any], client: Any, channel: str, thread: str,
                 error: str) -> None:  # fmt: skip
@@ -239,7 +276,11 @@ class SlackAgent:
     def _page(self, person: dict[str, Any], case_id: str | None) -> str:
         if case_id:
             task = next((t for t in self.ws.tasks(person) if t.case_id == case_id), None)
-            return task.page if task else "record"
+            if task:
+                return task.page
+            # a site's case opens on its documents, the Safety Specialist's on its QC page
+            own = person["role"] in ("site", "safety_specialist")
+            return LANDING[person["role"]] if own else "record"
         return LANDING.get(person["role"], "record")
 
     @staticmethod
@@ -325,12 +366,13 @@ def _call_ref(case_id: str | None, call: dict[str, str] | None) -> dict[str, Any
 
 
 def _text_of(message: dict[str, Any]) -> str:
-    """A message's text as the person wrote it (Slack escapes &, < and >); an attachment
-    with no words says so."""
+    """A message's text as the person wrote it (Slack escapes &, < and >), and how many
+    files are attached to it (never their names, which may carry identifiers)."""
     text = html.unescape(str(message.get("text") or "")).strip()
     files = message.get("files") or []
-    if not text and files:
-        text = f"(attached {len(files)} file{'s' if len(files) > 1 else ''})"
+    if files:
+        note = f"(attached {len(files)} file{'s' if len(files) > 1 else ''})"
+        text = f"{text}\n\n{note}" if text else note
     return text
 
 

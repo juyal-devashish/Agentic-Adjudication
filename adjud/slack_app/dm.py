@@ -11,6 +11,11 @@ Each DM's channel and `ts` are recorded in `data/slack/dm_sent.jsonl` with its c
 the DM starts a Conversation: a reply in its thread reaches the Agent with that case as
 context (P-58, Q12).
 
+One DM says more than its e-mail (ADR 0005, Q13): the site's `query_opened` carries the
+signed Site Query's reasons and text when the PHI gate passes them (`QueryInDm`), and the
+site answers by attaching files in its thread. The note in the outbox, and so the
+e-mail, is unchanged. If the gate holds the text, or cannot run, the DM goes without it.
+
 Configuration, from the environment only: NOTIFY_CHANNELS must include `slack`;
 SLACK_BOT_TOKEN (a secret, never logged); APP_BASE_URL for the links.
 """
@@ -18,6 +23,7 @@ SLACK_BOT_TOKEN (a secret, never logged); APP_BASE_URL for the links.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from collections.abc import Callable, Mapping
@@ -26,8 +32,11 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from adjud.delivery import SLACK, ChannelError
+from adjud.flow2 import QUERY_CODES
 from adjud.slack_app.blocks import notice
-from adjud.slack_app.core import ROLE_WORDS, Directory
+from adjud.slack_app.core import ROLE_WORDS, Directory, Workspace
+
+log = logging.getLogger("adjud.slack_app")
 
 ACTOR = "system:slack"
 TIMEOUT_SECONDS = 10
@@ -90,6 +99,8 @@ class SlackDmChannel:
     client: PostClient
     # (person, case ID) -> their next step in Task words, e.g. Workspace.next_step (P-57)
     next_step: Callable[[dict[str, Any], str], str] | None = None
+    # note -> what the DM says beyond the e-mail, already PHI-gated (Q13), e.g. QueryInDm
+    detail: Callable[[dict[str, Any]], str | None] | None = None
     name: str = SLACK
 
     def send(self, note: dict[str, Any], people: list[dict[str, Any]]) -> None:
@@ -102,11 +113,12 @@ class SlackDmChannel:
             raise ChannelError("no Slack user yet: choose someone with /adj act-as", later=True)
         url = f"{self.settings.base_url}{note['link']}" if note.get("link") else None
         reached = self.reached(note["id"])
+        detail = self.detail(note) if self.detail is not None else None
         for slack_user, group in targets.items():
             if slack_user in reached:  # sent on an earlier try that failed for someone else
                 continue
             text, blocks = notice(note, for_whom(note["to"], group, self.directory), url,
-                                  self._next(note, group[0]))  # fmt: skip
+                                  self._next(note, group[0]), detail)  # fmt: skip
             response = self._post(channel=slack_user, text=text, blocks=blocks)
             self._mark(note, slack_user, response)
 
@@ -159,3 +171,43 @@ class SlackDmChannel:
             raise ChannelError(f"cannot connect: {type(exc).__name__}", unreachable=True) from exc
         except Exception as exc:  # anything else: recorded by type only, never its message
             raise ChannelError(f"error: {type(exc).__name__}") from None
+
+
+def latest_query(ws: Workspace, case_id: str) -> dict[str, Any] | None:
+    """The case's latest signed `query.opened` event."""
+    return next((e for e in reversed(ws.store.events(case_id))
+                 if e["type"] == "query.opened"), None)  # fmt: skip
+
+
+@dataclass
+class QueryInDm:
+    """The Site Query in the site's `query_opened` DM (P-58, Q13): its reasons and text,
+    read from the case's latest signed `query.opened` when the DM is sent, and only if
+    the PHI gate passes them. Never raises: the DM then goes as the e-mail does."""
+
+    ws: Workspace
+    gate: Any = None  # a PhiGate; built on first use
+
+    def __call__(self, note: dict[str, Any]) -> str | None:
+        case_id = note.get("case_id")
+        if note.get("template") != "query_opened" or not case_id:
+            return None
+        try:
+            q = latest_query(self.ws, case_id)
+            if q is None:
+                return None
+            reasons = ", ".join(QUERY_CODES.get(c, c) for c in q["data"].get("codes") or [])
+            text = f"Query: {reasons}. {q['data'].get('text', '')}".strip()
+            text += "\nAnswer by attaching the files in this thread, or upload them in the app."
+            if self.gate is None:
+                from adjud.slack_app.phi_gate import PhiGate
+
+                self.gate = PhiGate.for_workspace(self.ws)
+            verdict = self.gate.check(text, {case_id})
+        except Exception as exc:  # no gate, no text: the DM goes without it
+            log.warning("the query text for the DM could not be checked: %s", type(exc).__name__)
+            return None
+        if verdict.held:
+            log.info("the query text of %s held from its DM: %s", case_id, verdict.found)
+            return None
+        return text

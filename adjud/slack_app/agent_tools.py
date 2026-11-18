@@ -18,23 +18,36 @@ the reports' masked fragments ("Ph… Ro…"): the redaction results are counts 
                           narrative_draft, query_text
     CEC Coordinator, adjudicator: tasks and status only (Flows 3–4 have no Agent tools)
 
-Read-only for now; the unsigned actions (import, pull, upload, drafts) come with
-step 32's actions.
+The unsigned steps (Q4) act as that person and are ordinary case events, as from the
+app; none signs, and none moves a case the app's same step would not:
+
+    data manager        import_waiting_files, pull_from_edc (recorded in the Slack
+                        actions log, as `/adj import` is)
+    site                upload_attached_files: the files attached to this message, to a
+                        case of its site that takes documents (Q8; `files.py`)
+    Safety Specialist   edit_narrative_draft, draft_site_query: unsigned drafts that
+                        pre-fill the Quality check page (`flow2.qc_drafts`); the case
+                        stays in QC review until it is signed there
+
+What a turn brings (the Slack user, the attached files) comes in a `Turn`, never in the
+tools' definitions: those stay fixed per role, so a recorded answer is found again.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from adjud.ai.tools import Tool, Toolbox, ToolError, _schema
-from adjud.documents import documents_of
+from adjud.documents import documents_of, upload
 from adjud.dossier import latest_dossier
-from adjud.flow2 import QUERY_CODES
+from adjud.flow2 import QC_QUERY_CODES, QUERY_CODES, Flow2, Flow2Refused, qc_drafts
 from adjud.qc import Checklist
-from adjud.slack_app.core import Workspace, suggested_word
-from adjud.workflow import State
+from adjud.slack_app.core import SlackActionsLog, Workspace, import_as, suggested_word
+from adjud.slack_app.files import FileRefused, SlackFiles
+from adjud.workflow import TRANSITIONS, State, state_words
 
 # De-identification categories in plain words, plural, so a count never reads like a
 # label followed by a value ("address 1") to the PHI gate's label rules.
@@ -65,14 +78,31 @@ SNAPSHOT_FIELDS = (
 )  # fmt: skip
 
 
-def agent_toolbox(ws: Workspace, person: dict[str, Any]) -> Toolbox:
+# The states in which a site may add documents, as the Documents page offers the upload
+UPLOAD_STATES = frozenset(s for s in TRANSITIONS["documents.uploaded"] if s is not None)
+SIGN_IN_APP = "Signed in the app: the reply's Open in the app button opens the page."
+
+
+@dataclass
+class Turn:
+    """What one Slack turn gives the acting tools, and what they did (for the logs)."""
+
+    slack_user: str = ""
+    actions: SlackActionsLog | None = None  # the Slack actions log, as for /adj import
+    attachments: list[dict[str, Any]] = field(default_factory=list)  # this message's files
+    files: SlackFiles | None = None  # fetches and deletes them
+    done: list[dict[str, Any]] = field(default_factory=list)  # for the conversation log
+
+
+def agent_toolbox(ws: Workspace, person: dict[str, Any], turn: Turn | None = None) -> Toolbox:
     """The tools of the person the Agent acts for (Q11)."""
-    return AgentTools(ws, person).toolbox()
+    return AgentTools(ws, person, turn).toolbox()
 
 
 class AgentTools:
-    def __init__(self, ws: Workspace, person: dict[str, Any]) -> None:
+    def __init__(self, ws: Workspace, person: dict[str, Any], turn: Turn | None = None) -> None:
         self.ws, self.person, self.role = ws, person, person["role"]
+        self.turn = turn or Turn()
 
     def case(self, args: dict[str, Any]) -> str:
         """The case named in `args`, among this person's cases only; the same refusal
@@ -108,6 +138,12 @@ class AgentTools:
                            {"ae_id": {"type": "string", "description": "AE ID or empty"}},
                            self.records_not_a_case),
                 summary,
+                self._tool("import_waiting_files", "Import the AE files waiting in the queue, "
+                           "as this person. Only when they ask for it.", {},
+                           self.import_waiting_files),
+                self._tool("pull_from_edc", "Pull the AE records from the EDC now and import "
+                           "them, as this person. Only when they ask for it.", {},
+                           self.pull_from_edc),
             ]  # fmt: skip
         elif self.role == "site":
             tools += [
@@ -120,6 +156,11 @@ class AgentTools:
                            "how many remain or were kept. Counts only.", CASE_ARG,
                            self.redaction_results),
                 query,
+                self._tool("upload_attached_files", "Add the files attached to the person's "
+                           "latest message to one case of their site, as this person; "
+                           "identifiers are then removed automatically. Only when they ask "
+                           "for it or answer a query with files.", CASE_ARG,
+                           self.upload_attached_files),
             ]  # fmt: skip
         elif self.role == "safety_specialist":
             tools += [
@@ -137,6 +178,21 @@ class AgentTools:
                            "came from and whether it was approved.", CASE_ARG,
                            self.narrative_draft),
                 query,
+                self._tool("edit_narrative_draft", "Save the narrative of one case in QC review "
+                           "as edited, unsigned. `text` is the whole narrative. It pre-fills "
+                           "the Quality check page, where it is signed.",
+                           {**CASE_ARG, "text": {"type": "string",
+                                                 "description": "The whole narrative"}},
+                           self.edit_narrative_draft),
+                self._tool("draft_site_query", "Draft the Site Query of one case in QC "
+                           "review, unsigned: its reasons and the message to the site. It "
+                           "pre-fills the Quality check page; nothing reaches the site until "
+                           "it is signed there.",
+                           {**CASE_ARG,
+                            "reasons": {"type": "array", "description": "Query reasons",
+                                        "items": {"type": "string", "enum": QC_QUERY_CODES}},
+                            "text": {"type": "string", "description": "Message to the site"}},
+                           self.draft_site_query),
             ]  # fmt: skip
         return Toolbox(tools)
 
@@ -255,6 +311,11 @@ class AgentTools:
         case_id = self.case(args)
         q = next((e for e in reversed(self.ws.store.events(case_id))
                   if e["type"] == "query.opened"), None)  # fmt: skip
+        draft = qc_drafts(self.ws.store, case_id) if self.role == "safety_specialist" else None
+        if draft is not None and draft.query_at and self._state(case_id) == State.QC_REVIEW:
+            return {"case": case_id, "query": None, "unsigned_draft": {
+                "reasons": [QUERY_CODES.get(c, c) for c in draft.query_codes],
+                "text": draft.query_text or "", "signed": SIGN_IN_APP}}  # fmt: skip
         if q is None:
             return {"case": case_id, "query": None}
         return {"case": case_id, "query": {
@@ -336,13 +397,116 @@ class AgentTools:
                                      "narrative.approved") and e["seq"] > drafted["seq"]
                        for e in events)  # fmt: skip
         d = drafted["data"]
+        edited = qc_drafts(self.ws.store, case_id).narrative if not approved else None
         return {
             "case": case_id,
-            "text": self.ws.store.get_file(case_id, d["draft"]["path"]).decode(),
+            "text": edited or self.ws.store.get_file(case_id, d["draft"]["path"]).decode(),
             "source": {"ai": "AI", "template": "study template"}.get(d.get("source"), "?"),
             "simulated": bool(d.get("simulated")),
+            "edited_unsigned": edited is not None,
             "approved": approved,
         }
+
+    # -- acting: unsigned steps only (Q4) ------------------------------------------------
+
+    def _import(self, action: str) -> dict[str, Any]:
+        if self.turn.actions is None:
+            raise ToolError("importing is not available here")
+        reply = import_as(self.ws, self.turn.actions, self.turn.slack_user, self.person,
+                          action, via="agent")  # fmt: skip
+        self.turn.done.append({"action": action, "result": reply.result,
+                               "cases": reply.created})  # fmt: skip
+        if reply.result != "done":
+            raise ToolError(reply.text)
+        return {"done": reply.text, "new_cases": reply.created}
+
+    def import_waiting_files(self, _: dict[str, Any]) -> dict[str, Any]:
+        return self._import("import")
+
+    def pull_from_edc(self, _: dict[str, Any]) -> dict[str, Any]:
+        return self._import("pull")
+
+    def upload_attached_files(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The site's upload from Slack (Q8, Q13): the same call as the Documents page,
+        as this person, then Slack is asked to delete the original."""
+        case_id = self.case(args)
+        state = self._state(case_id)
+        if state not in UPLOAD_STATES:
+            raise ToolError(f"{case_id} does not take documents now "
+                            f"({state_words(state, self.role)})")  # fmt: skip
+        if not self.turn.attachments or self.turn.files is None:
+            raise ToolError("no file is attached to the person's latest message")
+        events = self.ws.store.events(case_id)
+        before = {i for e in events if e["type"] == "documents.uploaded"
+                  for i in ((e["data"].get("via") or {}).get("slack_files") or [])}  # fmt: skip
+        got: list[tuple[str, bytes, str]] = []
+        refused = []
+        for n, f in enumerate(self.turn.attachments, 1):
+            if f.get("id") in before:
+                refused.append({"attachment": n, "why": "it is already in the case"})
+                continue
+            try:
+                name, content = self.turn.files.fetch(f)
+            except FileRefused as exc:
+                refused.append({"attachment": n, "why": str(exc)})
+                continue
+            got.append((name, content, str(f.get("id"))))
+        names = []
+        if got:
+            via = {"slack_files": [i for *_, i in got]}  # never added twice
+            names = upload(self.ws.store, case_id, [(n, c) for n, c, _ in got],
+                           self.person["id"], via=via)  # fmt: skip
+        deleted = {i: self.turn.files.delete(i) for *_, i in got}
+        said = sorted({v for v in deleted.values() if v != "deleted"})
+        detail = {"files": len(got), "refused": len(refused),
+                  "deleted_from_slack": sum(v == "deleted" for v in deleted.values()),
+                  "slack_said": said}  # fmt: skip
+        if self.turn.actions is not None:
+            self.turn.actions.record(
+                self.turn.slack_user, self.person["id"], "agent:upload", cases=[case_id],
+                result="done" if got else "refused",
+                reason=None if got else "no file could be added", detail=detail,
+            )  # fmt: skip
+        self.turn.done.append({"action": "upload", "case": case_id, **detail})
+        if not got:
+            raise ToolError("no file was added: " + "; ".join(
+                f"attachment {r['attachment']}: {r['why']}" for r in refused))  # fmt: skip
+        kept = len(got) - detail["deleted_from_slack"]
+        return {
+            "case": case_id,
+            "added": names,
+            "not_added": refused,
+            "next": "Identifiers are being removed now; the redacted pages are then ready "
+                    "to review and sign in the app.",
+            "original_in_slack": (f"{kept} original file(s) stay in Slack: the app cannot "
+                                  "delete a person's file there") if kept else
+                                 "The originals were deleted from Slack.",
+        }  # fmt: skip
+
+    def _flow2(self) -> Flow2:
+        return Flow2(self.ws.store, self.ws.paths.config, self.ws.study)
+
+    def edit_narrative_draft(self, args: dict[str, Any]) -> dict[str, Any]:
+        case_id = self.case(args)
+        try:
+            text = str(args.get("text") or "")
+            self._flow2().save_narrative_draft(case_id, self.person["id"], text, via="slack")
+        except Flow2Refused as exc:
+            raise ToolError(str(exc)) from None
+        self.turn.done.append({"action": "narrative_draft", "case": case_id})
+        return {"case": case_id, "saved": "narrative draft, unsigned", "signed": SIGN_IN_APP}
+
+    def draft_site_query(self, args: dict[str, Any]) -> dict[str, Any]:
+        case_id = self.case(args)
+        codes = [str(c) for c in args.get("reasons") or []]
+        try:
+            text = str(args.get("text") or "")
+            self._flow2().save_query_draft(case_id, self.person["id"], codes, text, via="slack")
+        except Flow2Refused as exc:
+            raise ToolError(str(exc)) from None
+        self.turn.done.append({"action": "query_draft", "case": case_id})
+        return {"case": case_id, "saved": "Site Query draft, unsigned; not sent to the site",
+                "signed": SIGN_IN_APP}  # fmt: skip
 
     def _state(self, case_id: str) -> State:
         return self.ws.store.state(case_id).state

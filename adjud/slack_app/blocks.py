@@ -190,11 +190,15 @@ def act_as_modal(people: Directory, current: str | None) -> dict[str, Any]:
 
 
 def notice(
-    note: dict[str, Any], who: str, url: str | None, next_step: str | None = None
+    note: dict[str, Any],
+    who: str,
+    url: str | None,
+    next_step: str | None = None,
+    detail: str | None = None,
 ) -> tuple[str, list[dict]]:
     """A notice as a DM: the same content as the e-mail (study, case, task, for whom), the
-    recipient's next step in Task words (P-57) and an *Open in the app* button. Returns
-    (fallback text, blocks)."""
+    recipient's next step in Task words (P-57), `detail` (the Site Query, PHI-gated:
+    P-58, Q13) and an *Open in the app* button. Returns (fallback text, blocks)."""
     case = note.get("case_id")
     task = note["subject"][:1].lower() + note["subject"][1:]
     text = (
@@ -207,6 +211,8 @@ def notice(
     if next_step:
         body += f"\nNext: {esc(next_step)}"
     blocks: list[dict[str, Any]] = [_text(body)]
+    if detail:
+        blocks.append(_text(esc(detail)[:2900]))
     buttons = [open_button(url, action_id="open_app_dm")] if url else []
     if in_slack:
         label = {"type": "plain_text", "text": "Import queued files"}

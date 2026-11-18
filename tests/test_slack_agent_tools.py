@@ -57,12 +57,14 @@ def tool_names(ws: Workspace, person_id: str) -> set[str]:
 def test_each_role_has_only_its_own_tools(ws):
     everyone = {"my_tasks", "my_cases", "case_status"}
     assert tool_names(ws, "dm.dana") == everyone | {"waiting_files", "records_not_a_case",
-                                                    "case_summary"}  # fmt: skip
+                                                    "case_summary", "import_waiting_files",
+                                                    "pull_from_edc"}  # fmt: skip
     assert tool_names(ws, "site101.coord") == everyone | {
-        "case_summary", "required_documents", "redaction_results", "query_text"}  # fmt: skip
+        "case_summary", "required_documents", "redaction_results", "query_text",
+        "upload_attached_files"}  # fmt: skip
     assert tool_names(ws, "ss.anna") == everyone | {
         "case_summary", "qc_checks", "ai_suggestion", "dossier_summary", "narrative_draft",
-        "query_text"}  # fmt: skip
+        "query_text", "edit_narrative_draft", "draft_site_query"}  # fmt: skip
     for flows_3_4 in ("cec.sofia", "adj.okafor", "adj.lindqvist"):
         assert tool_names(ws, flows_3_4) == everyone
 

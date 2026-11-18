@@ -31,7 +31,7 @@ from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
 from adjud.slack_app.core import Directory, Workspace
 from adjud.slack_app.dm import ACTOR as SLACK_ACTOR
-from adjud.slack_app.dm import SlackDmChannel, SlackSettings
+from adjud.slack_app.dm import QueryInDm, SlackDmChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
@@ -79,6 +79,7 @@ class Runner:
             if settings is None:
                 log.warning("NOTIFY_CHANNELS lists slack, but SLACK_BOT_TOKEN is not set: off")
             else:  # Slack posts what is queued from when it was first switched on (P-54)
+                workspace = Workspace(self.paths, self.study, clock=self.clock)
                 self.slack = Deliverer(
                     self.pipeline.store,
                     self.paths.config,
@@ -86,7 +87,8 @@ class Runner:
                         Directory(self.paths.config, self.paths.root / "slack", self.study),
                         settings,
                         settings.client(),
-                        next_step=Workspace(self.paths, self.study, clock=self.clock).next_step,
+                        next_step=workspace.next_step,
+                        detail=QueryInDm(workspace),  # the Site Query, PHI-gated (P-58)
                     ),
                     SLACK_ACTOR,
                     since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
