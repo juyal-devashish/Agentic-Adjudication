@@ -313,7 +313,8 @@ def test_the_status_line_follows_the_adjudicators_own_review(reviewing, monkeypa
     """B33: after signing, or after being reassigned away, an adjudicator is not told to
     complete and sign the form; only the one with an open review is, with a link to it."""
     monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
-    from assistant import Assistant
+    from common import my_review
+    from wording import next_step
 
     runner, store, cid = reviewing
     rnd = current_round(store, cid)
@@ -328,8 +329,9 @@ def test_the_status_line_follows_the_adjudicators_own_review(reviewing, monkeypa
         a3: "Your independent review is open: complete and sign the form.",
     }
     for uid, line in expected.items():
-        reply = Assistant(USERS[uid]).handle(f"/status {cid}").text
-        assert line in reply and "may be open" not in reply, (uid, reply)
+        step = next_step("adjudicator", store.state(cid).state, site="", requested=[],
+                         ready=False, has_files=True, review=my_review(uid, cid))  # fmt: skip
+        assert step == line, (uid, step)
         at = as_user(uid, "views/results.py", cid)
         assert line in html_text(at) and "may be open" not in html_text(at), uid
         links = [p.proto.label for p in at.get("page_link")]

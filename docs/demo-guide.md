@@ -19,16 +19,17 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 
 ## Script (about 15 minutes)
 
-1. **Slack, roles and the app (P-56, ADR 0003).** Slack is where each person's work starts; the app is where it is read and signed. In Slack, `/adj act-as <name>` chooses whom you act as, App Home lists that person's Tasks, and each notice arrives as a DM. Every step that needs a signature or Clinical Content has **Open in the app**, which opens the right page on the right case as that person. In the app, each role lands on its own page with a short *Your tasks* list on top: the data manager *AE import*, the site *Documents*, the Safety Specialist *Quality check*, and everyone the read-only *Case record*.
-   - Slack never shows Clinical Content and never asks for a password (ADR 0004): case IDs, status, tasks and buttons only. Say this plainly; it is the point. The AI decides nothing either: it prepares the Quality Check, and people sign (ADR 0001).
+1. **Slack, roles and the app (P-56, P-58, ADR 0003).** Each person does their work by talking to the **Agent** in Slack's Messages tab; the app keeps signatures and the screens Slack cannot show. In Slack, `/adj act-as <name>` chooses whom you act as (and whom the Agent acts as), App Home lists that person's Tasks, and each notice arrives as a DM that starts a conversation about its case. Every step that needs a signature has **Open in the app**, which opens the right page on the right case as that person. In the app, each role lands on its own page with a short *Your tasks* list on top: the data manager *AE import*, the site *Documents*, the Safety Specialist *Quality check*, and everyone the read-only *Case record*.
+   - Slack may show anything without PHI, never PHI, and never asks for a password (ADR 0005): every Agent reply passes the same detectors de-identification uses before it is posted. Slack stands in for Teams here; synthetic data only. The AI decides nothing either: it prepares the Quality Check, and people sign (ADR 0001).
    - In Slack: `/adj tasks`, `/adj cases`, `/adj status 0001`, `/adj import`, `/adj pull`, `/adj help`. Replies are visible only to you.
    - As *Priya Nair* (Larkfield General Hospital, site 101), only her hospital's cases are visible, in Slack and in the app. The people and hospitals are fictional; Tech Observer staff are Rahul Mehta (data manager) and Dr. Anna Weber (Safety Specialist). Without Slack, every step works from the app and the e-mail links.
    - **E-mails.** Each e-mail the runner sends pops up at the bottom right within a few seconds, for every role, about cases that role may see. Keep Mailpit (:8025) open beside the app to show the same message arriving; its link opens the case.
 2. **AE import.** In Slack, `/adj act-as rahul` (Rahul Mehta, data manager):
-   - App Home shows *1 AE file waiting to be imported*. Click **Import queued files**: 3 new cases and 1 record that is not a case. Do it within 5 minutes of starting the runner; after that the runner imports the file itself. In the app, the same import is on *AE import*.
-   - Home says *1 record is not a case*; **Open AE import** shows, on the AE-008 row, the rule it fails (it is not serious). Slack doesn't say why: the reason is Clinical Content.
+   - App Home shows *1 AE file waiting to be imported*. Type **import the AE file** to the Agent, or click **Import queued files** on Home: 3 new cases and 1 record that is not a case. Do it within 5 minutes of starting the runner; after that the runner imports the file itself. In the app, the same import is on *AE import*.
+   - Home says *1 record is not a case*. Ask the Agent **why is one record not a case?**, or **Open AE import**: the AE-008 row shows the rule it fails (it is not serious).
    - `/adj pull` (or **Pull AE records now** on *AE import*) is a stand-in that reads the mock EDC; no live EDC is connected.
 3. **Upload.** Case DEMO01-0001's site gets an e-mail (show it in Mailpit). `/adj act-as priya` (site 101): the DM *documents requested* arrives, and App Home lists her two cases with *Upload the documents*. Click **Open in the app** on DEMO01-0001: *Documents* opens on that case. Then either:
+   - in Slack, reply in the thread of the *documents requested* DM with the three files attached: the Agent uploads them to the case as Priya. The originals then also stay in Slack (demo only, synthetic data; ADR 0005); or
    - on *Documents*, add the three files from `data/demo_uploads/documents/DEMO01-101-0001_AE-001/`. Each is tagged automatically from its title (discharge summary, ECG report, laboratory results); a wrong tag can be changed under *Review*; or
    - zip them into the case's folder `data/uploads/DEMO01-0001/`. The runner picks the ZIP up within a minute.
 4. **Redaction and review.** As *Priya Nair* (site 101), on *Documents*:
@@ -38,7 +39,7 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
    - Sign with the password `demo`.
 5. **Flow 2: one Quality Check stop (P-39).** After the site's signature, code and the AI prepare everything before the Safety Specialist looks. Allow about a minute with live AI.
    - Code runs the six checks and builds the dossier. The AI writes its **AI Suggestion**: which documents are needed (the checklist's, plus advice on what would help) and a field-by-field match with the EDC, each with its reasoning and the quotes code verified. The AI also drafts the narrative.
-   - `/adj act-as anna`: a DM says the quality check of DEMO01-0001 needs her review, and App Home's task shows *suggested: pass*, one word worked out by code (`/adj status 0001` says the same). The AI Suggestion itself stays in the app. Click **Open in the app**. One page shows the checks, the AI Suggestion, the **suggested outcome** (*pass*, worked out by code), the documents, the dossier and the narrative draft.
+   - `/adj act-as anna`: a DM says the quality check of DEMO01-0001 needs her review, and App Home's task shows *suggested: pass*, one word worked out by code (`/adj status 0001` says the same). Ask the Agent **what does the QC say for 0001?** for the checks and the AI Suggestion, and **change the last sentence of the narrative to "…"** to edit the draft (unsigned). Click **Open in the app**. One page shows the checks, the AI Suggestion, the **suggested outcome** (*pass*, worked out by code), the documents, the dossier and the narrative draft.
    - Say it plainly: this is not adjudication, and the AI decides nothing. It supports her review (ADR 0001). The outcome field shows *Not sure* where the documents say "discharged home" but not "recovered"; that doesn't hold back a pass, because the event itself matches.
    - Edit the narrative, for example add a sentence, and sign once: **Sign the pass and the narrative** (password `demo`). The case becomes ready for adjudication.
    - Show *Case record*: two signatures in the audit trail (site, and the Quality Check), *Narrative: what the Safety Specialist changed*, the notifications, and the AI calls with their cost.
@@ -60,23 +61,24 @@ Synthetic data only. This shows the mechanics; it is not validated, and roles ar
 
 Cost on Opus 5.5 is about $0.50 per full demo run: each Quality Check round asks for the AI Suggestion and a narrative draft. If live AI fails, switch to `replay` and restart. Replay only has answers for the demo's own documents.
 
-## Slack app (P-55, ADR 0003, ADR 0004)
+## Slack app and the Agent (P-55, P-58, ADR 0003, ADR 0005)
 
-Slack is where work starts; the app is where it is read and signed. Slack shows case IDs, statuses, tasks and buttons, never Clinical Content, and no signature is taken there. E-mail and every app screen carry on as before. Synthetic data only. The test plan is [slack-test-plan.md](slack-test-plan.md).
+Each person talks to one Claude **Agent** in the app's Messages tab; it acts as that person, with that role's tools only, and does the steps that need no signature. Slack may carry anything without PHI: every Agent reply passes the PHI gate first, and a held reply says *That answer may contain identifiers; open it in the app.* No signature is taken in Slack. E-mail (still case ID, task and link only) and every app screen carry on as before. Synthetic data only. The step-by-step script is [slack-demo-runbook.md](slack-demo-runbook.md); the test plan is [slack-test-plan.md](slack-test-plan.md).
 
 1. **Set up once** (a separate free demo workspace, never the company's; you its only member).
    - At api.slack.com/apps: **Create New App → From a manifest**, pick the demo workspace, paste [slack-app-manifest.yaml](slack-app-manifest.yaml), create.
    - **Basic Information → App-Level Tokens → Generate**, scope `connections:write`: that is `SLACK_APP_TOKEN`.
    - **Install App → Install to Workspace**, then copy the **Bot User OAuth Token**: that is `SLACK_BOT_TOKEN`.
-   - In `.env`: `NOTIFY_CHANNELS=outbox,smtp,slack`, `SLACK_BOT_TOKEN=…`, `SLACK_APP_TOKEN=…`. Never commit them or paste them into a chat.
-2. **Start.** `uv run python -m tools.reset_demo --preload`, then three processes with `--env-file .env`: the runner, the UI, and `uv run --env-file .env python -m adjud.slack_app`. Run one Slack app process only.
+   - In `.env`: `NOTIFY_CHANNELS=outbox,smtp,slack`, `SLACK_BOT_TOKEN=…`, `SLACK_APP_TOKEN=…`, and for the Agent `ADJUD_AGENT_MODE=live` with `ANTHROPIC_API_KEY=…`. Never commit them or paste them into a chat.
+   - The installed manifest already has the agent experience; an app made from the pre-P-58 manifest needs the new one and a reinstall.
+2. **Start.** `uv run python -m tools.reset_demo --preload`, then three processes with `--env-file .env`: the runner, the UI, and `uv run --env-file .env python -m adjud.slack_app`. Run one Slack app process only. `ADJUD_AI_MODE=replay` with `ADJUD_AGENT_MODE=live` keeps Flow 2's agents on their recorded answers while the Agent talks live. With the Agent `off` (the default), or `live` without a key, its answers are the person's tasks and links, written by code.
 3. **Show it.**
-   - In Slack, type `/adj act-as rahul` (or `/adj act-as` for a list). Open the app's **Home** tab: *Acting as Rahul Mehta (Data manager)*, one task: *1 AE file waiting to be imported*. Click **Import queued files**. Three cases are created; Home shows the summary.
-   - The sites' notices arrive as DMs in the app's **Messages** tab, each saying who it is for, with **Open in the app**. E-mail still arrives in Mailpit.
-   - `/adj act-as priya`: Home lists DEMO01-0001's task, *Upload the documents*. **Open in the app** opens the Documents page as Priya Nair. Upload and sign there, as before.
-   - `/adj act-as anna` after the site signs: *Review the Quality Check and sign* opens the Quality check page. Say it plainly: the decision and the signature are in the app, because Slack must not ask for passwords and must not hold Clinical Content.
+   - `/adj act-as rahul` (or `/adj act-as` for a list). In the **Messages** tab, type **import the AE file**: three cases are created (or click **Import queued files** on **Home**).
+   - The sites' notices arrive as DMs, each saying who it is for, with **Open in the app**. Each starts a thread about its case. E-mail still arrives in Mailpit.
+   - `/adj act-as priya`: reply in the thread of DEMO01-0001's *documents requested* DM with the three files attached; the Agent uploads them. The originals also stay in Slack: the app tries to delete them and records the result (a live test answered `cant_delete_file`). Then **Open in the app** to review and sign.
+   - `/adj act-as anna` after the site signs: ask **what does the QC say for 0001?**, then **change the last sentence of the narrative to "…"**. **Open in the app** opens the Quality check page with the edited draft; the decision and the signature are in the app, because Slack must not ask for passwords.
    - `/adj status 0001` answers with the status and the next step, visible only to you.
    - The Case record's *Notifications* shows e-mail and Slack status per notice.
 4. **If Slack misbehaves on stage,** carry on from the e-mail link or the app; nothing in the workflow waits for Slack.
 
-Acting As is simulated, as the app's sidebar is. Every Slack action is in `data/slack/actions.jsonl` (hash-chained; `tools.verify_log` checks it) with your Slack user and whom you acted as. A demo reset clears that log but keeps whom you act as, so DMs keep reaching you.
+Acting As is simulated, as the app's sidebar is. Every Slack action is in `data/slack/actions.jsonl` (hash-chained; `tools.verify_log` checks it) with your Slack user and whom you acted as. Every turn with the Agent is in `data/slack/conversations.jsonl` (hash-chained, verified the same way): whom it acted as, the case, the tools called and the reply, or that it was held. A demo reset clears both logs but keeps whom you act as, so DMs keep reaching you.

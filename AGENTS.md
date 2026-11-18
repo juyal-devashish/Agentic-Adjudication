@@ -11,7 +11,7 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this
 - Read the relevant spec section before changing behavior. If code and spec disagree, flag it; don't silently pick one.
 - Don't start UI polish before the store, workflow and their tests pass. Don't pull in the production stack from spec.md §8.3.
 
-Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, SMTP via `smtplib` (Mailpit or Outlook for the demo), Anthropic Python SDK (version pinned, used only through the gateway), Slack Bolt for Python (`slack_bolt`, pinned, used only from `adjud/slack_app/`). **No database server, no queue broker, no cloud service** (one exception: a Slack app for notices, tasks and lookups, never Clinical Content or signatures; ADR 0003, ADR 0004).
+Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyMuPDF, Tesseract via pytesseract, Microsoft Presidio + spaCy English model, bcrypt, Faker, pytest, Docker Compose, SMTP via `smtplib` (Mailpit or Outlook for the demo), Anthropic Python SDK (version pinned, used only through the gateway), Slack Bolt for Python (`slack_bolt`, pinned, used only from `adjud/slack_app/`). **No database server, no queue broker, no cloud service** (one exception: a Slack app for notices, tasks and the Slack Agent, never PHI or signatures; ADR 0003, ADR 0005).
 
 ## Working style
 
@@ -53,7 +53,9 @@ Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyM
 - Intake is idempotent on (study, subject, AE ID). A newer `last_modified` stores a new snapshot and raises `source.changed`; nothing is withdrawn automatically.
 - **Sign and submit** is possible only when every file has passed verification. Signed submissions are immutable.
 - The Flow 2 handoff manifest lists only redacted files and source snapshots with hashes, never anything from `documents/original/`. Flow 2 reads only that manifest. The Flow 3 manifest likewise lists only the dossier, narrative and QC results with hashes.
-- Notifications contain no clinical content: case ID, task and link only.
+- E-mail notifications contain no clinical content: case ID, task and link only.
+- **Slack carries anything without PHI, nothing with PHI** (ADR 0005, plan P-58). PHI is what de-identification removes under the study's `deid_policy.yaml`. Never anything from `documents/original/` or an unverified file in Slack (one demo exception: a site's own originals attached in Slack stay there). Every text the Slack Agent posts passes the deterministic PHI gate (`adjud/slack_app/phi_gate.py`) first; a held reply says so and links to the app.
+- **The Slack Agent acts for one person** (P-58): Claude through the gateway only, with that role's tools (`adjud/slack_app/agent_tools.py`), which enforce in code what the person sees in the app; never only in the prompt. It does only unsigned steps; every signed step is an *Open in the app* button. Every turn goes to the hash-chained `data/slack/conversations.jsonl`; its actions are ordinary case events as that person.
 - Study behavior changes by editing config in `data/config/`, not code.
 
 **Data and privacy**
@@ -69,12 +71,12 @@ Stack: Python 3.12, Streamlit (UI), Pydantic + jsonschema, PyYAML, filelock, PyM
 
 **AI calls**
 - All calls go through `adjud/ai/gateway.py`. No other module imports the Anthropic SDK.
-- The mode (`off` / `replay` / `live`), the per-function switches, the pinned model (a small model by default) and the gate thresholds live in `study.yaml`; prompts are versioned files in `adjud/ai/prompts/`. Don't hard-code any of them elsewhere. `live` without a key falls back to `off` and says so.
+- The mode (`off` / `replay` / `live`; per function under `ai.modes`, so the Slack Agent can run `live` while the Quality Check agents replay; `ADJUD_AI_MODE` and `ADJUD_AGENT_MODE` override), the per-function switches, the pinned model (a small model by default) and the gate thresholds live in `study.yaml`; prompts are versioned files in `adjud/ai/prompts/`. Don't hard-code any of them elsewhere. `live` without a key falls back to `off` and says so.
 - Replay outputs written by hand are labelled *simulated* in events and in the UI until real outputs are recorded.
 - Log tokens and cost for every call in `data/ai/usage.jsonl`; respect the budget cap in `study.yaml`.
 - The API key comes only from an environment variable. Never write it to `data/`, logs or the repository.
 - Validate every output against its JSON schema, up to 2 retries, then continue without AI and tell the user. Verify citations in code; mark unverifiable findings "unverified".
-- Save every call to `cases/<id>/ai/` (function, mode, model, prompt version, input hash, output, valid, tokens, cost, latency), including failures, refusals and timeouts. Never drop them. The gate result is an event, and so is any human override.
+- Save every call to `cases/<id>/ai/` (function, mode, model, prompt version, input hash, output, valid, tokens, cost, latency), including failures, refusals and timeouts; a Slack Agent turn about no case goes to `data/ai/calls/<date>/`, referenced from its ledger line. Never drop them. The gate result is an event, and so is any human override.
 - Ask before running anything that makes more than ~10 real API calls (e.g. `tools/deid_check.py` with AI-1 on).
 
 **Code hygiene**
