@@ -423,9 +423,19 @@ class Assistant:
                 "The queued AE files had already been imported.",
                 [Action("Open the import results", "import")],
             )
-        lines = []
+        blocks = []  # one Markdown block per file, so summaries never join a bullet
         for r in results:
-            lines.append(import_summary({**r.summary(), "file": r.file}))
+            summary = import_summary({**r.summary(), "file": r.file})
+            lines = [summary]
+            if summary.endswith("below and import it again."):  # list what "below" means
+                for e in r.errors:
+                    where = ", ".join(
+                        p for p in (e["row"] and f"Row {e['row']}", e["column"] and
+                                    f"column {e['column']}") if p
+                    )  # fmt: skip
+                    problem = e["code"].replace("_", " ").capitalize()
+                    detail = f" ({e['message']})" if e.get("message") else ""
+                    lines.append(f"- {where + ': ' if where else ''}{problem}{detail}")
             for o in r.outcomes:
                 subject, ae = o["key"].split("|")[1:3]
                 word = IMPORT_OUTCOME.get(o["outcome"], o["outcome"])
@@ -433,9 +443,10 @@ class Assistant:
                     lines.append(f"- {ae} ({subject}): {word.lower()} **{o['case_id']}**")
                 else:
                     lines.append(f"- {ae} ({subject}): {word.lower()}. Ask me `/why {ae}`.")
+            blocks.append("\n".join(lines))
         if any(o.get("case_id") for r in results for o in r.outcomes):
-            lines.append("\nThe sites are e-mailed now with a link to upload their documents.")
-        return Reply("\n".join(lines), [Action("Open the import results", "import")])
+            blocks.append("The sites are e-mailed now with a link to upload their documents.")
+        return Reply("\n\n".join(blocks), [Action("Open the import results", "import")])
 
     # -- live updates ------------------------------------------------------------------------
 

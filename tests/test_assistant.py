@@ -271,3 +271,28 @@ def test_a_hidden_file_in_the_inbox_is_not_an_ae_file_waiting(demo):
     say(at, "/import")
     assert "There is no AE file waiting in the import queue." in chat(at).rsplit("/import", 1)[-1]
     assert (demo.inbox / ".DS_Store").exists()
+
+
+def test_import_reply_keeps_each_file_apart_and_lists_the_rejected_rows(demo, monkeypatch):
+    """B39: with several files, each summary starts its own Markdown block (not glued to the
+    previous paragraph or bullet), and a rejected file's "fix the rows below" has rows below."""
+    from markdown_it import MarkdownIt
+
+    from tools.reset_demo import KIT
+
+    monkeypatch.syspath_prepend(str(ROOT / "ui"))  # the UI imports its modules by name
+    from assistant import Assistant
+
+    (demo.inbox / "05_invalid_rows.csv").write_bytes(
+        (KIT / "inbox_scenarios" / "05_invalid_rows.csv").read_bytes()
+    )
+    text = Assistant({"id": "dm.dana", "role": "data_manager"}).handle("/import").text
+    html = MarkdownIt().render(text)
+    blocks = html.split("<p>")
+    assert sum("Imported 01_initial.csv" in b for b in blocks) == 1
+    assert sum("05_invalid_rows.csv was not imported" in b for b in blocks) == 1
+    items = [li.split("</li>", 1)[0] for li in html.split("<li>")[1:]]
+    assert not any("Imported" in li or "not imported" in li for li in items)
+    assert "fix the rows below" in text
+    below = text.split("fix the rows below", 1)[1]
+    assert "Row 3" in below and "onset_date" in below  # AE-031's impossible date
