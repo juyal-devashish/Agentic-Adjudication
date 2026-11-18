@@ -23,7 +23,7 @@ features:
   slash_commands:
     - command: /adj
       description: Your adjudication tasks, cases and status
-      usage_hint: "tasks | cases | status 0001 | import | act-as anna | help"
+      usage_hint: "tasks | cases | status 0001 | import | pull | act-as anna | help"
       should_escape: false
 oauth_config:
   scopes:

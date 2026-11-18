@@ -15,9 +15,9 @@ from adjud.paths import DataPaths
 from adjud.runner import Runner
 from adjud.slack_app import blocks
 from adjud.slack_app.app import SlackHandlers, build_app
-from adjud.slack_app.core import SlackActionsLog, Workspace
+from adjud.slack_app.core import SlackActionsLog, Workspace, suggested_word
 from adjud.workflow import State
-from tests.test_flow3 import SITE, pdf, through_qc
+from tests.test_flow3 import SITE, pdf, through_qc, to_qc_review
 from tools.reset_demo import DEMO_AES, reset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -256,10 +256,16 @@ def test_no_payload_carries_clinical_content(data):
                                   ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE)  # fmt: skip
     through_qc(runner, store, "DEMO01-0001")
     assert store.state("DEMO01-0001").state == State.ADJ_REVIEW
+    upload(store, "DEMO01-0003", [("note.pdf", pdf("CLINIC NOTE\nChest pain."))], SITE)
+    to_qc_review(runner, store, "DEMO01-0003")  # the Safety Specialist's row and status
     ws = Workspace(data)
+    dm = ws.people.by_id["dm.dana"]
+    pulled, _ = ws.pull_from_edc(dm)  # before the forbidden list, so its cases are in it
     bad = forbidden(ws)
     assert len(bad) > 10  # AE terms, dates, IDs and narrative lines of three cases
-    payloads = []
+    payloads: list = [pulled]
+    assert "suggested: " in json.dumps(blocks.home(ws, ws.people.by_id["ss.anna"]))
+    assert "not a case" in json.dumps(blocks.home(ws, dm))
     for person in ws.people.users:
         payloads.append(blocks.home(ws, person))
         payloads.append(blocks.tasks_reply(ws, person))
@@ -315,3 +321,60 @@ def test_a_failed_import_is_answered_and_logged(app, data, monkeypatch):
     assert "did not finish" in command(h, client, "import").last
     assert actions(data)[-1]["result"] == "failed"
     assert actions(data)[-1]["reason"] == "FileNotFoundError"
+
+
+def test_the_safety_specialist_sees_the_suggested_outcome_as_one_word(app, data):
+    h, client = app
+    runner = Runner(data)
+    runner.run_once()
+    store = runner.pipeline.store
+    upload(store, "DEMO01-0001", [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain."))], SITE)
+    to_qc_review(runner, store, "DEMO01-0001")
+    proposal = next(e["data"]["proposal"] for e in reversed(store.events("DEMO01-0001"))
+                    if e["type"] == "qc.checks_completed")  # fmt: skip
+    word = suggested_word(proposal)
+    command(h, client, "act-as anna")
+    rows = [b["text"]["text"] for b in client.published[-1]["view"]["blocks"] if "text" in b]
+    assert "*DEMO01-0001* · Review the Quality Check and sign · suggested: " + word in rows
+    assert f"suggested: {word}" in command(h, client, "status 0001").last
+    for other in ("rahul", "priya", "sofia"):  # data manager, site, CEC Coordinator
+        command(h, client, f"act-as {other}")
+        assert "suggested" not in json.dumps(client.published[-1]["view"])
+        assert "suggested" not in command(h, client, "status 0001").last
+
+
+def test_the_suggested_outcome_words_are_pass_query_or_none():
+    assert [suggested_word(p) for p in ("pass", "query", "unclear", None)] == [
+        "pass", "query", "none", "none"]  # fmt: skip
+
+
+def test_the_data_manager_sees_how_many_records_are_not_a_case(app, data):
+    h, client = app
+    command(h, client, "act-as rahul")
+    assert "not a case" not in json.dumps(client.published[-1]["view"])
+    command(h, client, "import")
+    home = client.published[-1]["view"]
+    row = next(b for b in home["blocks"] if "not a case" in json.dumps(b))
+    assert row["text"]["text"] == "1 record is not a case. The reasons are on AE import."
+    assert row["accessory"]["text"]["text"] == "Open AE import"
+    assert row["accessory"]["url"] == "http://localhost:8501/import?role=data_manager&user=dm.dana"
+    assert row["accessory"]["action_id"].startswith("open_app")
+    command(h, client, "act-as anna")
+    assert "not a case" not in json.dumps(client.published[-1]["view"])
+
+
+def test_the_data_manager_pulls_from_the_edc_from_slack(app, data):
+    h, client = app
+    command(h, client, "act-as anna")
+    assert "data manager's step" in command(h, client, "pull").last
+    assert actions(data)[-1]["action"] == "pull" and actions(data)[-1]["result"] == "refused"
+    assert h.ws.store.list_cases() == []
+    command(h, client, "act-as rahul")
+    r = command(h, client, "pull")
+    created = sorted(h.ws.store.list_cases())
+    assert created and "Pulled the AE records from the EDC. Imported 2 files" in r.last
+    assert all(c in r.last for c in created) and "AE-0" not in r.last
+    entry = actions(data)[-1]
+    assert (entry["action"], entry["result"], sorted(entry["cases"])) == ("pull", "done", created)
+    assert "Pulled the AE records" in json.dumps(client.published[-1]["view"])
+    assert "/adj pull" in command(h, client, "help").last

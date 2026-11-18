@@ -22,9 +22,10 @@ from urllib.parse import urlencode
 import yaml
 
 from adjud.chain import ChainedLog
+from adjud.edc_pull import pull
 from adjud.events import Clock, utc_now
 from adjud.flow3 import Flow3, assigned_cases, current_round
-from adjud.intake import IntakePipeline
+from adjud.intake import ImportResult, IntakePipeline
 from adjud.paths import DataPaths
 from adjud.store import FileCaseStore, write_atomic
 from adjud.workflow import State, state_words
@@ -42,6 +43,13 @@ FLAG_WORDS = {
     "no_longer_eligible": "no longer meets the rules",
     "possible_duplicate": "a possible duplicate",
 }
+# The Suggested Outcome (computed by code in flow2.py) as the one word Slack may show
+# (ADR 0004): never its reasons or any AI text.
+SUGGESTED_WORDS = {"pass": "pass", "query": "query", "unclear": "none"}
+
+
+def suggested_word(proposal: str | None) -> str:
+    return SUGGESTED_WORDS.get(proposal or "", "none")
 
 
 @dataclass(frozen=True)
@@ -258,7 +266,8 @@ class Workspace:
             return Task(cid, site_steps[state], "documents") if state in site_steps else None
         if role == "safety_specialist":
             if state == State.QC_REVIEW:
-                return Task(cid, "Review the Quality Check and sign", "qc")
+                word = self.suggested(cid)
+                return Task(cid, f"Review the Quality Check and sign · suggested: {word}", "qc")
             if state == State.NARRATIVE_REVIEW:
                 return Task(cid, "Check and sign the narrative", "qc")
             return None
@@ -276,6 +285,26 @@ class Workspace:
                     and meeting["data"]["quorum_met"]):  # fmt: skip
                 return Task(cid, "Sign the committee's consensus", "committee")
         return None
+
+    def suggested(self, case_id: str) -> str:
+        """The latest Quality Check round's Suggested Outcome as one word, read from the
+        proposal on its `qc.checks_completed` event only (no results file, no reasons)."""
+        proposal = None
+        for e in self.store.events(case_id):
+            if e["type"] == "qc.checks_completed":
+                proposal = e["data"].get("proposal")
+        return suggested_word(proposal)
+
+    def records_not_a_case(self, person: dict[str, Any]) -> int:
+        """For the data manager: how many AE records are, at their latest evaluation, not
+        eligible and not a case. A count only; the records and reasons stay in the app."""
+        if person["role"] != "data_manager":
+            return 0
+        latest: dict[str, dict[str, Any]] = {}
+        for e in self.store.intake_log().records():
+            latest[e["key"]] = e
+        return sum(1 for e in latest.values()
+                   if not e.get("case_id") and e.get("eligible") is False)  # fmt: skip
 
     # -- status --------------------------------------------------------------------------------
 
@@ -303,19 +332,33 @@ class Workspace:
         results = self.pipe.process_inbox(
             self.paths.inbox, self.paths.processed, actor=person["id"]
         )
-        outcomes = [o for r in results for o in r.outcomes]
-        created = [o["case_id"] for o in outcomes if o.get("outcome") == "created"]
-        others = len(outcomes) - len(created)
-        rejected = sum(1 for r in results if r.status != "ACCEPTED")
-        parts = [f"Imported {len(results)} file{'s' if len(results) != 1 else ''}: "
-                 f"{len(outcomes)} record{'s' if len(outcomes) != 1 else ''}"]  # fmt: skip
-        parts.append(f"{len(created)} new case{'s' if len(created) != 1 else ''}"
-                     + (f" ({', '.join(created)})" if created else ""))  # fmt: skip
-        if others:
-            parts.append(f"{others} not a new case (the reasons are on AE import in the app)")
-        if rejected:
-            parts.append(f"{rejected} file{'s' if rejected > 1 else ''} rejected")
-        return "; ".join(parts) + ".", created
+        return summarise_import(results)
+
+    def pull_from_edc(self, person: dict[str, Any]) -> tuple[str, list[str]]:
+        """The app's 'Pull AE records now' as this person (adjud/edc_pull.pull): the mock
+        EDC's records and any queued file are imported. Counts and case IDs only."""
+        if person["role"] != "data_manager":
+            raise PermissionError("Pulling AE records from the EDC is the data manager's step.")
+        summary, created = summarise_import(pull(self.pipe, person["id"]))
+        return "Pulled the AE records from the EDC. " + summary, created
+
+
+def summarise_import(results: list[ImportResult]) -> tuple[str, list[str]]:
+    """An import in counts and case IDs only, and the cases created: no subject or AE IDs
+    (ADR 0004)."""
+    outcomes = [o for r in results for o in r.outcomes]
+    created = [o["case_id"] for o in outcomes if o.get("outcome") == "created"]
+    others = len(outcomes) - len(created)
+    rejected = sum(1 for r in results if r.status != "ACCEPTED")
+    parts = [f"Imported {len(results)} file{'s' if len(results) != 1 else ''}: "
+             f"{len(outcomes)} record{'s' if len(outcomes) != 1 else ''}"]  # fmt: skip
+    parts.append(f"{len(created)} new case{'s' if len(created) != 1 else ''}"
+                 + (f" ({', '.join(created)})" if created else ""))  # fmt: skip
+    if others:
+        parts.append(f"{others} not a new case (the reasons are on AE import in the app)")
+    if rejected:
+        parts.append(f"{rejected} file{'s' if rejected > 1 else ''} rejected")
+    return "; ".join(parts) + ".", created
 
 
 def _site_of(subject: str | None) -> str | None:
