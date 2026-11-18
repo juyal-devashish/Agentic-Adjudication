@@ -24,6 +24,7 @@ from typing import Any
 
 from adjud.events import EventDraft, format_time, sha256_bytes
 from adjud.flow3 import SLOTS, Flow3, current_round
+from adjud.forms import FormRefused
 from adjud.signatures import SignatureRefused, load_users, sign
 from adjud.store import FileCaseStore, json_bytes, write_atomic
 from adjud.workflow import State
@@ -113,6 +114,10 @@ class Flow4:
         missing = [f for f in form.compared_ids if f not in values]
         if missing:
             raise Flow4Refused(f"no final value for {', '.join(missing)}")
+        try:  # the combined outcome must be a valid form: no confirmed MI without its type
+            form.validate({f: v["value"] for f, v in values.items()}, form.compared_ids)
+        except FormRefused as exc:
+            raise Flow4Refused(f"the outcome is incomplete: {exc}") from exc
         notes = {f.id: {f"Adjudicator {s}": a.get(f.id) for s, a in sorted(answers.items())
                         if a.get(f.id)} for f in form.fields if not f.compared}  # fmt: skip
         related = self.flow3.cfg.get("related") or {}

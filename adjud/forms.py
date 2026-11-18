@@ -86,6 +86,16 @@ class Form(BaseModel):
     def compared_ids(self) -> list[str]:
         return [f.id for f in self.fields if f.compared]
 
+    def with_dependents(self, ids: list[str]) -> list[str]:
+        """`ids` plus every field whose `show_if` depends on one of them, in form order. A
+        field shown only by an open decision is open with it: two hidden answers to it are
+        not an agreement while that decision may still show it."""
+        open_ids = set(ids)
+        for f in self.fields:  # show_if refers to an earlier field: one pass is enough
+            if set(f.show_if or {}) & open_ids:
+                open_ids.add(f.id)
+        return [f.id for f in self.fields if f.id in open_ids]
+
     def validate(
         self,
         answers: dict[str, Any],

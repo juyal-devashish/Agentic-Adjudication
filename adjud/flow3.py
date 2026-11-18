@@ -291,8 +291,8 @@ class Flow3:
         base = f"adjudication/round{rnd.number}/pass{rnd.passes}"
         sha = self.store.put_json_once(case_id, f"{base}/comparison.json", rows)
         ref = {"path": f"{base}/comparison.json", "sha256": sha}
-        agreed = {r["field"]: r["1"] for r in rows if r["agree"]}
-        disputed = [r["field"] for r in rows if not r["agree"]]
+        disputed = form.with_dependents([r["field"] for r in rows if not r["agree"]])
+        agreed = {r["field"]: r["1"] for r in rows if r["field"] not in disputed}
         if not disputed:
             self._event(case_id, "comparison.agreed", SYSTEM_CEC, {"comparison": ref})
             return "comparison.agreed"
@@ -321,8 +321,11 @@ class Flow3:
         base = f"adjudication/round{rnd.number}/pass{rnd.passes}"
         sha = self.store.put_json_once(case_id, f"{base}/adjudicator3_result.json", rows)
         ref = {"path": f"{base}/adjudicator3_result.json", "sha256": sha}
-        agreed = {**rnd.agreed, **{r["field"]: r["3"] for r in rows if r["matches"]}}
-        unresolved = [r["field"] for r in rows if not r["matches"]]
+        unresolved = [f for f in form.with_dependents([r["field"] for r in rows
+                                                       if not r["matches"]])
+                      if f in rnd.disputed]  # fmt: skip
+        agreed = {**rnd.agreed,
+                  **{r["field"]: r["3"] for r in rows if r["field"] not in unresolved}}  # fmt: skip
         if not unresolved:
             self._event(case_id, "adj3.resolved", SYSTEM_CEC, {"result": ref, "agreed": agreed})
             return "adj3.resolved"

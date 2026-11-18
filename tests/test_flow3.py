@@ -225,6 +225,39 @@ def test_unresolved_fields_go_to_the_committee_and_the_chair_signs(assigned):
     assert state(store, cid) == State.CLOSED
 
 
+def test_fields_shown_only_by_an_open_decision_stay_open_with_it(assigned):
+    """B06: MI type and date are shown only when the event is confirmed. While that
+    decision is open, two hidden answers are not an agreement: the committee decides them
+    with it, and a confirmed MI never leaves without its type and date."""
+    runner, store, cid = assigned
+    f3 = runner.flow3
+    a1, a2 = holders(store, cid)
+    f3.sign_review(cid, a1, "demo", answers(event_date="2026-01-08"))
+    a2_answers = {"event_confirmed": "insufficient_data",
+                  "related_to_study_drug": "not_related", "rationale": "x"}  # fmt: skip
+    f3.sign_review(cid, a2, "demo", a2_answers)
+    runner.run_case_steps()
+    rnd = current_round(store, cid)
+    assert rnd.disputed == ["event_confirmed", "mi_type", "event_date"]
+    a3 = rnd.holders["3"]
+    f3.sign_review(cid, a3, "demo", {"event_confirmed": "no"})
+    runner.run_case_steps()
+    assert state(store, cid) == State.CEC_MEETING
+    assert f3.committee_fields(cid) == ["event_confirmed", "mi_type", "event_date"]
+    assert "mi_type" not in current_round(store, cid).agreed
+    meeting = {"held_on": "2026-11-18", "attendees": list(ADJS), "summary": "Discussed."}
+    with pytest.raises(Flow3Refused, match="MI type"):
+        f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes"})
+    f3.record_meeting(cid, COORD, **meeting, decisions={"event_confirmed": "yes",
+                      "mi_type": "type_2", "event_date": "2026-01-08"})  # fmt: skip
+    f3.sign_consensus(cid, CHAIR, "demo")
+    finish(runner)
+    assert state(store, cid) == State.CLOSED
+    values = store.get_json(cid, outcomes(store, cid)[0]["outcome"]["path"])["values"]
+    assert {f: (values[f]["value"], values[f]["how"]) for f in ("mi_type", "event_date")} == {
+        "mi_type": ("type_2", "committee"), "event_date": ("2026-01-08", "committee")}  # fmt: skip
+
+
 def test_more_data_goes_back_through_flow_1_and_qc_then_to_the_same_reviewers(assigned):
     runner, store, cid = assigned
     f3 = runner.flow3
