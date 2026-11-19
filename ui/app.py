@@ -138,4 +138,27 @@ with menu:
     for key in own:
         st.page_link(pages[key], label=PAGES[key][1], icon=PAGES[key][2])
     st.divider()
+
+
+def _reset_demo() -> None:
+    """Start the demo over for everyone: the same reset as scripts/slack-demo.sh start
+    (the short demo, the AE file queued), without restarting the runner or the Slack app."""
+    from tools.reset_demo import DEMO_AES, reset
+
+    reset(paths(), preload=True, only=DEMO_AES)
+    st.cache_resource.clear()
+    st.cache_data.clear()
+    for key in list(st.session_state):
+        del st.session_state[key]
+    st.query_params.clear()
+
+
+with st.sidebar.popover("Reset the demo", icon=":material/restart_alt:"):
+    st.caption(
+        "Removes every case, document, signature, e-mail record and Slack conversation, "
+        "for everyone using the demo, and queues the AE file again."
+    )
+    if st.button("Reset everything", type="primary", key="reset_demo"):
+        _reset_demo()
+        st.switch_page(pages[ROLE_PAGES[roles[0]][0]])
 current.run()

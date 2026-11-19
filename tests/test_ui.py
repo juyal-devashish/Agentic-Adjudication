@@ -627,3 +627,15 @@ def test_a_refused_zip_and_its_reason_show_on_documents_and_in_the_record(demo):
     trail = next(df.value for df in at.dataframe if "Reason" in df.value.columns)
     row = trail[trail["What"] == "Uploaded ZIP file refused"]
     assert len(row) == 1 and "damaged" in row["Reason"].iloc[0]
+
+
+def test_reset_the_demo_button_starts_over_for_everyone(demo):
+    """The sidebar's Reset the demo: every case gone, the short demo's AE file queued again,
+    with the queued file waiting for the data manager's import."""
+    at = run("views/edc_input.py", role="data_manager")
+    next(b for b in at.button if b.label == "Import queued files").click().run()
+    assert any(demo.cases.iterdir())
+    next(b for b in at.button if b.label == "Reset everything").click().run()
+    assert not at.exception, at.exception
+    assert not any(demo.cases.iterdir())
+    assert [f.name for f in demo.inbox.iterdir()] == ["01_initial.csv"]

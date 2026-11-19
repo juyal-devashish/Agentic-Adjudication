@@ -117,21 +117,24 @@ class Runner:
         if counts["sent"] or counts["failed"]:
             log.info("Slack: %d sent, %d failed", counts["sent"], counts["failed"])
 
-    def announce_waiting_files(self) -> None:
+    def announce_waiting_files(self) -> bool:
         """Tell the data manager, once per file, that AE records wait in the import queue
         (P-57): a DM with an Import button in Slack and an e-mail. The files announced are
-        kept in a hidden `inbox/.announced`, which the import ignores and a reset removes."""
+        kept in a hidden `inbox/.announced`, which the import ignores and a reset removes.
+        True for the first notice since the inbox was reset (no marker yet)."""
         waiting = {f"{f.name}|{f.stat().st_size}|{f.stat().st_mtime_ns}"
                    for f in self.paths.waiting_files()}  # fmt: skip
         if not waiting:
-            return
+            return False
         marker = self.paths.inbox / ".announced"
         seen = set(json.loads(marker.read_text())) if marker.exists() else set()
         if waiting <= seen:
-            return
+            return False
         self.documents.outbox.queue(None, "role:data_manager", "ae_file_waiting", page="import")
+        first = not marker.exists()
         marker.write_text(json.dumps(sorted(seen | waiting)))
         log.info("data manager told: %d AE file(s) waiting", len(waiting))
+        return first
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -248,14 +251,17 @@ class Runner:
 
     def tick(self, now: float) -> None:
         """One loop iteration at monotonic time `now`. The inbox is checked every
-        `inbox_poll_minutes`, counted from the first tick: a file queued by a demo reset
-        stays for the data manager's "Import queued files" until one interval has passed."""
+        `inbox_poll_minutes`, counted from the first tick and again from the first notice
+        after a reset: a file queued by a demo reset (also the app's Reset the demo, with the
+        runner still going) stays for the data manager's "Import queued files" until one interval
+        has passed."""
         if self.last_inbox is None:
             self.last_inbox = now
         elif now - self.last_inbox >= self.inbox_poll_seconds:
             self.import_inbox()
             self.last_inbox = now
-        self.announce_waiting_files()
+        if self.announce_waiting_files():
+            self.last_inbox = now
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
