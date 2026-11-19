@@ -103,6 +103,12 @@ Adjudicators 1 and 2 are given round robin, so `#adjudicator-1` is Dr Okafor's o
 
 If the Agent's AI is off (or has no key), each answer is the person's tasks with their buttons: the demo still runs, with the buttons in the Agent's reply in the character's channel and **Open in the app** for each step. The Case record page, under *Notifications*, shows each notice's e-mail and Slack status.
 
+## 3a. Let someone use it from their own computer (public links)
+
+`scripts/share-demo.sh start` opens two public links (Cloudflare quick tunnels, no account; `brew install cloudflared` once): the app and the Mailpit inbox. It then resets and starts the demo so that every *Open in the app* button and e-mail link points at the public app link, and keeps the Mac from idle sleep. Send the two links and invite the person to the Slack workspace; they join the five role channels. Anyone with a link can open it: synthetic data only, never real documents.
+
+The links work only while this Mac is on, awake (lid open, or on power with a display), online and running the demo. They change every time the script starts, so send the new ones. Everyone shares one demo: a reset resets it for all. `scripts/share-demo.sh stop` closes the links and stops the demo.
+
 ## 4. If something goes wrong
 
 | Symptom | What to do |
