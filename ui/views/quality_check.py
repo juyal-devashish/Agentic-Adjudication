@@ -159,8 +159,12 @@ def start_note(nar: dict, drafts, rnd: int) -> str:
                 "dossier: check them, and add what the new documents show.")  # fmt: skip
     if drafts.narrative is not None:
         where = " from Slack" if drafts.narrative_via in ("slack", None) else ""
-        before = " before the query to the site" if (drafts.narrative_round or 0) < rnd else ""
-        return f"The narrative starts from your unsigned draft{where}{before}, {when_}."
+        if (drafts.narrative_round or 0) < rnd:  # carried over a query (QA, 2026-11-19)
+            return (f"The narrative starts from your unsigned draft{where} of round "
+                    f"{drafts.narrative_round}, before the query to the site, {when_}. Its "
+                    "dossier page references are to that round's dossier: check them, and "
+                    "add what the new documents show.")  # fmt: skip
+        return f"The narrative starts from your unsigned draft{where}, {when_}."
     return draft_note(nar)
 
 
@@ -197,7 +201,10 @@ def review_and_sign(latest: dict) -> None:
     if box not in st.session_state:
         st.session_state[box] = start
     text = st.text_area("Narrative", height=320, key=box, on_change=_save)
-    theme.quiet("Your edits are saved as you go, unsigned, and kept if you send a query.")
+    theme.quiet(
+        "Your edits are saved, unsigned, each time you click outside the box, and "
+        "kept if you send a query."
+    )
     st.header("Your decision")
     blocked = latest.get("failed_by_code") or []
     options = ["query"] if blocked else ["pass", "query"]
@@ -231,26 +238,34 @@ def review_and_sign(latest: dict) -> None:
     if decision is None:
         st.write("Choose pass or query to sign.")
         return
-    with st.form(f"qc_sign_{cid}_{latest['round']}"):
+    # Plain widgets and a button, not a form (QA, 2026-11-19): leaving the narrative box
+    # reruns the page, and a form's submit click arriving with that rerun was dropped, so
+    # the first click on Sign after an edit did nothing.
+    k = f"{cid}_{latest['round']}"
+    with st.container(border=True):
         codes, message, reason = [], "", ""
         if decision == "query":
             codes = st.multiselect("Query reasons", QC_QUERY_CODES,
                                    default=drafts.query_codes or latest.get("query_codes") or [],
-                                   format_func=QUERY_CODES.get)  # fmt: skip
+                                   format_func=QUERY_CODES.get, key=f"qc_codes_{k}")  # fmt: skip
             suggested_text = (" ".join(f"{r.rstrip('.')}." for r in latest.get("reasons", []))
                               if suggested_query else "")  # fmt: skip
-            message = st.text_area("Message to the site", drafts.query_text or suggested_text)
+            message = st.text_area("Message to the site", drafts.query_text or suggested_text,
+                                   key=f"qc_message_{k}")  # fmt: skip
         else:
             reason = st.text_input(
                 "Why you pass despite the suggested query (required)"
                 if suggested_query
-                else "Note for the audit trail (optional)"
+                else "Note for the audit trail (optional)",
+                key=f"qc_reason_{k}",
             )
         password = st.text_input(
-            f"Password for {ctx.user['name']} (demo password: demo)", type="password"
+            f"Password for {ctx.user['name']} (demo password: demo)",
+            type="password",
+            key=f"qc_password_{k}",
         )
         label = "Sign the pass and the narrative" if decision == "pass" else "Sign the query"
-        if st.form_submit_button(label, type="primary"):
+        if st.button(label, type="primary", key=f"qc_sign_{k}"):
             try:
                 if decision == "pass":
                     flow2.sign_qc_pass(cid, ctx.actor, password, text, reason)
@@ -363,7 +378,11 @@ for e in [e for e in events if e["type"] == "query.opened"]:
     d = e["data"]
     by = by_whom(e)
     reasons = ", ".join(QUERY_CODES[c].lower() for c in d["codes"])
-    st.info(f"Query sent {when(e)} by {by}: {reasons}. {d['text']}")
+    # Answered once the site submitted again after it (QA, 2026-11-19: it looked open)
+    answered = next((x for x in events if x["type"] == "submission.signed"
+                     and x["seq"] > e["seq"]), None)  # fmt: skip
+    status = f" Answered by the site, {when(answered)}." if answered else ""
+    st.info(f"Query sent {when(e)} by {by}: {reasons}. {d['text']}{status}")
 
 # --- dossier ---------------------------------------------------------------------------------
 dossier = latest_dossier(store, cid)
@@ -412,7 +431,9 @@ if signed:
                    + (f" Note: {e['reason']}" if e.get("reason") else ""))  # fmt: skip
         if e["data"].get("edited"):
             theme.quiet("Edited from the draft; the Case record shows what changed.")
-    st.write(f"Approved by {by}, {when(e)}. This version is frozen for the adjudicators.")
+        st.write("This version is frozen for the adjudicators.")
+    else:
+        st.write(f"Approved by {by}, {when(e)}. This version is frozen for the adjudicators.")
     text = store.get_file(cid, e["data"]["narrative"]["path"]).decode()
     theme.frozen_text(text, "Narrative")
 elif state == State.NARRATIVE_REVIEW and drafts:
@@ -452,5 +473,14 @@ elif state == State.NARRATIVE_REVIEW and drafts:
                     st.error(f"Not signed: {msg}. Try again.")
                 except Flow2Refused as exc:
                     st.error(f"Not signed: {exc}.")
+elif state == State.QUERY_OPEN and drafts:
+    # Kept over the query (P-59): shown as it will start the next round (QA, 2026-11-19).
+    kept = (
+        qc_drafts(store, cid).narrative
+        or store.get_file(cid, drafts[-1]["data"]["draft"]["path"]).decode()
+    )
+    st.write("The site is answering the query. When the case comes back, the next round "
+             "starts from this narrative:")  # fmt: skip
+    theme.frozen_text(kept, "Narrative kept for the next round")
 else:
     st.write("The narrative is drafted with the quality check, before the review.")

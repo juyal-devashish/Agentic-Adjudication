@@ -386,6 +386,10 @@ def narrative_edit(case_id: str) -> None:
     source = {"ai": "the AI draft", "template": "the template"}.get(
         signed["data"].get("source", ""), "the draft"
     )
+    if signed["data"].get("carried_from_round"):  # P-59: carried over a query to the site
+        source += f" of round {signed['data']['carried_from_round']}, before the query"
+    with st.expander("The signed narrative"):  # QA, 2026-11-19: only the QC page showed it
+        theme.frozen_text(final, "Signed narrative")
     with st.expander("Narrative: what the Safety Specialist changed"):
         if draft == final_lines:
             st.write(f"Signed exactly as {source} proposed it.")

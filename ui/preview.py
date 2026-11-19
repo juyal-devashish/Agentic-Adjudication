@@ -16,7 +16,16 @@ def show_sheets(content: bytes) -> None:
     for ws in wb.worksheets:
         hidden = " (hidden in the original)" if ws.sheet_state != "visible" else ""
         st.caption(f"Sheet {ws.title}{hidden}")
-        st.dataframe(pd.DataFrame(ws.values), hide_index=True, width="stretch")
+        # The first row is the header, as in Excel; every cell shown as text, so mixed
+        # columns (dates and words) display as they are (QA, 2026-11-19: the header row
+        # showed as data under 0..n, and mixed columns failed to convert).
+        rows = [["" if v is None else str(v) for v in row] for row in ws.values]
+        if not rows:
+            st.write("This sheet is empty.")
+            continue
+        head = [h or f"Column {i + 1}" for i, h in enumerate(rows[0])]
+        head = [h if head.count(h) == 1 else f"{h} ({i + 1})" for i, h in enumerate(head)]
+        st.dataframe(pd.DataFrame(rows[1:], columns=head), hide_index=True, width="stretch")
 
 
 def pdf_page(content: bytes, key: str | None = None) -> tuple[int, bytes]:

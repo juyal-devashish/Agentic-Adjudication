@@ -305,21 +305,15 @@ def test_the_short_demo_has_three_cases_and_keeps_its_recorded_ai(tmp_path, monk
         assert store.state(cid).state == State.QC_REVIEW  # one stop, a person decides
 
 
-def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, monkeypatch):
-    """Nirav's run (P-59): the Safety Specialist sends a query without editing the AI
-    narrative; the site answers with a new document, for which no AI answer is recorded,
-    so round 2 has only the study template. The Quality check page and the Slack notice
-    start from round 1's AI narrative, and the narrative box stays whatever the decision."""
-    from streamlit.testing.v1 import AppTest
-
+def round_two_after_a_query(tmp_path, monkeypatch, edit: str | None = None):
+    """DEMO01-0001 in round 2 of the Quality check: a query (after an unsigned narrative
+    edit, if given), the site's discharge summary sent again (no recorded AI answer for
+    it, so round 2 has only the template), signed and checked. Returns (paths, runner,
+    store, case id, round 1's AI narrative)."""
     from adjud.documents import upload
-    from adjud.flow2 import qc_drafts
     from adjud.paths import DataPaths
     from adjud.review import submit
     from adjud.runner import Runner
-    from adjud.slack_app.core import Workspace
-    from adjud.slack_app.dm import NoticeDetail
-    from adjud.workflow import State
     from tools.reset_demo import DEMO_AES, reset
 
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")
@@ -343,6 +337,8 @@ def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, mo
     assert first["source"] == "ai"
     ai_text = store.get_file(cid, first["draft"]["path"]).decode()
 
+    if edit:
+        runner.flow2.save_narrative_draft(cid, "ss.anna", edit, via="app")
     runner.flow2.open_query(cid, ["missing_document"], "Send the discharge summary again.",
                             user_id="ss.anna", password="demo")  # fmt: skip
     again = files[0]
@@ -351,6 +347,22 @@ def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, mo
     submit(store, cid, site, "demo", paths.config)
     for _ in range(2):
         runner.run_case_steps()
+    return paths, runner, store, cid, ai_text
+
+
+def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, monkeypatch):
+    """Nirav's run (P-59): the Safety Specialist sends a query without editing the AI
+    narrative; the site answers with a new document, for which no AI answer is recorded,
+    so round 2 has only the study template. The Quality check page and the Slack notice
+    start from round 1's AI narrative, and the narrative box stays whatever the decision."""
+    from streamlit.testing.v1 import AppTest
+
+    from adjud.flow2 import qc_drafts
+    from adjud.slack_app.core import Workspace
+    from adjud.slack_app.dm import NoticeDetail
+    from adjud.workflow import State
+
+    paths, runner, store, cid, ai_text = round_two_after_a_query(tmp_path, monkeypatch)
     assert store.state(cid).state == State.QC_REVIEW
     assert store.get_json(cid, "qc/checks_v2.json")["narrative"]["source"] == "template"
     drafts = qc_drafts(store, cid)
@@ -378,3 +390,28 @@ def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, mo
     next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
     assert box() == "Kept edit."  # back on "pass", the edit is there
     assert qc_drafts(store, cid).narrative.strip() == "Kept edit."
+
+
+def test_a_carried_narrative_signed_unchanged_is_recorded_as_unchanged(tmp_path, monkeypatch):
+    """QA (2026-11-19): round 1's AI narrative, carried into round 2 and signed as it was,
+    was recorded as an edit of round 2's template, crediting the AI's text to the Safety
+    Specialist; a carried edit likewise. The signature records what was carried."""
+    paths, runner, store, cid, ai_text = round_two_after_a_query(tmp_path, monkeypatch)
+    runner.flow2.sign_qc_pass(cid, "ss.anna", "demo", ai_text)
+    signed = next(e for e in store.events(cid) if e["type"] == "quality_check.signed")["data"]
+    assert signed["source"] == "ai" and signed["edited"] is False
+    assert signed["carried_from_round"] == 1
+    assert store.get_file(cid, signed["draft"]["path"]).decode() == ai_text
+
+
+def test_a_carried_edit_is_compared_with_the_draft_it_was_made_from(tmp_path, monkeypatch):
+    paths, runner, store, cid, ai_text = round_two_after_a_query(
+        tmp_path, monkeypatch, edit="The patient had chest pain. Edited before the query."
+    )
+    from adjud.flow2 import qc_drafts
+
+    kept = qc_drafts(store, cid).narrative
+    runner.flow2.sign_qc_pass(cid, "ss.anna", "demo", kept)
+    signed = next(e for e in store.events(cid) if e["type"] == "quality_check.signed")["data"]
+    assert signed["source"] == "ai" and signed["edited"] is True  # edited from round 1's AI
+    assert store.get_file(cid, signed["draft"]["path"]).decode() == ai_text

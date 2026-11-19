@@ -552,14 +552,22 @@ class Flow2:
         signature = sign(user, password, REVIEW_MEANING, records)
         expect = _still_in(State.QC_REVIEW, "the case is not waiting for a QC review")
         self._put_signed(case_id, rel, content, expect)
-        original = self.store.get_file(case_id, draft["draft"]["path"]).decode().strip()
-        self._event(case_id, "quality_check.signed", user_id,
-                    {"outcome": "pass", "results": checks,
-                     "dossier": {**dossier, "version": result["dossier"]["version"]},
-                     "narrative": {"path": rel, "sha256": sha}, "draft": draft["draft"],
-                     "source": draft["source"], "simulated": bool(draft.get("simulated")),
-                     "edited": original != narrative.strip()},
-                    expect, signature=signature, reason=reason)  # fmt: skip
+        # What was edited: this round's draft, or what carried over from an earlier round
+        # (the AI draft from before a query, or the draft a carried edit started from)
+        carried = qc_drafts(self.store, case_id)
+        base = carried.narrative_base or draft
+        original = self.store.get_file(case_id, base["draft"]["path"]).decode().strip()
+        data: dict[str, Any] = {
+            "outcome": "pass", "results": checks,
+            "dossier": {**dossier, "version": result["dossier"]["version"]},
+            "narrative": {"path": rel, "sha256": sha}, "draft": base["draft"],
+            "source": base["source"], "simulated": bool(base.get("simulated")),
+            "edited": original != narrative.strip(),
+        }  # fmt: skip
+        if carried.narrative_base:
+            data["carried_from_round"] = carried.narrative_round
+        self._event(case_id, "quality_check.signed", user_id, data, expect,
+                    signature=signature, reason=reason)  # fmt: skip
 
     def open_query(self, case_id: str, codes: list[str], text: str, *,
                    user_id: str, password: str) -> None:  # fmt: skip
@@ -678,6 +686,9 @@ class QcDrafts:
     # earlier round (P-59)
     narrative_via: str | None = None
     narrative_round: int | None = None  # earlier than the latest round: carried over
+    # carried over: the `narrative.drafted` data (draft, source, simulated) of the round
+    # the text comes from, which the signature records as what was edited (QA, P-59)
+    narrative_base: dict[str, Any] | None = None
     query_codes: list[str] = field(default_factory=list)
     query_text: str | None = None
     query_by: str | None = None
@@ -729,4 +740,7 @@ def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
             out |= {"narrative": store.get_file(case_id, e["data"]["draft"]["path"]).decode(),
                     "narrative_by": e["actor"], "narrative_at": e["at"],
                     "narrative_via": "earlier_ai", "narrative_round": r}  # fmt: skip
+    r = out.get("narrative_round")
+    if r is not None and r != rnd:
+        out["narrative_base"] = next((e["data"] for e, n in drafted if n == r), None)
     return QcDrafts(**out)
