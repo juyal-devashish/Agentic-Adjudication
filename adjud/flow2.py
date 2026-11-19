@@ -673,7 +673,10 @@ class QcDrafts:
     narrative: str | None = None
     narrative_by: str | None = None
     narrative_at: str | None = None
-    narrative_via: str | None = None  # "slack", "app", or None (before P-59)
+    # "slack" or "app": the Safety Specialist's edit (None: an edit from before P-59);
+    # "earlier_ai": no edit, and this round has only the template, so the AI draft of an
+    # earlier round (P-59)
+    narrative_via: str | None = None
     narrative_round: int | None = None  # earlier than the latest round: carried over
     query_codes: list[str] = field(default_factory=list)
     query_text: str | None = None
@@ -681,22 +684,34 @@ class QcDrafts:
     query_at: str | None = None
     latest: str | None = None  # "narrative" or "query": the draft saved last
 
+    @property
+    def narrative_edited(self) -> bool:
+        """The narrative is the Safety Specialist's own unsigned edit."""
+        return self.narrative is not None and self.narrative_via != "earlier_ai"
+
 
 def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
     """The latest unsigned drafts for the latest QC round. A query draft belongs to its
-    round. The narrative draft carries over: after a Site Query the next round starts from
-    the Safety Specialist's latest narrative, not a new AI draft (Nirav's review,
-    2026-11-19, P-59); `narrative_round` then names the earlier round."""
+    round. The narrative carries over (Nirav's review, 2026-11-19, P-59): after a Site
+    Query the next round starts from the Safety Specialist's latest narrative edit; with
+    no edit, and only the study template in this round (the AI could not draft, e.g. no
+    recorded answer for the new documents), from the latest earlier AI draft.
+    `narrative_round` then names the earlier round."""
     events = store.events(case_id)
     rounds = [e for e in events if e["type"] == "qc.checks_completed"]
     if not rounds:
         return QcDrafts()
     rnd, since = rounds[-1]["data"].get("round"), rounds[-1]["seq"]
     out: dict[str, Any] = {}
+    drafted: list[tuple[dict[str, Any], int | None]] = []  # (narrative.drafted, its round)
     for e in events:
         data = e.get("data") or {}
         this_round = e["seq"] > since and data.get("round") == rnd
-        if e["type"] == "narrative.draft_edited":
+        if e["type"] == "narrative.drafted":
+            drafted.append((e, None))
+        elif e["type"] == "qc.checks_completed" and drafted and drafted[-1][1] is None:
+            drafted[-1] = (drafted[-1][0], data.get("round"))
+        elif e["type"] == "narrative.draft_edited":
             out |= {"narrative": store.get_file(case_id, data["draft"]["path"]).decode(),
                     "narrative_by": e["actor"], "narrative_at": e["at"],
                     "narrative_via": data.get("via"),
@@ -707,4 +722,11 @@ def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
             out |= {"query_codes": list(data.get("codes") or []),
                     "query_text": data.get("text") or "", "query_by": e["actor"],
                     "query_at": e["at"], "latest": "query"}  # fmt: skip
+    if "narrative" not in out and drafted and drafted[-1][0]["data"].get("source") == "template":
+        earlier = [(e, r) for e, r in drafted[:-1] if e["data"].get("source") == "ai"]
+        if earlier:
+            e, r = earlier[-1]
+            out |= {"narrative": store.get_file(case_id, e["data"]["draft"]["path"]).decode(),
+                    "narrative_by": e["actor"], "narrative_at": e["at"],
+                    "narrative_via": "earlier_ai", "narrative_round": r}  # fmt: skip
     return QcDrafts(**out)

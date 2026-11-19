@@ -147,36 +147,64 @@ def draft_note(nar: dict) -> str:
             "the facts against the dossier and edit if needed.")  # fmt: skip
 
 
+def start_note(nar: dict, drafts, rnd: int) -> str:
+    """Where the narrative below comes from: the draft of this round, or what carries
+    over (P-58 drafts from Slack, P-59 edits in the app and the earlier AI draft)."""
+    at = drafts.narrative_at
+    when_ = f"{theme.date_words(at)} {at[11:16]} UTC" if at else ""
+    if drafts.narrative_via == "earlier_ai":
+        return ("This round's AI draft could not be written for the new documents, so the "
+                f"narrative starts from the AI draft of round {drafts.narrative_round}, before "
+                "the query to the site. Its dossier page references are to that round's "
+                "dossier: check them, and add what the new documents show.")  # fmt: skip
+    if drafts.narrative is not None:
+        where = " from Slack" if drafts.narrative_via in ("slack", None) else ""
+        before = " before the query to the site" if (drafts.narrative_round or 0) < rnd else ""
+        return f"The narrative starts from your unsigned draft{where}{before}, {when_}."
+    return draft_note(nar)
+
+
 def review_and_sign(latest: dict) -> None:
     """One stop, one signature (P-39): pass with the narrative as edited, or a Site Query."""
     nar = latest["narrative"]
     draft = store.get_file(cid, nar["draft"]["path"]).decode()
+    # Unsigned drafts (from Slack, P-58, or this page, P-59) pre-fill the narrative and
+    # the query; the latest of them chooses the decision.
+    drafts = qc_drafts(store, cid)
+    start = drafts.narrative or draft
     st.header("Narrative")
-    st.write(draft_note(nar))
+    st.write(start_note(nar, drafts, latest["round"]))
     st.caption("Every statement must come from the dossier. No opinion on cause, no "
                "adjudication wording, nothing that reveals allocation.")  # fmt: skip
     if not is_ss:
-        theme.frozen_text(draft, "Narrative draft")
+        theme.frozen_text(start, "Narrative draft")
         st.write("Waiting for the Safety Specialist to decide.")
         return
+    # The narrative box stays on the page whatever the decision (Nirav's review, P-59): a
+    # box taken away while "query" was chosen came back empty. Each edit is also saved as
+    # an unsigned draft, so it survives a refresh, a new tab from Slack, and a query to
+    # the site: the next round starts from it.
+    box = f"narrative_{cid}_{latest['round']}"
+
+    def _save() -> None:
+        new = st.session_state[box]
+        if new.strip() and new.strip() != start.strip():
+            try:
+                flow2.save_narrative_draft(cid, ctx.actor, new, via="app")
+            except Flow2Refused as exc:
+                st.toast(f"Not saved: {exc}.")
+
+    if box not in st.session_state:
+        st.session_state[box] = start
+    text = st.text_area("Narrative", height=320, key=box, on_change=_save)
+    theme.quiet("Your edits are saved as you go, unsigned, and kept if you send a query.")
     st.header("Your decision")
     blocked = latest.get("failed_by_code") or []
     options = ["query"] if blocked else ["pass", "query"]
     if blocked:
         st.caption("A check failed, so this round can only end in a query to the site.")
     suggested_query = latest.get("proposal") == "query"
-    # Unsigned drafts from the Agent in Slack (P-58) pre-fill the narrative and the query;
-    # the latest of them chooses the decision.
-    drafts = qc_drafts(store, cid)
     drafted_query = drafts.latest == "query"
-    if drafts.narrative_at:
-        at = drafts.narrative_at
-        where = {"slack": " from Slack", "app": ""}.get(drafts.narrative_via or "", " from Slack")
-        before = (" before the query to the site"
-                  if (drafts.narrative_round or 0) < latest["round"] else "")  # fmt: skip
-        theme.quiet(f"The narrative below starts from your unsigned draft{where}{before}, "
-                    f"{theme.date_words(at)} {at[11:16]} UTC. Your edits are saved as you "
-                    "go.")  # fmt: skip
     if drafts.query_at:
         at = drafts.query_at
         theme.quiet(f"The Site Query below starts from your unsigned draft from Slack, "
@@ -194,40 +222,15 @@ def review_and_sign(latest: dict) -> None:
         index=preselect,
         format_func={
             "pass": "Pass: the documents are complete and fit for adjudication; sign the "
-            "narrative with it",
+            "narrative above with it",
             "query": "Send a query to the site",
         }.get,
         key=f"qc_decision_{cid}_{latest['round']}",
         label_visibility="collapsed",
     )
-    # The narrative box sits outside the form too, so an edit survives switching the
-    # decision to "query" and back: its text is kept under its own key while hidden. Each
-    # edit is also saved as an unsigned draft (P-59), so it survives a refresh, a new tab
-    # from Slack, and a query to the site: the next round starts from it.
-    box, kept = f"narrative_{cid}_{latest['round']}", f"narrative_kept_{cid}_{latest['round']}"
-    current = st.session_state.get(kept, drafts.narrative or draft)
-    text = ""
     if decision is None:
-        theme.frozen_text(current, "Narrative draft")
         st.write("Choose pass or query to sign.")
         return
-    if decision == "query":
-        with st.expander("Narrative (kept for when the case comes back)"):
-            theme.frozen_text(current, "Narrative draft")
-    else:
-
-        def _save() -> None:
-            new = st.session_state[box]
-            if new.strip() and new.strip() != (drafts.narrative or draft).strip():
-                try:
-                    flow2.save_narrative_draft(cid, ctx.actor, new, via="app")
-                except Flow2Refused as exc:
-                    st.toast(f"Not saved: {exc}.")
-
-        if box not in st.session_state:
-            st.session_state[box] = current
-        text = st.text_area("Narrative", height=320, key=box, on_change=_save)
-        st.session_state[kept] = text
     with st.form(f"qc_sign_{cid}_{latest['round']}"):
         codes, message, reason = [], "", ""
         if decision == "query":
