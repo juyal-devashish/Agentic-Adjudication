@@ -31,7 +31,7 @@ from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
 from adjud.slack_app.core import Directory, Workspace
 from adjud.slack_app.dm import ACTOR as SLACK_ACTOR
-from adjud.slack_app.dm import QueryInDm, SlackDmChannel, SlackSettings
+from adjud.slack_app.dm import NoticeDetail, SlackDmChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
@@ -88,7 +88,7 @@ class Runner:
                         settings,
                         settings.client(),
                         next_step=workspace.next_step,
-                        detail=QueryInDm(workspace),  # the Site Query, PHI-gated (P-58)
+                        detail=NoticeDetail(workspace),  # the Site Query, the narrative; PHI-gated
                     ),
                     SLACK_ACTOR,
                     since=slack_since(DeliveryLog(self.pipeline.store), self.clock),

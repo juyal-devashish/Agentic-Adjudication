@@ -305,6 +305,13 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     assert store.state(CASE).state == State.QC_REVIEW
     assert dm_task(slack.posts[-1]) == "a quality check needs your review"
     assert slack.posts[-1]["channel"] == to("ss.anna")
+    # P-59: the notice carries the narrative draft, passed by the PHI gate
+    in_notice = json.dumps(slack.posts[-1]["blocks"])
+    first_line = tool(ws, "ss.anna", "narrative_draft", case=CASE)["text"].splitlines()[0]
+    assert "Narrative draft (drafted by AI" in in_notice and json.dumps(first_line)[1:-1][:60] in (
+        in_notice
+    )
+    assert not phi_in(slack.posts[-1])
 
     # 3. Dr Weber asks about the Quality Check, then edits the narrative through the Agent
     here = be("anna", "ss.anna", "Dr. Anna Weber")

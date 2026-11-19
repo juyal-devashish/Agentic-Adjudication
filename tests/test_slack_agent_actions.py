@@ -27,7 +27,7 @@ from adjud.slack_app.agent import NO_FILES
 from adjud.slack_app.agent_tools import AgentTools, Turn, agent_toolbox
 from adjud.slack_app.conversations import ConversationLog
 from adjud.slack_app.core import Directory, SlackActionsLog, Workspace
-from adjud.slack_app.dm import QueryInDm, SlackDmChannel, SlackSettings
+from adjud.slack_app.dm import NARRATIVE_HELD, NoticeDetail, SlackDmChannel, SlackSettings
 from adjud.slack_app.files import SlackFiles
 from adjud.slack_app.phi_gate import HOLD_TEXT, PhiGate
 from adjud.workflow import State
@@ -372,7 +372,7 @@ def test_the_signed_query_reaches_the_sites_dm_and_is_answered_by_upload(ws, in_
     client = FilesSlack()
     channel = SlackDmChannel(Directory(ws.paths.config, ws.paths.root / "slack"),
                              SlackSettings(bot_token="xoxb-test"), client,
-                             detail=QueryInDm(ws))  # fmt: skip
+                             detail=NoticeDetail(ws))  # fmt: skip
     channel.send(note, people(note["to"], directory(ws.paths.config, "DEMO01")))
     dm = json.dumps(client.posts[0]["blocks"])
     assert "Please send the ECG report." in dm and "More documents needed" in dm
@@ -399,10 +399,10 @@ def test_a_query_text_with_identifiers_stays_out_of_the_dm(ws, monkeypatch):
              "text": f"Page 2 names {who['first']} {who['last']}."}}  # fmt: skip
     monkeypatch.setattr("adjud.slack_app.dm.latest_query", lambda ws, cid: query)
     note = {"template": "query_opened", "case_id": CID}
-    assert QueryInDm(ws)(note) is None  # the DM then goes as the e-mail does
+    assert NoticeDetail(ws)(note) is None  # the DM then goes as the e-mail does
     query["data"]["text"] = "Page 2 is about another patient."
-    assert "another patient" in (QueryInDm(ws)(note) or "")
-    assert QueryInDm(ws)({"template": "documents_requested", "case_id": CID}) is None
+    assert "another patient" in (NoticeDetail(ws)(note) or "")
+    assert NoticeDetail(ws)({"template": "documents_requested", "case_id": CID}) is None
 
 
 def test_after_the_signature_the_agent_shows_the_signed_narrative(ws, in_qc_review):
@@ -451,3 +451,74 @@ def test_a_file_attached_as_one_site_is_not_uploaded_as_another(ws, tmp_path):
 
     assert offered("site102.coord") == []
     assert offered("site101.coord") == ["F5"]
+
+
+def test_the_quality_check_notice_carries_the_narrative(ws, in_qc_review, monkeypatch):
+    """P-59 (Nirav's review): the Safety Specialist reads the narrative in the notice,
+    without asking the Agent for it; the e-mail's note is unchanged. A narrative the PHI
+    gate holds is replaced by a line saying so."""
+    note = next(n for n in DeliveryLog(ws.store).notes() if n["template"] == "qc_review_needed")
+    ws.people.act_as(ME, "ss.anna")
+    client = FilesSlack()
+    channel = SlackDmChannel(Directory(ws.paths.config, ws.paths.root / "slack"),
+                             SlackSettings(bot_token="xoxb-test"), client,
+                             detail=NoticeDetail(ws))  # fmt: skip
+    channel.send(note, people(note["to"], directory(ws.paths.config, "DEMO01")))
+    dm = json.dumps(client.posts[0]["blocks"])
+    first = qc_drafts(ws.store, CID).narrative or ""
+    drafted = next(e for e in reversed(ws.store.events(CID)) if e["type"] == "narrative.drafted")
+    text = ws.store.get_file(CID, drafted["data"]["draft"]["path"]).decode().strip()
+    assert not first and text.splitlines()[0] in json.loads(dm)[1]["text"]["text"]
+    assert "Narrative draft (" in dm and "not signed" in dm
+    assert "Narrative draft" not in json.dumps(note)
+
+    Flow2(ws.store, ws.paths.config).save_narrative_draft(CID, "ss.anna", "Edited text.")
+    assert "your unsigned edit" in NoticeDetail(ws)(note) and "Edited text." in (
+        NoticeDetail(ws)(note) or ""
+    )
+    who = PhiGate.for_workspace(ws).identities[ws.store.state(CID).subject]
+    monkeypatch.setattr("adjud.slack_app.dm.narrative_now",
+                        lambda ws, cid: (f"{who['first']} {who['last']} had chest pain.",
+                                         {"edited": True}))  # fmt: skip
+    assert NoticeDetail(ws)(note) == NARRATIVE_HELD
+
+
+def test_the_narrative_survives_a_query_to_the_site(ws, in_qc_review):
+    """P-59 (Nirav's review): the Safety Specialist's narrative edit is kept when a query
+    goes to the site; the next round starts from it, while the query draft does not carry
+    over."""
+    flow2 = Flow2(ws.store, ws.paths.config)
+    flow2.save_narrative_draft(CID, "ss.anna", "My careful narrative.", via="app")
+    flow2.save_query_draft(CID, "ss.anna", ["missing_document"], "Send the ECG.")
+    flow2.open_query(CID, ["missing_document"], "Send the ECG.", user_id="ss.anna",
+                     password="demo")  # fmt: skip
+    upload(ws.store, CID, [("ecg2.pdf", pdf("ECG REPORT\nRepeat ECG."))], "site101.coord")
+    to_qc_review(in_qc_review, ws.store, CID)
+    drafts = qc_drafts(ws.store, CID)
+    assert drafts.narrative.strip() == "My careful narrative."
+    assert drafts.narrative_round == 1 and drafts.narrative_via == "app"
+    assert drafts.query_text is None and drafts.latest is None  # the query was sent
+
+
+def test_a_narrative_edit_on_the_page_is_saved_as_a_draft(ws, in_qc_review):
+    """P-59: an edit on the Quality check page is saved unsigned, so a refresh or a new
+    tab from Slack starts from it."""
+    at = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=30)
+    at.session_state["role"], at.session_state["case_id"] = "safety_specialist", CID
+    at.run()
+    at.switch_page("views/quality_check.py")
+    at.run()
+    next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
+    next(a for a in at.text_area if a.label == "Narrative").set_value("Edited here.").run()
+    assert not at.exception, at.exception
+    drafts = qc_drafts(ws.store, CID)
+    assert drafts.narrative.strip() == "Edited here." and drafts.narrative_via == "app"
+
+    fresh = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=30)  # a new tab
+    fresh.session_state["role"], fresh.session_state["case_id"] = "safety_specialist", CID
+    fresh.run()
+    fresh.switch_page("views/quality_check.py")
+    fresh.run()
+    next(r for r in fresh.radio if r.label == "Your decision").set_value("pass").run()
+    assert next(a for a in fresh.text_area if a.label == "Narrative").value == "Edited here.\n"
+    assert ws.store.state(CID).state == State.QC_REVIEW  # saved, never signed
