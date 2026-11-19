@@ -193,11 +193,11 @@ def test_without_seeded_identities_the_gate_still_runs_its_detectors(ws, caplog,
                                                                      tmp_path):  # fmt: skip
     """No kit anywhere: a warning, and the detectors alone. Measured here, not gated:
     how many of the kit's must-redact values they hold."""
-    from adjud.slack_app import phi_gate
+    from adjud import paths
     from tests.test_slack_agent_tools import seeded_phi
 
     (ws.paths.root / "flow1-testkit").unlink()
-    monkeypatch.setattr(phi_gate, "REPO_DATA", tmp_path / "no-kit")
+    monkeypatch.setattr(paths, "REPO_DATA", tmp_path / "no-kit")
     gate = PhiGate.for_workspace(ws)
     assert gate.identities == {} and "detectors only" in caplog.text
     phi = seeded_phi()

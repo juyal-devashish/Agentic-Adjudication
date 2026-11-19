@@ -353,3 +353,29 @@ def test_the_data_manager_pulls_from_the_edc_from_slack(app, data):
     assert (entry["action"], entry["result"], sorted(entry["cases"])) == ("pull", "done", created)
     assert "Pulled the AE records" in json.dumps(client.published[-1]["view"])
     assert "/adj pull" in command(h, client, "help").last
+
+
+def test_adj_in_a_character_channel_answers_as_that_channel_s_person(app, data):
+    """QA (2026-11-19): like the buttons and the Agent there, /adj in #site-user is Priya,
+    whoever the Slack user acts as; a tab after the subcommand still counts."""
+    h, client = app
+    h.ws.people.save_channel_ids({"site-user": "C0SITE"})
+    command(h, client, "act-as rahul")
+    command(h, client, "import")  # the cases, waiting for the site's documents
+    r = Replies()
+    h.on_command(ack, {"user_id": ME, "text": "tasks", "trigger_id": "T1",
+                       "channel_id": "C0SITE"}, r, client)  # fmt: skip
+    assert "Upload the documents" in r.last  # Priya's task, not Rahul's
+    r = command(h, client, "status\t0001")
+    assert "I don't know that one" not in r.last and "DEMO01-0001" in r.last
+
+
+def test_acting_as_someone_else_drops_the_last_import_note(app, data):
+    h, client = app
+    command(h, client, "act-as rahul")
+    command(h, client, "import")
+    assert h.notes.get(ME)
+    command(h, client, "act-as priya")
+    assert ME not in h.notes
+    home = json.dumps(client.published[-1]["view"])
+    assert "Imported" not in home

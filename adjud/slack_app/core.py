@@ -316,7 +316,7 @@ class Workspace:
             site_steps = {
                 State.AWAITING_DOCUMENTS: "Upload the documents",
                 State.AWAITING_SITE_CONFIRMATION: "Review the redacted pages and sign",
-                State.QUERY_OPEN: "Answer the query (read it in the app)",
+                State.QUERY_OPEN: "Answer the query: send the files it asks for",
             }
             return Task(cid, site_steps[state], "documents") if state in site_steps else None
         if role == "safety_specialist":

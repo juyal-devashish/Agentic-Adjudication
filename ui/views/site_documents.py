@@ -252,6 +252,7 @@ if reviewable:
     output = store.get_file(cid, done["output"]["path"])
     is_sheet = done["output"]["path"].endswith(".xlsx")
     left, right = st.columns([3, 2], gap="large")
+    box, n = None, None  # the area dragged on the page; its button sits on the right
     with left:
         if is_sheet:
             show_sheets(output)
@@ -265,11 +266,6 @@ if reviewable:
                     "missed, such as a handwritten name or a stamp, drag a box over it."
                 )
                 box = page_box(png, key=f"box_{done['output']['path']}_{n}")
-                if box and st.button(f"Black out the selected area on page {n}", type="primary"):
-                    try:
-                        apply_change(boxes=[{"file": name, "page": n, "rect": box}])
-                    except ReviewRefused as exc:
-                        st.error(f"Nothing changed: {exc}.")
     with right:
         if report["residuals"]:
             items = "".join(
@@ -359,6 +355,13 @@ if reviewable:
                 st.warning(f"Not removed: {exc}.")
             else:
                 st.rerun()
+        # Under the other buttons, not under the page (the user, 2026-11-19): the area is
+        # dragged on the page on the left and blacked out from here.
+        if box and st.button(f"Black out the selected area on page {n}", type="primary"):
+            try:
+                apply_change(boxes=[{"file": name, "page": n, "rect": box}])
+            except ReviewRefused as exc:
+                st.error(f"Nothing changed: {exc}.")
 
 # --- sign and submit --------------------------------------------------------------------------
 st.header("Sign and submit")

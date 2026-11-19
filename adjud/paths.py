@@ -74,3 +74,18 @@ class DataPaths:
     @property
     def logs(self) -> Path:
         return self.root / "logs"
+
+
+REPO_DATA = Path(__file__).resolve().parents[1] / "data"  # the kit, for a demo folder
+
+
+def seeded_identities_path(root: Path, rel: str | None) -> Path | None:
+    """`study.yaml: seeded_identities` (synthetic data only), relative to the data folder;
+    a separate demo folder (data/demo, P-57) has no kit of its own, so the repository's
+    data folder is tried next. None when neither has it."""
+    if not rel:
+        return None
+    for base in (root, REPO_DATA):
+        if (base / rel).exists():
+            return base / rel
+    return None

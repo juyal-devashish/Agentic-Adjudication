@@ -40,6 +40,7 @@ from adjud.delivery import SLACK, ChannelError
 from adjud.flow2 import QUERY_CODES, qc_drafts
 from adjud.slack_app.blocks import notice
 from adjud.slack_app.core import ROLE_WORDS, Directory, Workspace
+from adjud.workflow import State
 
 log = logging.getLogger("adjud.slack_app")
 
@@ -269,6 +270,8 @@ class NoticeDetail:
         return text + "\nAnswer by attaching the files in this thread, or upload them in the app."
 
     def _narrative(self, case_id: str) -> str | None:
+        if self.ws.store.state(case_id).state != State.QC_REVIEW:
+            return None  # a late notice (a retry, or one that waited for a Slack user)
         now = narrative_now(self.ws, case_id)
         if now is None:
             return None
