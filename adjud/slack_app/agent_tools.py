@@ -401,14 +401,19 @@ class AgentTools:
                         None)  # fmt: skip
         approved = approval is not None
         d = drafted["data"]
-        edited = qc_drafts(self.ws.store, case_id).narrative if not approved else None
+        start = qc_drafts(self.ws.store, case_id) if not approved else None
+        edited = start.narrative if start else None  # an edit, or an earlier AI draft (P-59)
         path = approval["data"]["narrative"]["path"] if approval else d["draft"]["path"]
         return {
             "case": case_id,
             "text": edited or self.ws.store.get_file(case_id, path).decode(),
-            "source": {"ai": "AI", "template": "study template"}.get(d.get("source"), "?"),
+            "source": (
+                "AI, from before the query to the site"
+                if start and start.narrative_via == "earlier_ai"
+                else {"ai": "AI", "template": "study template"}.get(d.get("source"), "?")
+            ),
             "simulated": bool(d.get("simulated")),
-            "edited_unsigned": edited is not None,
+            "edited_unsigned": bool(start and start.narrative_edited),
             "approved": approved,
         }
 

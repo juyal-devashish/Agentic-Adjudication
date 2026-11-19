@@ -303,3 +303,78 @@ def test_the_short_demo_has_three_cases_and_keeps_its_recorded_ai(tmp_path, monk
     assert more["suggestion"]["would_help"]  # the AI's advice, beside code's required list
     for cid in ("DEMO01-0001", "DEMO01-0002", "DEMO01-0003"):
         assert store.state(cid).state == State.QC_REVIEW  # one stop, a person decides
+
+
+def test_after_a_query_the_narrative_is_the_ai_draft_from_before_it(tmp_path, monkeypatch):
+    """Nirav's run (P-59): the Safety Specialist sends a query without editing the AI
+    narrative; the site answers with a new document, for which no AI answer is recorded,
+    so round 2 has only the study template. The Quality check page and the Slack notice
+    start from round 1's AI narrative, and the narrative box stays whatever the decision."""
+    from streamlit.testing.v1 import AppTest
+
+    from adjud.documents import upload
+    from adjud.flow2 import qc_drafts
+    from adjud.paths import DataPaths
+    from adjud.review import submit
+    from adjud.runner import Runner
+    from adjud.slack_app.core import Workspace
+    from adjud.slack_app.dm import NoticeDetail
+    from adjud.workflow import State
+    from tools.reset_demo import DEMO_AES, reset
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    monkeypatch.setenv("ADJUD_DATA_DIR", str(data))
+    paths = DataPaths(data)
+    reset(paths, preload=True, only=DEMO_AES)
+    runner = Runner(paths)
+    runner.run_once()
+    store, cid, site = runner.pipeline.store, "DEMO01-0001", "site101.coord"
+    files = sorted((KIT / "documents" / "DEMO01-101-0001_AE-001").iterdir())
+    upload(store, cid, [(f.name, f.read_bytes()) for f in files], site)
+    runner.run_case_steps()
+    submit(store, cid, site, "demo", paths.config)
+    for _ in range(2):
+        runner.run_case_steps()
+    first = store.get_json(cid, "qc/checks_v1.json")["narrative"]
+    assert first["source"] == "ai"
+    ai_text = store.get_file(cid, first["draft"]["path"]).decode()
+
+    runner.flow2.open_query(cid, ["missing_document"], "Send the discharge summary again.",
+                            user_id="ss.anna", password="demo")  # fmt: skip
+    again = files[0]
+    upload(store, cid, [("discharge_summary-2.pdf", again.read_bytes())], site)
+    runner.run_case_steps()
+    submit(store, cid, site, "demo", paths.config)
+    for _ in range(2):
+        runner.run_case_steps()
+    assert store.state(cid).state == State.QC_REVIEW
+    assert store.get_json(cid, "qc/checks_v2.json")["narrative"]["source"] == "template"
+    drafts = qc_drafts(store, cid)
+    assert drafts.narrative == ai_text and drafts.narrative_via == "earlier_ai"
+    assert drafts.narrative_round == 1 and not drafts.narrative_edited
+    note = {"template": "qc_review_needed", "case_id": cid}
+    said = NoticeDetail(Workspace(paths))(note) or ""
+    assert "from before the query" in said and ai_text.splitlines()[0][:40] in said
+
+    at = AppTest.from_file(str(ROOT / "ui" / "app.py"), default_timeout=30)
+    at.session_state["role"], at.session_state["case_id"] = "safety_specialist", cid
+    at.run()
+    at.switch_page("views/quality_check.py")
+    at.run()
+    assert not at.exception, at.exception
+
+    def box() -> str:
+        return next(a for a in at.text_area if a.label == "Narrative").value
+
+    assert box() == ai_text  # shown before any decision
+    decision = next(r for r in at.radio if r.label == "Your decision")
+    decision.set_value("query").run()
+    assert box() == ai_text  # still there with "query" chosen
+    next(a for a in at.text_area if a.label == "Narrative").set_value("Kept edit.").run()
+    next(r for r in at.radio if r.label == "Your decision").set_value("pass").run()
+    assert box() == "Kept edit."  # back on "pass", the edit is there
+    assert qc_drafts(store, cid).narrative.strip() == "Kept edit."

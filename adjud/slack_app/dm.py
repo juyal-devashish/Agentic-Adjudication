@@ -205,16 +205,17 @@ def latest_query(ws: Workspace, case_id: str) -> dict[str, Any] | None:
 
 
 def narrative_now(ws: Workspace, case_id: str) -> tuple[str, dict[str, Any]] | None:
-    """The narrative as it stands in the case's QC review: the Safety Specialist's latest
-    unsigned draft if there is one (`qc_drafts`), else the latest AI or template draft,
-    with that `narrative.drafted` event's data."""
+    """The narrative as it stands in the case's QC review, as the Quality check page
+    starts it (`qc_drafts`, P-59), else the latest AI or template draft, with that
+    `narrative.drafted` event's data."""
     events = ws.store.events(case_id)
     drafted = next((e for e in reversed(events) if e["type"] == "narrative.drafted"), None)
     if drafted is None:
         return None
-    edited = qc_drafts(ws.store, case_id).narrative
-    text = edited or ws.store.get_file(case_id, drafted["data"]["draft"]["path"]).decode()
-    return text.strip(), {**drafted["data"], "edited": edited is not None}
+    drafts = qc_drafts(ws.store, case_id)
+    text = drafts.narrative or ws.store.get_file(case_id, drafted["data"]["draft"]["path"]).decode()
+    return text.strip(), {**drafted["data"], "edited": drafts.narrative_edited,
+                          "earlier": drafts.narrative_via == "earlier_ai"}  # fmt: skip
 
 
 @dataclass
@@ -274,6 +275,8 @@ class NoticeDetail:
         text, d = now
         if d["edited"]:
             source = "your unsigned edit"
+        elif d.get("earlier"):
+            source = "the AI draft from before the query; check it against the new documents"
         else:
             source = {"ai": "drafted by AI", "template": "from the study template"}.get(
                 d.get("source"), "draft"
