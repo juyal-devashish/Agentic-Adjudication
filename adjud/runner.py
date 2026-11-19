@@ -11,6 +11,7 @@ re-run after a crash, because every write goes through the CaseStore rules.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ from adjud.mailer import Mailer, SmtpSettings
 from adjud.paths import DataPaths
 from adjud.slack_app.core import Directory, Workspace
 from adjud.slack_app.dm import ACTOR as SLACK_ACTOR
-from adjud.slack_app.dm import SlackDmChannel, SlackSettings
+from adjud.slack_app.dm import QueryInDm, SlackDmChannel, SlackSettings
 from adjud.upload_folder import UploadFolders
 
 log = logging.getLogger("adjud.runner")
@@ -78,6 +79,7 @@ class Runner:
             if settings is None:
                 log.warning("NOTIFY_CHANNELS lists slack, but SLACK_BOT_TOKEN is not set: off")
             else:  # Slack posts what is queued from when it was first switched on (P-54)
+                workspace = Workspace(self.paths, self.study, clock=self.clock)
                 self.slack = Deliverer(
                     self.pipeline.store,
                     self.paths.config,
@@ -85,7 +87,8 @@ class Runner:
                         Directory(self.paths.config, self.paths.root / "slack", self.study),
                         settings,
                         settings.client(),
-                        next_step=Workspace(self.paths, self.study, clock=self.clock).next_step,
+                        next_step=workspace.next_step,
+                        detail=QueryInDm(workspace),  # the Site Query, PHI-gated (P-58)
                     ),
                     SLACK_ACTOR,
                     since=slack_since(DeliveryLog(self.pipeline.store), self.clock),
@@ -113,6 +116,22 @@ class Runner:
             return
         if counts["sent"] or counts["failed"]:
             log.info("Slack: %d sent, %d failed", counts["sent"], counts["failed"])
+
+    def announce_waiting_files(self) -> None:
+        """Tell the data manager, once per file, that AE records wait in the import queue
+        (P-57): a DM with an Import button in Slack and an e-mail. The files announced are
+        kept in a hidden `inbox/.announced`, which the import ignores and a reset removes."""
+        waiting = {f"{f.name}|{f.stat().st_size}|{f.stat().st_mtime_ns}"
+                   for f in self.paths.waiting_files()}  # fmt: skip
+        if not waiting:
+            return
+        marker = self.paths.inbox / ".announced"
+        seen = set(json.loads(marker.read_text())) if marker.exists() else set()
+        if waiting <= seen:
+            return
+        self.documents.outbox.queue(None, "role:data_manager", "ae_file_waiting", page="import")
+        marker.write_text(json.dumps(sorted(seen | waiting)))
+        log.info("data manager told: %d AE file(s) waiting", len(waiting))
 
     def import_inbox(self) -> int:
         self.paths.inbox.mkdir(parents=True, exist_ok=True)
@@ -221,6 +240,7 @@ class Runner:
 
     def run_once(self) -> None:
         self.import_inbox()
+        self.announce_waiting_files()
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()
@@ -235,6 +255,7 @@ class Runner:
         elif now - self.last_inbox >= self.inbox_poll_seconds:
             self.import_inbox()
             self.last_inbox = now
+        self.announce_waiting_files()
         self.take_uploads()
         self.run_case_steps()
         self.send_mail()

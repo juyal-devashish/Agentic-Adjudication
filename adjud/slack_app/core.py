@@ -1,4 +1,5 @@
-"""What the Slack app knows, with no Slack library and no Clinical Content (ADR 0004).
+"""What the Slack app knows, with no Slack library and no Clinical Content (written under
+ADR 0004; ADR 0005 now draws the line at PHI, and these facts stay inside it).
 
 Everything here is built from case IDs, workflow states, site names, people's names and
 counts: never from the AE snapshot, documents, queries, narratives or answers. A Task
@@ -13,6 +14,7 @@ sidebar does; simulated, not enforced. Real use maps each Slack user to one pers
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +32,7 @@ from adjud.paths import DataPaths
 from adjud.store import FileCaseStore, write_atomic
 from adjud.workflow import State, state_words
 
+log = logging.getLogger("adjud.slack_app")
 ROLE_WORDS = {
     "data_manager": "Data manager",
     "site": "Site user",
@@ -44,7 +47,7 @@ FLAG_WORDS = {
     "possible_duplicate": "a possible duplicate",
 }
 # The Suggested Outcome (computed by code in flow2.py) as the one word Slack may show
-# (ADR 0004): never its reasons or any AI text.
+# in a notice: never its reasons or any AI text (the Agent shows those, ADR 0005).
 NOTHING_NEXT = "Nothing more for you on this case now."
 SUGGESTED_WORDS = {"pass": "pass", "query": "query", "unclear": "none"}
 
@@ -86,6 +89,11 @@ class Directory:
         )["users"]
         cfg = yaml.safe_load((self.config_dir / self.study / "study.yaml").read_text()) or {}
         self.site_names: dict[str, str] = {str(k): v for k, v in cfg.get("site_names", {}).items()}
+        # Demo only (P-58): person id -> the name of their character channel
+        self.character_channels: dict[str, str] = {
+            str(k): str(v).lstrip("#")
+            for k, v in (cfg.get("slack_character_channels") or {}).items()
+        }
 
     @property
     def by_id(self) -> dict[str, dict[str, Any]]:
@@ -132,12 +140,55 @@ class Directory:
 
     def slack_user_for(self, person_id: str) -> str | None:
         """Where a notice for this person goes: their own Slack user (real use), else the
-        demo presenter, the Slack account that last chose someone to act as."""
+        Slack account acting as them (the last to choose them, when several did), else the
+        demo presenter, the account that last chose anyone. So with one Slack account per
+        character, each notice reaches that character's window (P-58)."""
         own = self.by_id.get(person_id, {}).get("slack_user_id")
         if own:
             return own
         acting = self.acting()
+        theirs = [slack for slack, pid in acting.items() if pid == person_id]
+        if theirs:
+            return theirs[-1]
         return next(reversed(acting), None) if acting else None
+
+    # -- character channels (demo only, P-58) ---------------------------------------------------
+
+    @property
+    def channels_path(self) -> Path:
+        return self.slack_dir / "channels.json"
+
+    def channel_ids(self) -> dict[str, str]:
+        """Channel name -> Slack channel id, as the Slack app found or created them at its
+        start (`channels.ensure_channels`). Read on every call: the runner may start first."""
+        if not self.channels_path.exists():
+            return {}
+        try:
+            return dict(json.loads(self.channels_path.read_text()))
+        except (ValueError, TypeError):
+            log.warning("slack/channels.json is not readable: notices go as DMs")
+            return {}
+
+    def save_channel_ids(self, ids: dict[str, str]) -> None:
+        write_atomic(self.channels_path, json.dumps(ids, indent=1).encode(), overwrite=True)
+
+    def channel_of(self, person_id: str) -> str | None:
+        """The id of this person's character channel, when one is configured and the app
+        has it; else None (a DM as before)."""
+        name = self.character_channels.get(person_id)
+        return self.channel_ids().get(name) if name else None
+
+    def person_in_channel(self, channel_id: str | None) -> dict[str, Any] | None:
+        """The person whose character channel this is: whoever writes or clicks there
+        takes their part, whatever their Acting As (demo only)."""
+        if not channel_id or not self.character_channels:
+            return None
+        names = {cid: name for name, cid in self.channel_ids().items()}
+        name = names.get(channel_id)
+        if name is None:
+            return None
+        pid = next((p for p, n in self.character_channels.items() if n == name), None)
+        return self.by_id.get(pid) if pid else None
 
     def find(self, words: str) -> list[dict[str, Any]]:
         """People whose id or name contains every word, e.g. 'anna' or 'site 102'."""
@@ -171,6 +222,7 @@ class SlackActionsLog:
         cases: list[str] | None = None,
         result: str = "done",
         reason: str | None = None,
+        detail: dict[str, Any] | None = None,
     ) -> None:
         entry: dict[str, Any] = {
             "slack_user": slack_user,
@@ -181,6 +233,8 @@ class SlackActionsLog:
         }
         if reason:
             entry["reason"] = reason
+        if detail:  # e.g. what Slack said when asked to delete an uploaded original (P-58)
+            entry["detail"] = detail
         self.log.append(entry)
 
 
@@ -333,7 +387,7 @@ class Workspace:
 
     def import_queued(self, person: dict[str, Any]) -> tuple[str, list[str]]:
         """Import the queued AE files as this person. Returns a summary in counts and case
-        IDs only, and the cases created: no subject or AE IDs (ADR 0004)."""
+        IDs only, and the cases created: no subject or AE IDs."""
         if person["role"] != "data_manager":
             raise PermissionError("Importing AE records is the data manager's step.")
         if not self.waiting_files():
@@ -352,9 +406,39 @@ class Workspace:
         return "Pulled the AE records from the EDC. " + summary, created
 
 
+@dataclass(frozen=True)
+class ImportReply:
+    text: str  # counts and case IDs only
+    created: list[str]
+    result: str  # done | refused | failed, as recorded
+
+
+def import_as(ws: Workspace, actions: SlackActionsLog, slack_user: str, person: dict[str, Any],
+              action: str = "import", via: str = "") -> ImportReply:  # fmt: skip
+    """The data manager's import of the queued files ("import") or EDC pull ("pull"), the
+    same calls as the app's buttons, recorded in the Slack actions log as this person.
+    `via` names where in Slack it was asked ("agent" for the Agent, P-58)."""
+    run = ws.pull_from_edc if action == "pull" else ws.import_queued
+    name = f"{via}:{action}" if via else action
+    acting = person["id"]
+    try:
+        summary, created = run(person)
+    except PermissionError as exc:
+        actions.record(slack_user, acting, name, result="refused", reason="not the data manager")
+        return ImportReply(str(exc), [], "refused")
+    except Exception as exc:  # e.g. the runner took the same file: say so, log it
+        log.exception("%s from Slack failed", action)
+        actions.record(slack_user, acting, name, result="failed", reason=type(exc).__name__)
+        return ImportReply(f"The {action} did not finish. Try again, or use AE import in "
+                           "the app.", [], "failed")  # fmt: skip
+    actions.record(slack_user, acting, name, cases=created)
+    return ImportReply(summary + (" The sites are notified now." if created else ""), created,
+                       "done")  # fmt: skip
+
+
 def summarise_import(results: list[ImportResult]) -> tuple[str, list[str]]:
-    """An import in counts and case IDs only, and the cases created: no subject or AE IDs
-    (ADR 0004)."""
+    """An import in counts and case IDs only, and the cases created: no subject or AE
+    IDs."""
     outcomes = [o for r in results for o in r.outcomes]
     created = [o["case_id"] for o in outcomes if o.get("outcome") == "created"]
     others = len(outcomes) - len(created)

@@ -104,6 +104,9 @@ TRANSITIONS: dict[str, dict[State | None, State | str]] = {
     # Built in the QC round since P-39, after the pass before it (cases on disk replay)
     "dossier.built": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
     "narrative.drafted": {State.QC_CHECKS: SAME, State.NARRATIVE: SAME},
+    # P-58: the Safety Specialist's unsigned drafts (from Slack); they never move the case
+    "narrative.draft_edited": {State.QC_REVIEW: SAME},
+    "query.drafted": {State.QC_REVIEW: SAME},
     "narrative.approved": {State.NARRATIVE: State.READY_FOR_ADJUDICATION},  # agent gate
     "narrative.review_needed": {State.NARRATIVE: State.NARRATIVE_REVIEW},
     "narrative.signed": {State.NARRATIVE_REVIEW: State.READY_FOR_ADJUDICATION},

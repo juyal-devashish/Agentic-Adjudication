@@ -240,6 +240,61 @@ def test_study_config_builds_a_gateway_with_ai_off(case):
     assert gw.cfg.mode == "off" and gw.replay_dir == CONFIG / "DEMO01" / "ai_replays"
 
 
+def test_a_function_can_have_its_own_mode():
+    """P-58: the Slack Agent runs live while the Quality Check agents stay on replay."""
+    c = AiConfig(mode="replay", modes={"slack_agent": "live"},
+                 functions={"slack_agent": True, "narrative": True})  # fmt: skip
+    assert (c.mode_for("slack_agent"), c.mode_for("narrative")) == ("live", "replay")
+    assert c.enabled("slack_agent") and c.enabled("narrative")
+    c = AiConfig(mode="off", modes={"slack_agent": "live"}, functions={"slack_agent": True})
+    assert c.enabled("slack_agent") and not c.enabled("narrative")
+
+
+def test_the_master_mode_never_turns_the_slack_agent_on():
+    c = AiConfig(mode="live", functions={"slack_agent": True, "narrative": True})
+    assert c.mode_for("slack_agent") == "off" and not c.enabled("slack_agent")
+    assert c.enabled("narrative")
+
+
+def test_environment_overrides_master_and_agent_modes_separately(case, monkeypatch):
+    store, _ = case
+    assert Gateway.for_study(store, CONFIG).cfg.mode_for("slack_agent") == "off"
+    monkeypatch.setenv("ADJUD_AI_MODE", "live")
+    gw = Gateway.for_study(store, CONFIG)
+    assert (gw.cfg.mode_for("narrative"), gw.cfg.mode_for("slack_agent")) == ("live", "off")
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setenv("ADJUD_AGENT_MODE", "live")
+    gw = Gateway.for_study(store, CONFIG)
+    assert (gw.cfg.mode_for("narrative"), gw.cfg.mode_for("slack_agent")) == ("replay", "live")
+    assert gw.cfg.enabled("slack_agent") and gw.cfg.budget_usd == 100
+
+
+def test_a_mistyped_agent_mode_turns_the_agent_off_and_never_stops_the_workflow(
+    case, monkeypatch, caplog
+):
+    """`ADJUD_AGENT_MODE` concerns only the Slack Agent, but `for_study` also builds the
+    Quality Check gateway (runner, Quality check page): a typo must not stop them."""
+    store, _ = case
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setenv("ADJUD_AGENT_MODE", "on")
+    with caplog.at_level("WARNING", logger="adjud.ai"):
+        gw = Gateway.for_study(store, CONFIG)
+    assert (gw.cfg.mode_for("narrative"), gw.cfg.mode_for("slack_agent")) == ("replay", "off")
+    assert "ADJUD_AGENT_MODE" in caplog.text and "'on'" in caplog.text
+    monkeypatch.setenv("ADJUD_AGENT_MODE", " LIVE ")
+    assert Gateway.for_study(store, CONFIG).cfg.mode_for("slack_agent") == "live"
+    monkeypatch.setenv("ADJUD_AGENT_MODE", "  ")  # blank: as if unset
+    assert Gateway.for_study(store, CONFIG).cfg.mode_for("slack_agent") == "off"
+
+
+def test_a_function_on_replay_replays_even_when_the_master_mode_is_live(case, tmp_path):
+    store, cid = case
+    client = FakeClient()
+    gw = gateway(store, tmp_path, client=client, modes={"document_type": "replay"})
+    r = run(gw, store, cid)
+    assert r.mode == "replay" and "no recorded output" in r.note and not client.requests
+
+
 # --- AI-1: the agent adds identifiers on scanned pages (plan step 20) ----------------------
 
 

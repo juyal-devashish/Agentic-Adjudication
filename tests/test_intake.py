@@ -98,7 +98,7 @@ def test_processed_files_are_never_overwritten_within_one_second(tmp_path):
 
 
 def test_two_inbox_imports_at_once_import_each_file_once(pipe, tmp_path, clock):
-    """B11: a second caller (another tab, the runner, the Assistant, Slack) that starts
+    """B11: a second caller (another tab, the runner, Slack) that starts
     while an import is under way used to re-log every record and then crash moving a
     file the first caller had already moved. It must wait and find nothing left."""
     inbox, done = tmp_path / "inbox", tmp_path / "processed"

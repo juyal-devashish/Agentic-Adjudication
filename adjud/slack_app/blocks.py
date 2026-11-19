@@ -1,4 +1,5 @@
-"""What Slack shows (Block Kit), built only from core.py's clinical-free facts (ADR 0004).
+"""What Slack shows (Block Kit), built only from core.py's clinical-free facts (ADR 0005:
+no PHI; the Agent's answers are gated in agent.py).
 
 Every block here carries case IDs, workflow words, site and people's names, counts,
 buttons and links into the app; nothing else is passed in. Limits respected: a Home view
@@ -11,7 +12,7 @@ from typing import Any
 
 from adjud.slack_app.core import ROLE_ORDER, ROLE_WORDS, Directory, Status, Task, Workspace
 
-SYNTHETIC = "Synthetic data only. No patient or clinical information is shown in Slack."
+SYNTHETIC = "Synthetic data only. No PHI is shown in Slack."
 MAX_ROWS = 30  # per list on App Home, well inside the 100-block view limit
 
 
@@ -94,7 +95,7 @@ def home(ws: Workspace, person: dict[str, Any] | None, note: str | None = None) 
 
 def not_a_case_block(ws: Workspace, person: dict[str, Any]) -> dict[str, Any] | None:
     """The data manager's count of AE records that are not a case, with a button to AE
-    import, where the records and the reasons are. A count only (ADR 0004)."""
+    import, where the records and the reasons are. A count only."""
     n = ws.records_not_a_case(person)
     if not n:
         return None
@@ -190,19 +191,35 @@ def act_as_modal(people: Directory, current: str | None) -> dict[str, Any]:
 
 
 def notice(
-    note: dict[str, Any], who: str, url: str | None, next_step: str | None = None
+    note: dict[str, Any],
+    who: str,
+    url: str | None,
+    next_step: str | None = None,
+    detail: str | None = None,
 ) -> tuple[str, list[dict]]:
     """A notice as a DM: the same content as the e-mail (study, case, task, for whom), the
-    recipient's next step in Task words (P-57) and an *Open in the app* button. Returns
-    (fallback text, blocks)."""
-    case = note.get("case_id") or "-"
+    recipient's next step in Task words (P-57), `detail` (the Site Query, PHI-gated:
+    P-58, Q13) and an *Open in the app* button. Returns (fallback text, blocks)."""
+    case = note.get("case_id")
     task = note["subject"][:1].lower() + note["subject"][1:]
-    text = f"[{note['study']}] Case {case}: {task}"
+    text = (
+        f"[{note['study']}] Case {case}: {task}" if case else f"[{note['study']}] {note['subject']}"
+    )
+    in_slack = note["template"] == "ae_file_waiting"  # the import runs here (ADR 0003)
+    if in_slack:
+        next_step = "Import queued files, here in Slack, or check them on AE import first"
     body = f"*{esc(text)}*\nFor: {esc(who)}"
     if next_step:
         body += f"\nNext: {esc(next_step)}"
     blocks: list[dict[str, Any]] = [_text(body)]
-    if url:
-        blocks.append({"type": "actions", "elements": [open_button(url, action_id="open_app_dm")]})
+    if detail:
+        blocks.append(_text(esc(detail)[:2900]))
+    buttons = [open_button(url, action_id="open_app_dm")] if url else []
+    if in_slack:
+        label = {"type": "plain_text", "text": "Import queued files"}
+        buttons.insert(0, {"type": "button", "style": "primary", "action_id": "import_queued",
+                           "text": label})  # fmt: skip
+    if buttons:
+        blocks.append({"type": "actions", "elements": buttons})
     blocks.append(_context(SYNTHETIC))
     return text, blocks

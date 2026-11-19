@@ -1,22 +1,32 @@
-# Slack app manifest for the demo workspace (plan P-55, ADR 0003, ADR 0004).
-# Built from docs/research/slack-interactive-app.md §10, trimmed to the Friday slice.
-# Paste it at api.slack.com/apps → Create New App → From a manifest, in the DEMO workspace
-# only. Slack validates it there; if it objects to a field, see the research notes.
+# Slack app manifest for the demo workspace (plan P-55, P-58, ADR 0003, ADR 0005).
+# This is the manifest installed for the Slack Agent (P-58): Slack's agent experience
+# (features.agent_view), a writable Messages tab, and the events the Agent listens to.
+# Paste it at api.slack.com/apps → your app → App Manifest (or Create New App → From a
+# manifest), in the DEMO workspace only. Slack validates it there.
 #
 # Socket Mode: no public address. After creating the app:
 #   Basic Information → App-Level Tokens → Generate, scope connections:write → SLACK_APP_TOKEN
 #   Install App → Install to Workspace → Bot User OAuth Token → SLACK_BOT_TOKEN
-# Both go in .env only, never in the repository or the chat.
+# The four channels: scopes and message.channels serve the demo's character channels
+# (study.yaml slack_character_channels, P-58). Changing scopes or events needs a reinstall. Both tokens go in .env only, never in the
+# repository or the chat.
 _metadata:
   major_version: 1
 display_information:
   name: Adjudication Demo
-  description: Tasks and notices for the adjudication demo. Synthetic data only.
+  description: Your adjudication work and an agent that does it with you. Synthetic data only.
 features:
   app_home:
     home_tab_enabled: true
-    messages_tab_enabled: true            # the DMs with "Open in the app"
-    messages_tab_read_only_enabled: true  # nobody types free text to the app (ADR 0004)
+    messages_tab_enabled: true             # DMs and the conversation with the Agent
+    messages_tab_read_only_enabled: false  # people write to the Agent (P-58)
+  agent_view:                              # Slack's agent experience (P-58)
+    agent_description: >-
+      Your adjudication assistant: your tasks, case status and the steps that need no
+      signature, done as you. Signatures stay in the app. Synthetic data only; no PHI.
+    suggested_prompts:
+      - title: My tasks
+        message: What are my tasks?
   bot_user:
     display_name: Adjudication Demo
     always_online: false
@@ -28,12 +38,27 @@ features:
 oauth_config:
   scopes:
     bot:
-      - chat:write   # DMs to people (chat.postMessage to a user ID)
-      - commands     # /adj
+      - chat:write       # DMs and replies (chat.postMessage)
+      - commands         # /adj
+      - assistant:write  # agent session status (agents.sessions.setStatus) and titles
+      - im:history       # messages people write to the Agent (message.im)
+      - files:read       # files attached in a conversation (the site's upload)
+      - files:write      # try to delete an uploaded original from Slack (ADR 0005)
+      - channels:read    # demo character channels (P-58): find them (conversations.list)
+      - channels:manage  # create a missing one (conversations.create)
+      - channels:join    # join it, to post notices there (conversations.join)
+      - channels:history # messages written in them (message.channels) and their threads
 settings:
   event_subscriptions:
     bot_events:
-      - app_home_opened   # publish the Home tab when someone opens it
+      - app_home_opened             # Home tab, and the Messages tab opening (tab == "messages")
+      - message.im                  # a message to the Agent
+      - message.channels            # a message in a public channel: answered only in a
+                                    # demo character channel (P-58)
+      - app_context_changed         # the person switched what the Agent is looking at
+      - agent_session_stopped       # the person stopped the Agent's reply
+      - agent_session_title_changed # the conversation was renamed
+      - file_shared                 # a file attached in a conversation
   interactivity:
     is_enabled: true      # buttons and the Acting As form
   org_deploy_enabled: false

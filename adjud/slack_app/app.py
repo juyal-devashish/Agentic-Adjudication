@@ -1,4 +1,5 @@
-"""The Bolt app (P-55, ADR 0003): `/adj`, App Home, buttons and the Acting As form.
+"""The Bolt app (P-55, ADR 0003): `/adj`, App Home, buttons and the Acting As form, and
+the Agent's events in the Messages tab (P-58, `agent.py`).
 
 Handlers are plain methods of `SlackHandlers` taking Bolt's arguments (ack, command,
 body, respond, client), so tests drive them with a fake client and never reach Slack.
@@ -18,7 +19,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from adjud.slack_app import blocks
-from adjud.slack_app.core import SlackActionsLog, Workspace
+from adjud.slack_app.agent import SlackAgent
+from adjud.slack_app.conversations import ConversationLog
+from adjud.slack_app.core import SlackActionsLog, Workspace, import_as
 
 log = logging.getLogger("adjud.slack_app")
 EPHEMERAL = "ephemeral"
@@ -30,6 +33,12 @@ class SlackHandlers:
     ws: Workspace
     actions: SlackActionsLog
     notes: dict[str, str] = field(default_factory=dict)  # Slack user -> last result on Home
+    agent: SlackAgent | None = None  # the Agent in the Messages tab (P-58)
+
+    def __post_init__(self) -> None:
+        if self.agent is None:
+            self.agent = SlackAgent(self.ws, ConversationLog(self.ws.paths),
+                                    actions=self.actions)  # fmt: skip
 
     @property
     def people(self) -> Any:
@@ -38,8 +47,16 @@ class SlackHandlers:
     def _who(self, slack_user: str) -> dict[str, Any] | None:
         return self.people.person_for(slack_user)
 
-    def _record(self, slack_user: str, action: str, **kw: Any) -> None:
-        person = self._who(slack_user)
+    def _who_in(self, body: dict[str, Any]) -> dict[str, Any] | None:
+        """Whom a button click acts as: the character channel's person when it was
+        clicked there (demo, P-58), else the Slack user's person."""
+        channel = (body.get("channel") or {}).get("id") or (
+            body.get("container") or {}).get("channel_id")  # fmt: skip
+        return self.people.person_in_channel(channel) or self._who(body["user"]["id"])
+
+    def _record(self, slack_user: str, action: str, *, person: dict[str, Any] | None = None,
+                **kw: Any) -> None:  # fmt: skip
+        person = person or self._who(slack_user)
         self.actions.record(slack_user, person["id"] if person else None, action, **kw)
 
     def publish_home(self, client: Any, slack_user: str) -> None:
@@ -120,23 +137,18 @@ class SlackHandlers:
     def _import(self, slack_user: str, person: dict[str, Any], action: str = "import") -> str:
         """The data manager's import of the queued files ("import") or EDC pull ("pull"),
         the same calls as the app's buttons."""
-        run = self.ws.pull_from_edc if action == "pull" else self.ws.import_queued
-        try:
-            summary, created = run(person)
-        except PermissionError as exc:
-            self._record(slack_user, action, result="refused", reason="not the data manager")
-            return str(exc)
-        except Exception as exc:  # e.g. the runner took the same file: say so, log it
-            log.exception("%s from Slack failed", action)
-            self._record(slack_user, action, result="failed", reason=type(exc).__name__)
-            return f"The {action} did not finish. Try again, or use AE import in the app."
-        self._record(slack_user, action, cases=created)
-        self.notes[slack_user] = summary
-        return summary + (" The sites are notified now." if created else "")
+        reply = import_as(self.ws, self.actions, slack_user, person, action)
+        if reply.result == "done":
+            self.notes[slack_user] = reply.text.removesuffix(" The sites are notified now.")
+        return reply.text
 
     # -- App Home ------------------------------------------------------------------------------
 
     def on_home_opened(self, event: dict[str, Any], client: Any) -> None:
+        if event.get("tab") == "messages":  # the conversation with the Agent (P-58)
+            assert self.agent is not None
+            self.agent.on_messages_tab(event, client)
+            return
         if event.get("tab", "home") != "home":
             return
         self._record(event["user"], "home_opened")
@@ -156,7 +168,7 @@ class SlackHandlers:
                          respond: Any = None) -> None:  # fmt: skip
         ack()
         slack_user = body["user"]["id"]
-        person = self._who(slack_user)
+        person = self._who_in(body)
         if person is None:
             self._record(slack_user, "import", result="refused", reason="no person")
             return
@@ -171,7 +183,7 @@ class SlackHandlers:
         ack()
         action = (body.get("actions") or [{}])[0]
         case = parse_qs(urlparse(action.get("url", "")).query).get("case", [])
-        self._record(body["user"]["id"], "open_app", cases=case[:1])
+        self._record(body["user"]["id"], "open_app", person=self._who_in(body), cases=case[:1])
 
     # -- the Acting As form ---------------------------------------------------------------------
 
@@ -203,4 +215,12 @@ def build_app(handlers: SlackHandlers, bot_token: str, *, verify: bool = True) -
     app.action("import_queued")(handlers.on_import_button)
     app.action(re.compile(r"^open_app"))(handlers.on_open_app)
     app.view("act_as")(handlers.on_act_as_submitted)
+    agent = handlers.agent
+    assert agent is not None
+    # message.im, and message.channels for the demo's character channels (P-58); edits,
+    # bots and other channels are ignored there
+    app.event("message")(agent.on_message)
+    for name in ("app_context_changed", "agent_session_stopped", "agent_session_title_changed",
+                 "file_shared"):  # fmt: skip
+        app.event(name)(agent.on_session_event)
     return app

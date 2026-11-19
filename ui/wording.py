@@ -97,8 +97,8 @@ PAGES = {
 }
 
 # The pages each role works on, its landing page first. Case record is read-only for all.
-# Each role lands on the page of its own work, with its tasks listed at the top; the
-# Assistant chat is hidden, and work starts in Slack (P-56, superseding P-40; ADR 0003).
+# Each role lands on the page of its own work, with its tasks listed at the top; work
+# starts in Slack, with the Agent (P-56, P-58; ADR 0003).
 ROLE_PAGES = {
     "data_manager": ["import", "record"],
     "site": ["documents", "record"],

@@ -27,6 +27,13 @@ def _no_real_slack(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _no_live_agent(monkeypatch):
+    """Tests never call the Claude API: an Agent mode set in the shell or .env is ignored
+    (P-58); a test that needs one sets it itself."""
+    monkeypatch.delenv("ADJUD_AGENT_MODE", raising=False)
+
+
 @pytest.fixture
 def paths(tmp_path) -> DataPaths:
     return DataPaths(tmp_path / "data")

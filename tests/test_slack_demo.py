@@ -5,6 +5,7 @@ demo folder copies the committed config and leaves the repo's data alone."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -17,7 +18,7 @@ from adjud.slack_app.core import SlackActionsLog, Workspace
 from adjud.slack_app.dm import SlackSettings
 from adjud.workflow import State
 from tests.test_slack import PRESENTER, FakeClient
-from tests.test_slack_app import forbidden
+from tests.test_slack_agent_demo import phi_in
 from tools.reset_demo import DEMO_AES, reset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,8 +121,7 @@ def test_the_slack_demo_runs_from_the_import_to_the_assignment(tmp_path, monkeyp
          "Your independent review (round 1)", "adjudicate"),
     ]  # fmt: skip
 
-    sent = json.dumps(client.posts).lower()
-    assert not {w for w in forbidden(ws) if w in sent}  # ADR 0004
+    assert not phi_in(client.posts)  # ADR 0005: Clinical Content may go to Slack, PHI never
 
 
 def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp_path):
@@ -139,3 +139,67 @@ def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp
     reset(fresh, only=DEMO_AES)
     assert (fresh.config / "users.yaml").read_text() == "users: []\n"
     assert sorted(p.name for p in (ROOT / "data").iterdir()) == before
+
+
+def test_a_demo_folder_copied_earlier_takes_new_committed_settings(tmp_path):
+    """P-58: a demo folder copied before the Agent's settings existed gets them on the next
+    reset; a file the presenter changed there is kept, and an old copy is kept beside."""
+    committed = (ROOT / "data" / "config" / "DEMO01" / "study.yaml").read_bytes()
+    fresh = DataPaths(tmp_path / "demo")
+    reset(fresh, only=DEMO_AES)
+    study = fresh.config / "DEMO01" / "study.yaml"
+    study.write_text("stale: true\n")  # as copied before P-58, with no record of the copy
+    (fresh.config / ".copied.json").unlink()
+    reset(fresh, only=DEMO_AES)
+    assert study.read_bytes() == committed
+    assert study.with_name("study.yaml.kept").read_text() == "stale: true\n"
+    record = json.loads((fresh.config / ".copied.json").read_text())
+    study.write_text("old copy\n")  # as copied, before data/config changed
+    record["DEMO01/study.yaml"] = hashlib.sha256(b"old copy\n").hexdigest()
+    (fresh.config / ".copied.json").write_text(json.dumps(record))
+    reset(fresh, only=DEMO_AES)  # unchanged in the demo folder: it follows data/config
+    assert study.read_bytes() == committed
+
+
+def test_rahul_is_told_in_slack_when_ae_records_wait_and_imports_from_the_dm(tmp_path, monkeypatch):
+    """P-57: a queued AE file is a notice to the data manager, once per file, as a DM with
+    an Import queued files button (the import runs in Slack) and as an e-mail."""
+    monkeypatch.setenv("NOTIFY_CHANNELS", "outbox,slack")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test-secret-token")
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    client = FakeClient()
+    monkeypatch.setattr(SlackSettings, "client", lambda self: client)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, preload=True, only=DEMO_AES)
+    ws = Workspace(paths)
+    ws.people.act_as(PRESENTER, "dm.dana")
+    runner = Runner(paths)
+    runner.tick(0)
+    runner.tick(1)  # still waiting: no second notice
+    (dm,) = client.posts
+    body = json.dumps(dm["blocks"])
+    assert dm["text"] == "[DEMO01] AE records are waiting to be imported"
+    assert "For: Rahul Mehta (Data manager)" in body and "Case -" not in body
+    buttons = [e for b in dm["blocks"] if b["type"] == "actions" for e in b["elements"]]
+    assert buttons[0]["action_id"] == "import_queued"  # done here, in Slack
+    assert buttons[1]["url"] == "http://localhost:8501/import?role=data_manager"
+    assert not store_cases(runner)  # nothing imported until Rahul clicks
+
+    handlers = SlackHandlers(ws, SlackActionsLog(paths))
+    replies: list[dict] = []
+    handlers.on_import_button(lambda *a, **k: None,
+                              {"user": {"id": PRESENTER}, "response_url": "https://x"},
+                              FakeHomeClient(), lambda **k: replies.append(k))  # fmt: skip
+    assert store_cases(runner) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
+    assert "3 new cases" in replies[0]["text"]
+    (paths.inbox / "02_more.csv").write_text((paths.processed / "01_initial.csv").read_text())
+    runner.tick(2)  # a new file: a new notice
+    assert [p["text"] for p in client.posts].count(dm["text"]) == 2
+
+
+def store_cases(runner: Runner) -> list[str]:
+    return sorted(runner.pipeline.store.list_cases())

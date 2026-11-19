@@ -17,7 +17,7 @@ from common import case_header, case_list, context, paths, pipeline, your_tasks
 from preview import show_file
 
 from adjud.dossier import latest_dossier
-from adjud.flow2 import QC_QUERY_CODES, QUERY_CODES, Flow2, Flow2Refused
+from adjud.flow2 import QC_QUERY_CODES, QUERY_CODES, Flow2, Flow2Refused, qc_drafts
 from adjud.handoff import latest_manifest_ref
 from adjud.signatures import SignatureRefused
 from adjud.workflow import State
@@ -165,8 +165,16 @@ def review_and_sign(latest: dict) -> None:
     if blocked:
         st.caption("A check failed, so this round can only end in a query to the site.")
     suggested_query = latest.get("proposal") == "query"
+    # Unsigned drafts from the Agent in Slack (P-58) pre-fill the narrative and the query;
+    # the latest of them chooses the decision.
+    drafts = qc_drafts(store, cid)
+    drafted_query = drafts.latest == "query"
+    for what, at in (("narrative", drafts.narrative_at), ("Site Query", drafts.query_at)):
+        if at:
+            theme.quiet(f"The {what} below starts from your unsigned draft from Slack, "
+                        f"{theme.date_words(at)} {at[11:16]} UTC.")  # fmt: skip
     # Nothing is pre-selected when the Suggested Outcome is "unclear" (AI unsure or off).
-    if suggested_query or blocked:
+    if suggested_query or blocked or drafted_query:
         preselect = options.index("query")
     else:
         preselect = 0 if latest.get("proposal") == "pass" else None
@@ -197,21 +205,18 @@ def review_and_sign(latest: dict) -> None:
             theme.frozen_text(draft, "Narrative draft")
     else:
         if box not in st.session_state:
-            st.session_state[box] = st.session_state.get(kept, draft)
+            st.session_state[box] = st.session_state.get(kept, drafts.narrative or draft)
         text = st.text_area("Narrative", height=320, key=box)
         st.session_state[kept] = text
     with st.form(f"qc_sign_{cid}_{latest['round']}"):
         codes, message, reason = [], "", ""
         if decision == "query":
             codes = st.multiselect("Query reasons", QC_QUERY_CODES,
-                                   default=latest.get("query_codes") or [],
+                                   default=drafts.query_codes or latest.get("query_codes") or [],
                                    format_func=QUERY_CODES.get)  # fmt: skip
-            message = st.text_area(
-                "Message to the site",
-                " ".join(f"{r.rstrip('.')}." for r in latest.get("reasons", []))
-                if suggested_query
-                else "",
-            )
+            suggested_text = (" ".join(f"{r.rstrip('.')}." for r in latest.get("reasons", []))
+                              if suggested_query else "")  # fmt: skip
+            message = st.text_area("Message to the site", drafts.query_text or suggested_text)
         else:
             reason = st.text_input(
                 "Why you pass despite the suggested query (required)"

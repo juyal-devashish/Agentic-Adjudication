@@ -2,7 +2,9 @@
 
 Every tool is read-only and sees only **redacted** outputs and EDC snapshots, never
 `documents/original/`. No tool writes a file or an event: an agent's result is a
-proposal, and only the runner moves a case after a gate passes.
+proposal, and only the runner moves a case after a gate passes. The Slack Agent's
+acting tools (`adjud/slack_app/agent_tools.py`, P-58) differ: they do one person's
+unsigned steps as that person, through the same calls as the app.
 """
 
 from __future__ import annotations

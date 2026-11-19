@@ -309,3 +309,26 @@ def test_each_dm_says_what_the_recipient_does_next(pipe):  # noqa: F811
     site, ss = (json.dumps(p["blocks"]) for p in client.posts)
     assert "Next: Upload the documents" in site
     assert "Next: Nothing more for you on this case now." in ss
+
+
+def test_each_character_s_slack_account_gets_that_character_s_notices(pipe):  # noqa: F811
+    """P-58 demo: one Slack account per character, each in its own window. A notice goes
+    to the account acting as its recipient; nobody's choice: the last account to choose."""
+    since = format_time(pipe.clock())
+    d = Directory(CONFIG, pipe.store.paths.root / "slack")
+    d.act_as("U0PRIYA", "site101.coord")
+    d.act_as("U0ANNA", "ss.anna")
+    d.act_as("U0RAHUL", "dm.dana")
+    out = Outbox(pipe.store.paths, "DEMO01", clock=pipe.clock)
+    out.queue("DEMO01-0001", "site:101", "documents_requested")
+    out.queue("DEMO01-0001", "role:safety_specialist", "qc_review_needed", page="qc")
+    out.queue("DEMO01-0001", "user:adj.okafor", "adjudication_assigned", "adjudicator")
+    client = FakeClient()
+    channel = SlackDmChannel(d, SETTINGS, client)
+    Deliverer(pipe.store, CONFIG, channel, ACTOR, since, pipe.clock).deliver_pending()
+    to = {p["text"].split(": ", 1)[1]: p["channel"] for p in client.posts}
+    assert to == {
+        "documents requested for an adjudication case": "U0PRIYA",
+        "a quality check needs your review": "U0ANNA",
+        "an adjudication review is assigned to you": "U0RAHUL",  # nobody is Okafor
+    }

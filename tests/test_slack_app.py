@@ -1,6 +1,7 @@
-"""The Slack app (plan P-55, ADR 0003, ADR 0004) with a fake Slack client: nothing here
+"""The Slack app (plan P-55, ADR 0003, ADR 0005) with a fake Slack client: nothing here
 reaches Slack. Acting As, /adj, App Home, the data manager's import, the Slack actions
-log, and a check of every payload the app builds against the Clinical Content list."""
+log, and a check of every payload the app builds against the identifiers the kit seeded
+(ADR 0005 replaced ADR 0004's Clinical Content rule for Slack: PHI is the line, P-58)."""
 
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from adjud.slack_app.app import SlackHandlers, build_app
 from adjud.slack_app.core import SlackActionsLog, Workspace, suggested_word
 from adjud.workflow import State
 from tests.test_flow3 import SITE, pdf, through_qc, to_qc_review
+from tests.test_slack_agent_demo import phi_in
 from tools.reset_demo import DEMO_AES, reset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,11 @@ class FakeClient:
     def __init__(self):
         self.published: list[dict] = []
         self.opened: list[dict] = []
+        self.posts: list[dict] = []
+
+    def chat_postMessage(self, **kwargs):  # noqa: N802 (slack_sdk's name)
+        self.posts.append(kwargs)
+        return {"ok": True, "channel": "D0PRESENTER", "ts": f"{len(self.posts)}.0"}
 
     def views_publish(self, user_id, view):
         self.published.append({"user_id": user_id, "view": view})
@@ -183,8 +190,9 @@ def test_link_clicks_and_home_opening_are_handled(app, data):
     h.on_home_opened({"user": ME, "tab": "home"}, client)
     assert client.published[-1]["user_id"] == ME
     n = len(client.published)
-    h.on_home_opened({"user": ME, "tab": "messages"}, client)
-    assert len(client.published) == n
+    h.on_home_opened({"user": ME, "tab": "messages", "channel": "D0PRESENTER"}, client)
+    assert len(client.published) == n  # the Messages tab is the Agent's (P-58): no Home
+    assert "I act as *Dr. Anna Weber (Safety Specialist)*" in json.dumps(client.posts)
 
 
 def test_help_and_unknown_commands_answer_privately(app, data):
@@ -206,63 +214,31 @@ def test_the_slack_actions_log_is_verified_and_survives_a_reset_without_acting_a
 
 
 def test_the_bolt_app_registers_every_listener_without_calling_slack(app):
+    """/adj, App Home (both tabs), three buttons, the Acting As form, and the Agent's
+    events: message.im and four session events (P-58)."""
     h, _ = app
     bolt = build_app(h, "xoxb-test", verify=False)
-    assert len(bolt._listeners) == 6
+    assert len(bolt._listeners) == 11
 
 
-def forbidden(ws: Workspace) -> set[str]:
-    """Clinical Content of every case (ADR 0004): the AE term, dates, subject and AE IDs,
-    seriousness, outcome, severity, relatedness and codes (values of 5+ characters, so a
-    'Y' does not match everything), document names, the AI Suggestion's text, and every
-    line of each case's narrative and query text."""
-    from adjud.documents import documents_of
-
-    out: set[str] = set()
-    for cid in ws.store.list_cases():
-        snap = ws.pipe.latest_snapshot(cid)
-        for key in ("ae_term", "onset_date", "end_date", "subject_id", "ae_id"):
-            if snap.get(key):
-                out.add(str(snap[key]).lower())
-        for key in ("seriousness_criteria", "outcome", "severity", "relatedness_investigator",
-                    "pt_code", "llt_code", "soc_code"):  # fmt: skip
-            if len(str(snap.get(key) or "")) >= 5:
-                out.add(str(snap[key]).lower())
-        out |= {name.lower() for name in documents_of(ws.store, cid).files}
-        for e in ws.store.events(cid):
-            if e["type"] == "qc.checks_completed":
-                sg = ws.store.get_json(cid, e["data"]["results"]["path"]).get("suggestion") or {}
-                out |= {
-                    t.lower()
-                    for t in [sg.get("summary") or ""]
-                    + [f.get("reason") or "" for f in sg.get("fields") or []]
-                    if len(t) > 15
-                }
-            if e["type"] == "query.opened" and e["data"].get("text"):
-                out.add(e["data"]["text"].lower())
-            if e["type"] == "narrative.drafted":
-                text = ws.store.get_file(cid, e["data"]["draft"]["path"]).decode()
-                out |= {ln.strip().lower() for ln in text.splitlines() if len(ln.strip()) > 25}
-    return out
-
-
-def test_no_payload_carries_clinical_content(data):
+def test_no_payload_carries_phi(data):
     """Every App Home, reply and DM the app builds, for every person, with cases at
-    several steps (one through the Quality Check, with a narrative and adjudication)."""
+    several steps (one through the Quality Check from the kit's documents, which carry
+    seeded identifiers, with a narrative and adjudication). Clinical Content may go to
+    Slack (ADR 0005, P-58); none of the identifiers the kit seeded may."""
     runner = Runner(data)
     runner.run_once()
     store = runner.pipeline.store
-    upload(store, "DEMO01-0001", [("summary.pdf", pdf("DISCHARGE SUMMARY\nChest pain.")),
-                                  ("ecg.pdf", pdf("ECG REPORT\nST elevation."))], SITE)  # fmt: skip
+    kit = data.root / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    upload(store, "DEMO01-0001", [(f.name, f.read_bytes()) for f in sorted(kit.iterdir())],
+           SITE)  # fmt: skip
     through_qc(runner, store, "DEMO01-0001")
     assert store.state("DEMO01-0001").state == State.ADJ_REVIEW
     upload(store, "DEMO01-0003", [("note.pdf", pdf("CLINIC NOTE\nChest pain."))], SITE)
     to_qc_review(runner, store, "DEMO01-0003")  # the Safety Specialist's row and status
     ws = Workspace(data)
     dm = ws.people.by_id["dm.dana"]
-    pulled, _ = ws.pull_from_edc(dm)  # before the forbidden list, so its cases are in it
-    bad = forbidden(ws)
-    assert len(bad) > 10  # AE terms, dates, IDs and narrative lines of three cases
+    pulled, _ = ws.pull_from_edc(dm)
     payloads: list = [pulled]
     assert "suggested: " in json.dumps(blocks.home(ws, ws.people.by_id["ss.anna"]))
     assert "not a case" in json.dumps(blocks.home(ws, dm))
@@ -279,9 +255,8 @@ def test_no_payload_carries_clinical_content(data):
     for note in DeliveryLog(store).notes():
         who = for_whom(note["to"], people(note["to"], users), ws.people)
         payloads.append(blocks.notice(note, who, "http://localhost:8501" + (note["link"] or "")))
-    text = json.dumps(payloads).lower()
-    leaks = sorted(b for b in bad if b in text)
-    assert not leaks, leaks
+    assert "DEMO01-0001" in json.dumps(payloads)  # the check is over real payloads
+    assert not phi_in(payloads)
 
 
 def test_every_interaction_is_logged_without_the_typed_text(app, data):

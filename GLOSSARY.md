@@ -97,7 +97,7 @@ _Avoid_: reopening, re-review
 ## Notifications
 
 **Notification**:
-One notice to one recipient about one case and task, holding no clinical content. Every Notification is kept in the outbox for good.
+One notice to one recipient about one case and task, never holding PHI on any Channel. By e-mail it holds no Clinical Content either (case ID, task and link); its Slack DM may add Clinical Content without PHI, such as a Site Query's text (ADR 0005). Every Notification is kept in the outbox for good.
 _Avoid_: alert, message (for the notice itself)
 
 **Channel**:
@@ -109,17 +109,25 @@ One try at delivering one Notification through one Channel, recorded as sent or 
 _Avoid_: send (as a noun), retry (for the first try)
 
 **Clinical Content**:
-Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, identifiers found in them, query text, the Narrative, AI-written text about the case, and adjudication answers. Never sent to Slack or put in a notification. Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content. Free of PHI is not enough: a redacted Narrative holds no PHI and is still Clinical Content.
+Anything about the patient's event or care: the AE term and its dates, seriousness, outcome and relatedness, medical history, medication, labs, document pages, query text, the Narrative, AI-written text about the case, and adjudication answers. It may go to Slack when it holds no PHI; PHI is the line there, not Clinical Content. It never goes into e-mail (ADR 0005). Case IDs, site names, workflow status, task wording, people's names and counts are not Clinical Content.
 _Avoid_: PHI (for this broader idea), medical data, sensitive data
 
 **PHI**:
-Anything in a case's documents that identifies the subject: names, dates of birth, record and phone numbers, addresses and the like. Removed from every document before the site signs. Narrower than Clinical Content.
+Anything in a case's documents that identifies the subject: names, dates of birth, record and phone numbers, addresses and the like. Removed from every document before the site signs, and never sent to Slack. Narrower than Clinical Content; the subject ID, a study code, is not PHI.
 _Avoid_: personal data (alone), identifiers (for the category), Clinical Content
 
 **Task**:
-One step waiting for one person on one case, such as signing a submission, a Quality Check or a review. Shown in Slack and in the app by case ID and in words, never with Clinical Content.
+One step waiting for one person on one case, such as signing a submission, a Quality Check or a review. Shown in Slack and in the app by case ID and in words, never with PHI.
 _Avoid_: to-do, job, ticket
 
 **Acting As**:
 In the demo, one person (a Slack account, or the app's sidebar) taking the part of one demo user. Simulated, not enforced.
 _Avoid_: impersonation, login
+
+**Agent**:
+The one Claude assistant in Slack that each person talks to. It acts as that person, sees only what that person sees in the app, and does only steps that need no signature. Not the AI functions that prepare the Quality Check.
+_Avoid_: bot, assistant, the Assistant (the retired in-app chat), chatbot
+
+**Conversation**:
+One thread between a person and the Agent, either started by the person or by a Notification's DM; a Conversation started from a Notification is about that case.
+_Avoid_: chat session, session, thread (for the idea)
