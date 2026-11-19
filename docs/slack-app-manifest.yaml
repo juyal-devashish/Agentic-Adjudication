@@ -7,7 +7,8 @@
 # Socket Mode: no public address. After creating the app:
 #   Basic Information → App-Level Tokens → Generate, scope connections:write → SLACK_APP_TOKEN
 #   Install App → Install to Workspace → Bot User OAuth Token → SLACK_BOT_TOKEN
-# Changing scopes or events needs a reinstall. Both tokens go in .env only, never in the
+# The four channels: scopes and message.channels serve the demo's character channels
+# (study.yaml slack_character_channels, P-58). Changing scopes or events needs a reinstall. Both tokens go in .env only, never in the
 # repository or the chat.
 _metadata:
   major_version: 1
@@ -43,11 +44,17 @@ oauth_config:
       - im:history       # messages people write to the Agent (message.im)
       - files:read       # files attached in a conversation (the site's upload)
       - files:write      # try to delete an uploaded original from Slack (ADR 0005)
+      - channels:read    # demo character channels (P-58): find them (conversations.list)
+      - channels:manage  # create a missing one (conversations.create)
+      - channels:join    # join it, to post notices there (conversations.join)
+      - channels:history # messages written in them (message.channels) and their threads
 settings:
   event_subscriptions:
     bot_events:
       - app_home_opened             # Home tab, and the Messages tab opening (tab == "messages")
       - message.im                  # a message to the Agent
+      - message.channels            # a message in a public channel: answered only in a
+                                    # demo character channel (P-58)
       - app_context_changed         # the person switched what the Agent is looking at
       - agent_session_stopped       # the person stopped the Agent's reply
       - agent_session_title_changed # the conversation was renamed
