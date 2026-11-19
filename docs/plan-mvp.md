@@ -400,7 +400,7 @@ Storage, intake, de-identification (text PDFs, spreadsheets, scans), site review
 - [x] The Assistant deleted (Q16) and step 30 closed with a note
 - [x] AGENTS.md, CLAUDE.md and README brought in line with ADR 0005 (they still cite ADR 0004 for Slack; their "no clinical content" rule stays for e-mail)
 - [x] Demo: one public channel per character, named by role (`#data-manager`, `#site-user`, `#safety-specialist`, `#adjudicator-1`, `#adjudicator-2`; `study.yaml: slack_character_channels`), so one Slack account works without switching person: the app creates and joins them, their notices go there, and the Agent there acts as the channel's person (user, 2026-11-18, after the live run found Acting As confusing; simulated like Acting As; unmapped people and refused channels fall back to DMs)
-- [ ] A live run on the demo workspace; runbook updated; merged into `main`
+- [x] A live run on the demo workspace (2026-11-18: in the role channels, import to the adjudicators' Assignment, one reply per message, nothing held wrongly after the gate fixes, `tools.notify_parity` clean); runbook updated; merged into `main`
 
 **Done when:** in the demo workspace each role can ask the Agent about its work and do its unsigned steps in Slack, and every signed step opens the right page in the app; no Slack payload carries the kit's seeded PHI; the P-57 demo still runs; with Slack and AI off the whole workflow runs from the app and e-mail; full suite and kit pass.
 
