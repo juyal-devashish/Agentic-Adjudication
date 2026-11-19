@@ -232,3 +232,18 @@ def test_counted_categories_are_not_a_label_with_a_value(ws):
     for text in ("Address: 14 Oak Lane, Leeds LS2 9JT", "Patient: Tom Weber",
                  "Page 1 Patient: Tom Weber", "Tel 07700 900123"):  # fmt: skip
         assert gate.check(text, []).held, text
+
+
+def test_the_gate_passes_the_words_live_answers_held_by_mistake(ws):
+    """Live capture run: "you can do it here in Slack" was held (NER took Slack for a
+    place), and "...isn't signed. No record I can see..." was held (the staff label "To"
+    read in prose). Slack is the app's own word; a staff label counts only with a colon
+    after it. A staff name after a real label is still held."""
+    gate = PhiGate.for_workspace(ws)
+    for text in ("You have one thing waiting, and you can do it here in Slack.",
+                 "I haven't changed the narrative yet. The Quality Check isn't signed. No "
+                 "record I can see shows that it was reviewed, so I want to check with you "
+                 "first before I edit it."):  # fmt: skip
+        assert not gate.check(text, ["DEMO01-0001"]).held, gate.check(text, []).found
+    for text in ("To: Dr Rupert Pemberton", "Signed: Rupert Pemberton", "Reported by: Ann Pike"):
+        assert gate.check(text, []).held, text

@@ -50,7 +50,14 @@ HOLD_TEXT = "That answer may contain identifiers; open it in the app."
 # Slack mrkdwn marks, read as spaces: `Smith_John.pdf` is checked as "Smith John.pdf"
 _MARKS = str.maketrans(dict.fromkeys("*_`~", " "))
 PATIENT_LABELS = frozenset({"PATIENT_NAME", "NEXT_OF_KIN"})
-APP_WORDS = ("Quality Check", "Quality check", "AI Suggestion", "Site Query", "Adjudication Demo")
+APP_WORDS = (
+    "Quality Check",
+    "Quality check",
+    "AI Suggestion",
+    "Site Query",
+    "Adjudication Demo",
+    "Slack",
+)  # the app's own words, which NER may take for a name or a place
 
 
 @dataclass(frozen=True)
@@ -107,6 +114,7 @@ class PhiGate:
         unit = TextUnit.from_string(_mask_counted(text.translate(_MARKS), self._label_words))
         allowed = [span for term in self.allowed for span in find_all(unit.text, term)]
         found = [piece for f in detect(unit, self.policy, KnownValues(), language="en")
+                 if not _staff_label_in_prose(f, unit.text)
                  for piece in (_subtract(f, allowed, unit.text)
                                if allowed and not _labelled_patient(f) else [f])]  # fmt: skip
         for value, category in self._case_values(case_ids):
@@ -190,6 +198,15 @@ def _mask_counted(text: str, label_words: frozenset[str]) -> str:
                 start = m.start(1) + w.start()
                 chars[start : start + len(word)] = " " * len(word)
     return "".join(chars)
+
+
+def _staff_label_in_prose(f: Finding, text: str) -> bool:
+    """A staff label ("To", "Signed", "Reported by") counts only with a colon after it: in
+    the Agent's prose "to" and "signed" are ordinary words (live run: "...isn't signed. No
+    record ..." was held). Patient and next-of-kin labels are never treated so."""
+    if f.detector != "label" or f.category != "STAFF_NAME":
+        return False
+    return not text[max(0, f.start - 3) : f.start].rstrip().endswith(":")
 
 
 def _labelled_patient(f: Finding) -> bool:
