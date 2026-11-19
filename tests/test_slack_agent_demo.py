@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from adjud.flow2 import qc_drafts
@@ -105,8 +106,9 @@ def test_the_seeded_identifiers_are_the_kits_and_none_is_an_app_users_name():
 
 
 class SlackWorld(FilesSlack):
-    """One DM between the presenter and the app: every post the app makes (notices and the
-    Agent's replies, each with its own `ts`), the messages the person sends, threads as
+    """One DM between the presenter and the app, or the demo's character channels (P-58):
+    every post the app makes (notices and the Agent's replies, each with its own `ts` and
+    the channel it went to), the messages the person sends, threads as
     `conversations.replies` gives them, and the App Home views published."""
 
     def __init__(self) -> None:
@@ -122,9 +124,11 @@ class SlackWorld(FilesSlack):
     def chat_postMessage(self, **kwargs):  # noqa: N802 (slack_sdk's name)
         self.posts.append(kwargs)
         ts = self._ts()
+        channel = kwargs["channel"] if kwargs["channel"].startswith("C") else DM
         self.history.append({"bot_id": "B0APP", "text": kwargs.get("text") or "", "ts": ts,
-                             "thread_ts": kwargs.get("thread_ts") or ts})  # fmt: skip
-        return {"ok": True, "channel": DM, "ts": ts}
+                             "thread_ts": kwargs.get("thread_ts") or ts,
+                             "channel": channel})  # fmt: skip
+        return {"ok": True, "channel": channel, "ts": ts}
 
     def conversations_replies(self, *, channel, ts, limit):
         return {"messages": [m for m in self.history if m["thread_ts"] == ts][:limit]}
@@ -141,13 +145,17 @@ class SlackWorld(FilesSlack):
                     if m["thread_ts"] == m["ts"] and about in m["text"])  # fmt: skip
 
     def say(self, agent: SlackAgent, text: str, thread: str | None = None,
-            files: list[dict] | None = None) -> dict[str, Any]:  # fmt: skip
-        """The person's message, with the edit and the app's own echo Slack also sends;
-        returns the one reply, which must be in the message's thread."""
+            files: list[dict] | None = None,
+            channel: str | None = None) -> dict[str, Any]:  # fmt: skip
+        """The person's message (in `channel`, a character channel, else the DM), with the
+        edit and the app's own echo Slack also sends; returns the one reply, which must be
+        in the message's thread."""
         ts = self._ts()
         extra: dict[str, Any] = {"thread_ts": thread} if thread else {}
         if files:
             extra |= {"subtype": "file_share", "files": files}
+        if channel:
+            extra |= {"channel": channel, "channel_type": "channel"}
         event = message(text, ts=ts, **extra)
         self.history.append({**event, "thread_ts": thread or ts})
         posts, statuses = len(self.posts), len(self.statuses)
@@ -155,8 +163,8 @@ class SlackWorld(FilesSlack):
                   {**event, "bot_id": "B0APP", "user": None}):  # fmt: skip
             agent.on_message(e, self)
         (reply,) = self.posts[posts:]
-        assert reply["thread_ts"] == (thread or ts) and reply["channel"] == DM
-        assert self.statuses[statuses:] == ["processing", "active"]
+        assert reply["thread_ts"] == (thread or ts) and reply["channel"] == (channel or DM)
+        assert self.statuses[statuses:] == ([] if channel else ["processing", "active"])
         return reply
 
 
@@ -183,7 +191,15 @@ def tool(ws: Workspace, person_id: str, name: str, **args) -> dict:
 # -- the demo ------------------------------------------------------------------------------------
 
 
-def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path, monkeypatch):
+CHANNELS = {"dm.dana": "C0DM", "site101.coord": "C0SITE", "ss.anna": "C0SS",
+            "adj.okafor": "C0ADJ1", "adj.lindqvist": "C0ADJ2"}  # fmt: skip
+
+
+@pytest.mark.parametrize("channels", [False, True], ids=["dms", "character-channels"])
+def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path, monkeypatch,
+                                                                       channels):  # fmt: skip
+    """As in the DMs with Acting As, or (P-58 follow-up) in one channel per character
+    with nobody acting as anyone: the same steps, the same replies, no PHI."""
     monkeypatch.setenv("ADJUD_AI_MODE", "replay")  # the QC agents: identical every run
     monkeypatch.setenv("NOTIFY_CHANNELS", "outbox,slack")
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test-secret-token")
@@ -197,6 +213,9 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     paths = DataPaths(data)
     reset(paths, preload=True, only=DEMO_AES)
     ws = Workspace(paths)
+    if channels:  # as the Slack app writes them at its start (channels.ensure_channels)
+        names = ws.people.character_channels
+        ws.people.save_channel_ids({names[pid]: cid for pid, cid in CHANNELS.items()})
     agent = replay_agent(ws, tmp_path)
     folder = data / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
     kit_files = {f.name: f.read_bytes() for f in sorted(folder.iterdir())}
@@ -219,17 +238,30 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
         adj("cases")
         adj(f"status {CASE}")
 
-    adj("act-as rahul")
+    def be(name: str, person_id: str, full_name: str) -> str | None:
+        """Take this person's part: Acting As in the DMs; in the channel mode only their
+        channel, where the Agent acts as them (returned)."""
+        if channels:
+            return CHANNELS[person_id]
+        assert full_name in adj(f"act-as {name}")
+        return None
+
+    def to(person_id: str) -> str:
+        """Where a notice for this person goes: their channel, or the presenter's DM."""
+        return CHANNELS[person_id] if channels else ME
+
+    here = be("rahul", "dm.dana", "Rahul Mehta")
     runner = Runner(paths)
     store = runner.pipeline.store
     runner.tick(0)  # "AE records are waiting to be imported", with Import in the DM
     assert slack.texts == ["[DEMO01] AE records are waiting to be imported"]
+    assert slack.posts[-1]["channel"] == to("dm.dana")
 
     # 1. Rahul asks the Agent to import: the cases are created as him
     answer(agent, "dm.dana", "Import the waiting AE records, please",
            "Imported 1 file: 3 new cases, DEMO01-0001 to DEMO01-0003.",
            [{"tool": "import_waiting_files", "input": {}}])  # fmt: skip
-    reply = slack.say(agent, "Import the waiting AE records, please")
+    reply = slack.say(agent, "Import the waiting AE records, please", channel=here)
     assert reply["text"] == "Imported 1 file: 3 new cases, DEMO01-0001 to DEMO01-0003."
     assert sorted(store.list_cases()) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
     assert {e["actor"] for e in store.events(CASE) if e["type"] == "case.created"} == {"dm.dana"}
@@ -237,15 +269,16 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     runner.tick(1)
     assert [dm_task(p) for p in slack.posts[-3:] if dm_task(p)] == [
         "documents requested for an adjudication case"]  # fmt: skip
+    assert slack.posts[-1]["channel"] == to("site101.coord")
 
     # 2. Priya answers that notice with the three kit documents attached
-    assert "Priya Nair" in adj("act-as priya")
+    here = be("priya", "site101.coord", "Priya Nair")
     asked = slack.notice(f"Case {CASE}: documents requested")
     added = ("Added 3 files to DEMO01-0001. Identifiers are being removed now; review and "
              "sign the redacted pages in the app.")  # fmt: skip
     answer(agent, "site101.coord", "Here are the documents\n\n(attached 3 files)", added,
            [{"tool": "upload_attached_files", "input": {"case": CASE}}], case_id=CASE)  # fmt: skip
-    reply = slack.say(agent, "Here are the documents", thread=asked, files=files)
+    reply = slack.say(agent, "Here are the documents", thread=asked, files=files, channel=here)
     assert reply["text"] == added
     (up,) = [e for e in store.events(CASE) if e["type"] == "documents.uploaded"]
     assert up["actor"] == "site101.coord" and up["data"]["via"] == {"slack_files":
@@ -263,7 +296,7 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
         f"{f['identifiers_left']} left" for f in results["files"])  # fmt: skip
     answer(agent, "site101.coord", "How did the redaction go?", told,
            [{"tool": "redaction_results", "input": {"case": CASE}}], case_id=CASE)  # fmt: skip
-    reply = slack.say(agent, "How did the redaction go?", thread=ready)
+    reply = slack.say(agent, "How did the redaction go?", thread=ready, channel=here)
     assert reply["text"] == told and len(results["files"]) == 3
     look_around()
     submit(store, CASE, "site101.coord", "demo", paths.config)  # signed in the app
@@ -271,9 +304,10 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     runner.tick(4)  # the Quality Check round, agents on replay
     assert store.state(CASE).state == State.QC_REVIEW
     assert dm_task(slack.posts[-1]) == "a quality check needs your review"
+    assert slack.posts[-1]["channel"] == to("ss.anna")
 
     # 3. Dr Weber asks about the Quality Check, then edits the narrative through the Agent
-    assert "Dr. Anna Weber" in adj("act-as anna")
+    here = be("anna", "ss.anna", "Dr. Anna Weber")
     review = slack.notice(f"Case {CASE}: a quality check needs your review")
     checks = tool(ws, "ss.anna", "qc_checks", case=CASE)
     suggestion = tool(ws, "ss.anna", "ai_suggestion", case=CASE)
@@ -286,7 +320,7 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     answer(agent, "ss.anna", asked_qc, qc_said,
            [{"tool": "qc_checks", "input": {"case": CASE}},
             {"tool": "ai_suggestion", "input": {"case": CASE}}], case_id=CASE)  # fmt: skip
-    reply = slack.say(agent, asked_qc, thread=review)
+    reply = slack.say(agent, asked_qc, thread=review, channel=here)
     assert reply["text"] == qc_said and "Simulated AI" in json.dumps(reply["blocks"])
 
     draft = tool(ws, "ss.anna", "narrative_draft", case=CASE)["text"]
@@ -300,7 +334,7 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     answer(agent, "ss.anna", [asked_qc, qc_said, asked_edit], saved,
            [{"tool": "edit_narrative_draft", "input": {"case": CASE, "text": edited}}],
            case_id=CASE)  # fmt: skip
-    reply = slack.say(agent, asked_edit, thread=review)
+    reply = slack.say(agent, asked_edit, thread=review, channel=here)
     assert reply["text"] == saved
     url = reply["blocks"][-2]["elements"][0]["url"]  # the signature is in the app
     assert "/qc?" in url and "user=ss.anna" in url and f"case={CASE}" in url
@@ -314,7 +348,17 @@ def test_the_slack_agent_demo_runs_from_the_import_to_the_adjudicators(tmp_path,
     runner.tick(5)  # the Flow 3 package
     runner.tick(6)  # Adjudicators 1 and 2 assigned
     assert store.state(CASE).state == State.ADJ_REVIEW
-    adj("act-as okafor")
+    (assigned,) = [e for e in store.events(CASE) if e["type"] == "adjudication.assigned"]
+    assert assigned["data"]["adjudicators"] == {"1": "adj.okafor", "2": "adj.lindqvist"}
+    last = slack.posts[-2:]  # the two notices, sent in either order
+    assert {dm_task(p) for p in last} == {"an adjudication review is assigned to you"}
+    assert sorted(p["channel"] for p in last) == sorted([to("adj.okafor"), to("adj.lindqvist")])
+    for p in last:  # each in its own adjudicator's channel
+        who = "adj.okafor" if "For: Dr. Daniel Okafor" in json.dumps(p["blocks"]) else (
+            "adj.lindqvist")  # fmt: skip
+        assert p["channel"] == to(who)
+    if not channels:
+        adj("act-as okafor")
     look_around()
 
     # one reply per message, each logged as posted, never held

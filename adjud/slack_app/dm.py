@@ -4,6 +4,8 @@
 A notice goes to the Slack user of each person behind its recipient: their own
 `slack_user_id` in users.yaml (real use), else the demo presenter (the Slack account that
 chose someone to act as). People who share one Slack account get one DM naming them all.
+In the demo, a person with a character channel (study.yaml `slack_character_channels`,
+P-58) gets the notice there instead, as a top-level message opening the app as them.
 Same content as the e-mail, except that the site's Site Query DM carries the query
 text (P-58, Q13); never PHI (ADR 0005). A failure is a recorded
 Delivery Attempt (adjud.delivery) and never holds up e-mail or the workflow.
@@ -31,6 +33,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from adjud.delivery import SLACK, ChannelError
 from adjud.flow2 import QUERY_CODES
@@ -105,23 +108,30 @@ class SlackDmChannel:
     name: str = SLACK
 
     def send(self, note: dict[str, Any], people: list[dict[str, Any]]) -> None:
+        # Where each person's notice goes: their character channel (demo, P-58), else
+        # their Slack user's DM. In a channel the link opens the app as that person.
         targets: dict[str, list[dict[str, Any]]] = {}
+        in_channel: set[str] = set()
         for p in people:
-            slack_user = self.directory.slack_user_for(p["id"])
-            if slack_user:
-                targets.setdefault(slack_user, []).append(p)
+            channel = self.directory.channel_of(p["id"])
+            target = channel or self.directory.slack_user_for(p["id"])
+            if target:
+                targets.setdefault(target, []).append(p)
+            if channel:
+                in_channel.add(channel)
         if not targets:
             raise ChannelError("no Slack user yet: choose someone with /adj act-as", later=True)
         url = f"{self.settings.base_url}{note['link']}" if note.get("link") else None
         reached = self.reached(note["id"])
         detail = self.detail(note) if self.detail is not None else None
-        for slack_user, group in targets.items():
-            if slack_user in reached:  # sent on an earlier try that failed for someone else
+        for target, group in targets.items():
+            if target in reached:  # sent on an earlier try that failed for someone else
                 continue
-            text, blocks = notice(note, for_whom(note["to"], group, self.directory), url,
+            link = as_person(url, group[0]) if target in in_channel and url else url
+            text, blocks = notice(note, for_whom(note["to"], group, self.directory), link,
                                   self._next(note, group[0]), detail)  # fmt: skip
-            response = self._post(channel=slack_user, text=text, blocks=blocks)
-            self._mark(note, slack_user, response)
+            response = self._post(channel=target, text=text, blocks=blocks)
+            self._mark(note, target, response, channel=target if target in in_channel else None)
 
     def _next(self, note: dict[str, Any], person: dict[str, Any]) -> str | None:
         """Worked out when the DM is sent, so it says where the case is now. None for a
@@ -141,14 +151,19 @@ class SlackDmChannel:
         lines = (json.loads(ln) for ln in self.sent_path.read_text().splitlines() if ln.strip())
         return {d["slack_user"] for d in lines if d["note"] == note_id}
 
-    def _mark(self, note: dict[str, Any], slack_user: str, response: Any) -> None:
+    def _mark(self, note: dict[str, Any], slack_user: str, response: Any,
+              channel: str | None = None) -> None:  # fmt: skip
         """Who it reached, and where: the DM channel (`D…`, what a reply's message event
-        carries) and the message's `ts`, so a reply in its thread finds the case (Q12)."""
+        carries) or the character channel, and the message's `ts`, so a reply in its thread
+        finds the case (Q12). `slack_user` is the target posted to: a Slack user, or a
+        character channel's id (P-58)."""
         sent = {"note": note["id"], "slack_user": slack_user, "case_id": note.get("case_id")}
         for key in ("channel", "ts"):
             value = response.get(key) if hasattr(response, "get") else None
             if isinstance(value, str):
                 sent[key] = value
+        if channel:  # a character channel: posted there whatever the response says
+            sent["channel"] = channel
         self.sent_path.parent.mkdir(parents=True, exist_ok=True)
         with self.sent_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(sent) + "\n")
@@ -172,6 +187,14 @@ class SlackDmChannel:
             raise ChannelError(f"cannot connect: {type(exc).__name__}", unreachable=True) from exc
         except Exception as exc:  # anything else: recorded by type only, never its message
             raise ChannelError(f"error: {type(exc).__name__}") from None
+
+
+def as_person(url: str, person: dict[str, Any]) -> str:
+    """The link with this person as its `role` and `user`, so the app opens as them."""
+    parts = urlparse(url)
+    query = dict(parse_qsl(parts.query))
+    query.update({"role": person["role"], "user": person["id"]})
+    return urlunparse(parts._replace(query=urlencode(query)))
 
 
 def latest_query(ws: Workspace, case_id: str) -> dict[str, Any] | None:

@@ -21,6 +21,11 @@ record in the conversation log (Q18).
 A reply in the thread of a DM notice is about that notice's case (Q12), if the person
 can still see it (Acting As may have changed since).
 
+Demo only (P-58): in a character channel (study.yaml `slack_character_channels`) the
+Agent answers every person's message as that channel's person, whatever the writer's
+Acting As, with no session status (that belongs to the Messages tab). A notice posted
+there starts a thread as a DM notice does. Messages in any other channel are ignored.
+
 The Agent also does a person's unsigned steps (Q4, `agent_tools`): the data manager's
 import and pull, a site's upload of the files attached to its message (`files.py`), the
 Safety Specialist's narrative and Site Query drafts. Files arrive with the message
@@ -63,6 +68,9 @@ SWITCH = ("Here I act as you, *{name}*. To take someone else's part in the demo,
           "*Switch person* on the Home tab, or type `/adj act-as <name>` in a channel. Commands "
           "typed in this conversation reach me as messages and do not run.")  # fmt: skip
 # "/adj ...", "act as priya", "act-as anna": a command or a switch typed to the Agent
+IN_CHANNEL = ("In this channel you are *{name}*: whoever writes here takes their part in the "
+              "demo. To take someone else's part, go to their channel. Commands typed in a "
+              "message reach me as messages and do not run.")  # fmt: skip
 SWITCH_RE = re.compile(r"^\s*(?:/adj\b|/?act[\s-]*as\b)", re.IGNORECASE)
 NO_AI = "I can't answer questions right now. Here is what is waiting for you:"
 NOTHING = "I can't answer questions right now, and nothing is waiting for you."
@@ -76,10 +84,11 @@ SUBJECT_RE = re.compile(r"\b[A-Z][A-Z0-9]*-\d{3}-\d{4}\b")
 
 
 def answers(event: dict[str, Any]) -> bool:
-    """A person's own message in a DM with the app: the only kind the Agent answers."""
+    """A person's own message in a DM with the app, or in a channel (answered only if it
+    is a character channel, `SlackAgent.on_message`): the only kind the Agent answers."""
     return (
         event.get("type") == "message"
-        and event.get("channel_type") == "im"
+        and event.get("channel_type") in ("im", "channel")
         and event.get("subtype") in ANSWERED_SUBTYPES
         and not event.get("bot_id")
         and not event.get("bot_profile")
@@ -127,18 +136,28 @@ class SlackAgent:
         if not answers(event):
             return
         channel, thread = event["channel"], event.get("thread_ts") or event["ts"]
-        self._status(client, channel, thread, "processing")
+        character = None
+        if event.get("channel_type") == "channel":  # only a character channel (demo, P-58)
+            character = self.ws.people.person_in_channel(channel)
+            if character is None:
+                return
+        else:  # the session status belongs to the Messages tab
+            self._status(client, channel, thread, "processing")
         try:
-            self._turn(event, client, channel, thread)
+            self._turn(event, client, channel, thread, character)
         except Exception as exc:  # the person still gets an answer, and it is recorded
             log.exception("the Agent's turn failed")
-            self._failed(event, client, channel, thread, type(exc).__name__)
+            self._failed(event, client, channel, thread, type(exc).__name__, character)
         finally:
-            self._status(client, channel, thread, "active")
+            if character is None:
+                self._status(client, channel, thread, "active")
 
-    def _turn(self, event: dict[str, Any], client: Any, channel: str, thread: str) -> None:
+    def _turn(self, event: dict[str, Any], client: Any, channel: str, thread: str,
+              character: dict[str, Any] | None = None) -> None:  # fmt: skip
+        """`character`: the person of the character channel the message is in; the Agent
+        acts as them whoever wrote it, Acting As aside (demo, P-58)."""
         slack_user = event["user"]
-        person = self.ws.people.person_for(slack_user)
+        person = character or self.ws.people.person_for(slack_user)
         record = {"slack_user": slack_user, "channel": channel, "thread": thread,
                   "kind": "turn"}  # fmt: skip
         if person is None:
@@ -147,7 +166,8 @@ class SlackAgent:
                                       note="no person")  # fmt: skip
             return
         if SWITCH_RE.match(str(event.get("text") or "")) and not event.get("files"):
-            text = SWITCH.format(name=person["name"])  # from code: nothing is switched here
+            words = IN_CHANNEL if character else SWITCH
+            text = words.format(name=person["name"])  # from code: nothing is switched here
             said = self._say(client, channel, thread, text, person, None)
             self._record_said(record | {"acting_as": person["id"], "case_id": None,
                                         "note": "switch or command typed to the Agent"},
@@ -215,9 +235,9 @@ class SlackAgent:
                     attachments=list(attachments.values()), files=files)  # fmt: skip
 
     def _failed(self, event: dict[str, Any], client: Any, channel: str, thread: str,
-                error: str) -> None:  # fmt: skip
+                error: str, character: dict[str, Any] | None = None) -> None:  # fmt: skip
         try:
-            person = self.ws.people.person_for(event["user"])
+            person = character or self.ws.people.person_for(event["user"])
             self._say(client, channel, thread, FAILED, person, None)
             self.conversations.record(
                 slack_user=event["user"], acting_as=person["id"] if person else None,

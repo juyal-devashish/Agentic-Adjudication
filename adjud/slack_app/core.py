@@ -89,6 +89,11 @@ class Directory:
         )["users"]
         cfg = yaml.safe_load((self.config_dir / self.study / "study.yaml").read_text()) or {}
         self.site_names: dict[str, str] = {str(k): v for k, v in cfg.get("site_names", {}).items()}
+        # Demo only (P-58): person id -> the name of their character channel
+        self.character_channels: dict[str, str] = {
+            str(k): str(v).lstrip("#")
+            for k, v in (cfg.get("slack_character_channels") or {}).items()
+        }
 
     @property
     def by_id(self) -> dict[str, dict[str, Any]]:
@@ -146,6 +151,44 @@ class Directory:
         if theirs:
             return theirs[-1]
         return next(reversed(acting), None) if acting else None
+
+    # -- character channels (demo only, P-58) ---------------------------------------------------
+
+    @property
+    def channels_path(self) -> Path:
+        return self.slack_dir / "channels.json"
+
+    def channel_ids(self) -> dict[str, str]:
+        """Channel name -> Slack channel id, as the Slack app found or created them at its
+        start (`channels.ensure_channels`). Read on every call: the runner may start first."""
+        if not self.channels_path.exists():
+            return {}
+        try:
+            return dict(json.loads(self.channels_path.read_text()))
+        except (ValueError, TypeError):
+            log.warning("slack/channels.json is not readable: notices go as DMs")
+            return {}
+
+    def save_channel_ids(self, ids: dict[str, str]) -> None:
+        write_atomic(self.channels_path, json.dumps(ids, indent=1).encode(), overwrite=True)
+
+    def channel_of(self, person_id: str) -> str | None:
+        """The id of this person's character channel, when one is configured and the app
+        has it; else None (a DM as before)."""
+        name = self.character_channels.get(person_id)
+        return self.channel_ids().get(name) if name else None
+
+    def person_in_channel(self, channel_id: str | None) -> dict[str, Any] | None:
+        """The person whose character channel this is: whoever writes or clicks there
+        takes their part, whatever their Acting As (demo only)."""
+        if not channel_id or not self.character_channels:
+            return None
+        names = {cid: name for name, cid in self.channel_ids().items()}
+        name = names.get(channel_id)
+        if name is None:
+            return None
+        pid = next((p for p, n in self.character_channels.items() if n == name), None)
+        return self.by_id.get(pid) if pid else None
 
     def find(self, words: str) -> list[dict[str, Any]]:
         """People whose id or name contains every word, e.g. 'anna' or 'site 102'."""

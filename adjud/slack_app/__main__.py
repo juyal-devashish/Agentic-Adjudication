@@ -5,7 +5,8 @@
 Needs SLACK_BOT_TOKEN and SLACK_APP_TOKEN (an app-level token with connections:write)
 in the environment, never in data/ or the repository. Run one copy only: Slack sends
 each click to one of the app's open connections. The runner sends the DMs; this process
-answers `/adj`, App Home and buttons.
+answers `/adj`, App Home and buttons, and at its start makes sure the demo's character
+channels exist (`channels.py`, P-58).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import sys
 
 from adjud.paths import DataPaths
 from adjud.slack_app.app import SlackHandlers, build_app
+from adjud.slack_app.channels import ensure_channels
 from adjud.slack_app.core import SlackActionsLog, Workspace
 
 
@@ -30,7 +32,9 @@ def main() -> int:
     handlers = SlackHandlers(Workspace(paths, base_url=base), SlackActionsLog(paths))
     from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-    SocketModeHandler(build_app(handlers, bot), app_token).start()
+    app = build_app(handlers, bot)
+    ensure_channels(app.client, handlers.ws.people)  # demo character channels (P-58)
+    SocketModeHandler(app, app_token).start()
     return 0
 
 

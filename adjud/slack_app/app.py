@@ -47,8 +47,16 @@ class SlackHandlers:
     def _who(self, slack_user: str) -> dict[str, Any] | None:
         return self.people.person_for(slack_user)
 
-    def _record(self, slack_user: str, action: str, **kw: Any) -> None:
-        person = self._who(slack_user)
+    def _who_in(self, body: dict[str, Any]) -> dict[str, Any] | None:
+        """Whom a button click acts as: the character channel's person when it was
+        clicked there (demo, P-58), else the Slack user's person."""
+        channel = (body.get("channel") or {}).get("id") or (
+            body.get("container") or {}).get("channel_id")  # fmt: skip
+        return self.people.person_in_channel(channel) or self._who(body["user"]["id"])
+
+    def _record(self, slack_user: str, action: str, *, person: dict[str, Any] | None = None,
+                **kw: Any) -> None:  # fmt: skip
+        person = person or self._who(slack_user)
         self.actions.record(slack_user, person["id"] if person else None, action, **kw)
 
     def publish_home(self, client: Any, slack_user: str) -> None:
@@ -160,7 +168,7 @@ class SlackHandlers:
                          respond: Any = None) -> None:  # fmt: skip
         ack()
         slack_user = body["user"]["id"]
-        person = self._who(slack_user)
+        person = self._who_in(body)
         if person is None:
             self._record(slack_user, "import", result="refused", reason="no person")
             return
@@ -175,7 +183,7 @@ class SlackHandlers:
         ack()
         action = (body.get("actions") or [{}])[0]
         case = parse_qs(urlparse(action.get("url", "")).query).get("case", [])
-        self._record(body["user"]["id"], "open_app", cases=case[:1])
+        self._record(body["user"]["id"], "open_app", person=self._who_in(body), cases=case[:1])
 
     # -- the Acting As form ---------------------------------------------------------------------
 
@@ -209,7 +217,9 @@ def build_app(handlers: SlackHandlers, bot_token: str, *, verify: bool = True) -
     app.view("act_as")(handlers.on_act_as_submitted)
     agent = handlers.agent
     assert agent is not None
-    app.event("message")(agent.on_message)  # message.im; edits and bots are ignored there
+    # message.im, and message.channels for the demo's character channels (P-58); edits,
+    # bots and other channels are ignored there
+    app.event("message")(agent.on_message)
     for name in ("app_context_changed", "agent_session_stopped", "agent_session_title_changed",
                  "file_shared"):  # fmt: skip
         app.event(name)(agent.on_session_event)

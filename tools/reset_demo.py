@@ -117,7 +117,8 @@ def reset(paths: DataPaths, *, preload: bool = False, only: tuple[str, ...] | No
         if target.exists():
             shutil.rmtree(target)
     # The Slack actions and conversation logs go with the cases they name; Acting As
-    # (slack/acting_as.json) is kept, so DMs still reach the presenter after a reset (P-55).
+    # (slack/acting_as.json) is kept, so DMs still reach the presenter after a reset (P-55),
+    # and so are the character channels' ids (slack/channels.json, P-58).
     for name in ("actions.jsonl", ".actions.jsonl.lock", "dm_sent.jsonl",
                  "conversations.jsonl", ".conversations.jsonl.lock"):  # fmt: skip
         (paths.root / "slack" / name).unlink(missing_ok=True)

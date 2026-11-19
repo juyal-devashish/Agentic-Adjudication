@@ -45,6 +45,17 @@ ai:                          # plan §2 and P-26 to P-28; adjud/ai/config.py
 # Synthetic data only: verification also searches each output
 # for the generator's seeded identifiers of the case's subject. Relative to the data dir.
 seeded_identities: flow1-testkit/identities/identities_SYNTHETIC.json
+# Demo only (P-58): one public Slack channel per character, named by role. Anyone in a
+# channel takes that person's part (simulated, as Acting As). Notices for them go there
+# instead of a DM, and the Agent there acts as them. Real use: each person's own Slack
+# account and the Agent's Messages tab. Empty or absent: DMs only. adjudicator-1 and -2
+# are slots 1 and 2 of DEMO01-0001 when it is the first case assigned after a reset.
+slack_character_channels:
+  dm.dana: data-manager
+  site101.coord: site-user
+  ss.anna: safety-specialist
+  adj.okafor: adjudicator-1
+  adj.lindqvist: adjudicator-2
 slack_phi_gate:              # P-58 (Q17): the check on everything the Slack Agent posts
   allow: [Discharged]        # ordinary words NER takes for a name ("Discharged home ...")
 narrative:                   # plan step 17; checked by code in the narrative gate
