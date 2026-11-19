@@ -223,3 +223,39 @@ def test_a_new_file_notice_restarts_the_auto_import_countdown(tmp_path):
     assert not store_cases(runner)
     runner.tick(2 * wait)
     assert store_cases(runner) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]
+
+
+def test_a_demo_folder_without_the_kit_still_checks_for_the_seeded_identities(tmp_path):
+    """data/demo (scripts/slack-demo.sh) has no kit of its own: the de-identification
+    check and the PHI gate both fall back to the repository's kit, so the final check of
+    every redacted file still searches for the subject's seeded identifiers."""
+    from adjud.documents import DocumentProcessor
+    from adjud.slack_app.phi_gate import PhiGate
+
+    paths = DataPaths(tmp_path / "demo")
+    reset(paths, preload=True, only=DEMO_AES)  # copies the config, links no kit
+    assert not (paths.root / "flow1-testkit").exists()
+    runner = Runner(paths)
+    processor = DocumentProcessor(runner.pipeline.store, paths.config)
+    assert "DEMO01-101-0001" in processor.identities
+    assert PhiGate.for_workspace(Workspace(paths)).identities == processor.identities
+
+
+def test_a_reset_just_before_the_poll_still_tells_the_data_manager_first(tmp_path):
+    """QA (2026-11-19): a reset a few seconds before the 5-minute poll imported the file
+    at once, with no notice; the notice now comes first and restarts the countdown."""
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, only=DEMO_AES)
+    runner = Runner(paths)
+    wait = runner.inbox_poll_seconds
+    runner.tick(0)
+    reset(paths, preload=True, only=DEMO_AES)
+    runner.tick(wait)  # exactly when the old countdown was due
+    assert not store_cases(runner)
+    assert [f.name.split("-")[-1] for f in sorted(paths.outbox.glob("*.json"))] == [
+        "ae_file_waiting.json"
+    ]

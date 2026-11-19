@@ -68,10 +68,12 @@ class SlackHandlers:
     def on_command(self, ack: Any, command: dict[str, Any], respond: Any, client: Any) -> None:
         ack()
         slack_user = command["user_id"]
-        sub, _, rest = (command.get("text") or "").strip().partition(" ")
-        sub, rest = sub.lower(), rest.strip()
+        words = (command.get("text") or "").split(None, 1)  # any whitespace, tabs too
+        sub, rest = (words[0].lower() if words else ""), (words[1].strip() if words[1:] else "")
         known = sub if sub in SUBCOMMANDS else "unknown"  # typed text never goes in the log
-        person = self._who(slack_user)
+        # In a character channel (demo, P-58), as that channel's person, like its buttons
+        # and the Agent there; elsewhere the Slack user's person.
+        person = self.people.person_in_channel(command.get("channel_id")) or self._who(slack_user)
 
         def reply(content: list[dict[str, Any]] | str, text: str = "Adjudication") -> None:
             if isinstance(content, str):
@@ -130,6 +132,7 @@ class SlackHandlers:
             reply(f"'{rest}' matches {names}. Be more precise, or type `/adj act-as` for a list.")
             return
         person = self.people.act_as(slack_user, found[0]["id"])
+        self.notes.pop(slack_user, None)  # the last import's note was someone else's
         self._record(slack_user, "act_as")
         reply(f"You now act as {self.people.describe(person)}. Your App Home shows their tasks.")
         self.publish_home(client, slack_user)

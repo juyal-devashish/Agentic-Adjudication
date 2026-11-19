@@ -26,6 +26,7 @@ from adjud.deid.pipeline import DocInput, deidentify_case
 from adjud.deid.policy import Policy
 from adjud.events import EventDraft
 from adjud.notify import Outbox
+from adjud.paths import seeded_identities_path
 from adjud.store import CaseBusy, FileCaseStore, json_bytes
 from adjud.workflow import State
 
@@ -200,9 +201,10 @@ class DocumentProcessor:
             (Path(self.config_dir) / self.study / "study.yaml").read_text()
         )
         self.outbox = Outbox(self.store.paths, self.study, clock=self.store.clock)
-        rel = self.study_cfg.get("seeded_identities")
-        path = self.store.paths.root / rel if rel else None
-        self.identities = json.loads(path.read_text())["subjects"] if path and path.exists() else {}
+        path = seeded_identities_path(
+            self.store.paths.root, self.study_cfg.get("seeded_identities")
+        )
+        self.identities = json.loads(path.read_text())["subjects"] if path else {}
 
     def _event(self, case_id: str, type_: str, data: dict[str, Any]) -> None:
         self.store.append_event(case_id, EventDraft(type=type_, actor=SYSTEM, data=data))

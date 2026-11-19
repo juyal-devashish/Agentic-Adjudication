@@ -152,14 +152,21 @@ else:
         if not rows:
             theme.quiet("Select a row to see why that record did or did not become a case.")
         else:
-            key = outcomes[rows[0]]["key"]
-            latest = {
-                e["key"]: e for e in read_log(pipe.store.evaluations_path) if e.get("explanation")
-            }
+            row = outcomes[rows[0]]
+            key = row["key"]
+            # The evaluation of this row in this file: the same record can be evaluated
+            # again by a later import with another result (QA, 2026-11-19).
+            this_file = [
+                e
+                for e in read_log(pipe.store.evaluations_path)
+                if e.get("explanation") and e["key"] == key
+                and e.get("origin") == rep.get("file") and e.get("row") == row.get("row")
+                and e.get("eligible") == row.get("eligible")
+            ]  # fmt: skip
             subject, ae = key.split("|")[1:3]
             st.subheader(f"Why: {subject}, {ae}")
-            if key in latest:
-                e = latest[key]
+            if this_file:
+                e = this_file[-1]
                 verdict = "meets" if e["eligible"] else "does not meet"
                 st.html(
                     f"<p>This record {verdict} the study's rules for adjudication.</p>"

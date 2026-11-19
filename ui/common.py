@@ -184,9 +184,12 @@ def case_list(ctx: Context, intro: str) -> None:
         theme.quiet(f"Only cases of {site_name(ctx.user['site'])} are shown.")
     if not states:
         st.write(
-            "No cases yet. They appear here once the data manager imports AE records."
-            if ctx.role != "data_manager"
-            else "No cases yet. Import an AE file on the AE import page first."
+            {
+                "data_manager": "No cases yet. Import an AE file on the AE import page first.",
+                "adjudicator": "No cases are assigned to you yet.",
+            }.get(
+                ctx.role, "No cases yet. They appear here once the data manager imports AE records."
+            )  # fmt: skip
         )
         return
     st.write(intro)

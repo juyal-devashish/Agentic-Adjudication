@@ -332,3 +332,21 @@ def test_each_character_s_slack_account_gets_that_character_s_notices(pipe):  # 
         "a quality check needs your review": "U0ANNA",
         "an adjudication review is assigned to you": "U0RAHUL",  # nobody is Okafor
     }
+
+
+def test_long_text_is_split_between_words_and_says_when_the_rest_is_in_the_app():
+    """QA (2026-11-19): split after escaping, an `&amp;` was cut in two; beyond ten
+    sections the end was dropped silently."""
+    from adjud.slack_app.blocks import REST_IN_APP, esc, sections
+
+    text = "x" * 2898 + " & troponin < 14"
+    parts = sections(text)
+    whole = [p.replace("&amp;", "").replace("&lt;", "").replace("&gt;", "") for p in parts]
+    assert not any("&" in p for p in whole)  # every entity is whole
+    assert all(len(p) <= 2900 for p in parts) and parts[-1].startswith("&amp;")
+    long = " ".join(f"word{i}" for i in range(8000))  # about 70,000 characters
+    parts = sections(long)
+    assert len(parts) == 10 and parts[-1].endswith(REST_IN_APP)
+    assert all(len(p) <= 2900 for p in parts)
+    short = "One line.\nTwo & three."
+    assert sections(short) == [esc(short)]

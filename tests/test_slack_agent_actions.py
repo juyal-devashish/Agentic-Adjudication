@@ -10,6 +10,7 @@ replay with answers written in the test's folder: nothing reaches Slack or the A
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -522,3 +523,25 @@ def test_a_narrative_edit_on_the_page_is_saved_as_a_draft(ws, in_qc_review):
     next(r for r in fresh.radio if r.label == "Your decision").set_value("pass").run()
     assert next(a for a in fresh.text_area if a.label == "Narrative").value == "Edited here.\n"
     assert ws.store.state(CID).state == State.QC_REVIEW  # saved, never signed
+
+
+def test_the_gate_holds_the_date_of_birth_in_every_common_form(ws):
+    """QA (2026-11-19): month first, ordinals and month-name-first forms of the subject's
+    date of birth were posted to Slack; they are held like 24/07/1955."""
+    gate = PhiGate.for_workspace(ws)
+    subject = ws.store.state(CID).subject
+    dob = date.fromisoformat(gate.identities[subject]["dob"])
+    forms = [dob.strftime("%m/%d/%Y"), f"{dob:%b} {dob.day} {dob.year}",
+             f"{dob:%B} {dob.day} {dob.year}", f"{dob.day}th {dob:%B} {dob.year}",
+             dob.strftime("%m-%d-%Y"), f"{dob.month}/{dob.day}/{dob.year}"]  # fmt: skip
+    for form in forms:
+        assert gate.check(f"He was seen on {form} in clinic.", {CID}).held, form
+
+
+def test_a_late_qc_notice_after_the_signature_carries_no_draft(ws, in_qc_review):
+    """QA (2026-11-19): a notice sent after the pass (a retry) must not call the signed
+    narrative an unsigned draft."""
+    flow2 = Flow2(ws.store, ws.paths.config)
+    narrative = qc_drafts(ws.store, CID).narrative or "The patient had chest pain."
+    flow2.sign_qc_pass(CID, "ss.anna", "demo", narrative, "Documents present")
+    assert NoticeDetail(ws)({"template": "qc_review_needed", "case_id": CID}) is None

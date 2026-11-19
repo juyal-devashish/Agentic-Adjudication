@@ -257,7 +257,7 @@ def test_more_data_from_the_form_reaches_the_site_and_the_quality_check(reviewin
     assert USERS[a1]["name"] not in shown + text(at)
     at = as_user(SITE, "views/site_documents.py")  # the site's landing page lists it
     rows = [m.value for m in at.markdown]
-    assert rows[rows.index(f"**{cid}**") + 1] == "Answer the query (read it in the app)"
+    assert rows[rows.index(f"**{cid}**") + 1] == "Answer the query: send the files it asks for"
     assert USERS[a1]["name"] not in text(at)
 
     upload(store, cid, [("angio.pdf", pdf("ANGIOGRAPHY REPORT\nOccluded artery."))], SITE)

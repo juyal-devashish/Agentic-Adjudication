@@ -146,7 +146,9 @@ def next_step(
             State.DEIDENTIFYING: "Identifiers are being removed. Scanned pages take a few "
             "seconds each.",
             State.AWAITING_SITE_CONFIRMATION: (
-                "Check the redacted pages, then sign and submit."
+                f"Upload the requested documents: {doc_list(requested)}."
+                if not has_files  # the site removed every file (QA, 2026-11-19)
+                else "Check the redacted pages, then sign and submit."
                 if ready
                 else "Some files need attention before you can submit. See below."
             ),

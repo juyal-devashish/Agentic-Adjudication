@@ -166,7 +166,7 @@ def measurements(heading: bool = True) -> None:
     if error := st.session_state.pop("measure_error", None):
         st.error(f"The measurement did not finish: {error}")
     if not latest.exists():
-        st.write("Not measured yet. Run `uv run python -m tools.deid_check`.")
+        st.write("Not measured yet.")
         return
     res = json.loads(latest.read_text())
     gate = res["summary"]["gate"]
@@ -386,6 +386,10 @@ def narrative_edit(case_id: str) -> None:
     source = {"ai": "the AI draft", "template": "the template"}.get(
         signed["data"].get("source", ""), "the draft"
     )
+    if signed["data"].get("carried_from_round"):  # P-59: carried over a query to the site
+        source += f" of round {signed['data']['carried_from_round']}, before the query"
+    with st.expander("The signed narrative"):  # QA, 2026-11-19: only the QC page showed it
+        theme.frozen_text(final, "Signed narrative")
     with st.expander("Narrative: what the Safety Specialist changed"):
         if draft == final_lines:
             st.write(f"Signed exactly as {source} proposed it.")
@@ -591,7 +595,10 @@ if calls:
             [
                 {
                     "When (UTC)": f"{theme.date_words(e['at'])} {e['at'][11:16]}",
-                    "Task": e["data"]["function"].replace("_", " ").capitalize(),
+                    "Task": e["data"]["function"]
+                    .replace("_", " ")
+                    .capitalize()
+                    .replace("Qc ", "QC "),
                     "Source": "Simulated AI" if e["data"]["simulated"] else "AI",
                     "Answer": "Valid" if e["data"]["valid"] else "Not usable",
                 }
@@ -615,14 +622,17 @@ with st.expander("Technical details"):
             rec = store.get_json(cid, d["call"]["path"])
             rows.append(
                 {
-                    "Task": d["function"].replace("_", " ").capitalize(),
+                    "Task": d["function"].replace("_", " ").capitalize().replace("Qc ", "QC "),
                     "Tools used": len(rec.get("tool_calls", [])),
                     "Tokens": sum(rec.get("usage", {}).values()),
                     "Cost (USD)": f"{d['cost_usd']:.4f}",
                 }
             )
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-    st.caption(f"All cases: ${gw.spent_usd():.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget.")
+    if ctx.role != "site":  # the sponsor's budget is not the site's business
+        st.caption(
+            f"All cases: ${gw.spent_usd():.4f} spent of the ${gw.cfg.budget_usd:.2f} AI budget."
+        )
     st.subheader("Audit trail seals")
     st.write("Each entry carries the hash of the one before it, so any change shows.")
     st.dataframe(

@@ -410,6 +410,8 @@ class AgentTools:
             "source": (
                 "AI, from before the query to the site"
                 if start and start.narrative_via == "earlier_ai"
+                else "the Safety Specialist's unsigned edit"
+                if start and start.narrative_edited
                 else {"ai": "AI", "template": "study template"}.get(d.get("source"), "?")
             ),
             "simulated": bool(d.get("simulated")),

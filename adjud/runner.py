@@ -255,12 +255,12 @@ class Runner:
         after a reset: a file queued by a demo reset (also the app's Reset the demo, with the
         runner still going) stays for the data manager's "Import queued files" until one interval
         has passed."""
-        if self.last_inbox is None:
+        # The notice first: a file queued by a reset just before the poll would otherwise
+        # be imported before the data manager was told about it.
+        if self.announce_waiting_files() or self.last_inbox is None:
             self.last_inbox = now
         elif now - self.last_inbox >= self.inbox_poll_seconds:
             self.import_inbox()
-            self.last_inbox = now
-        if self.announce_waiting_files():
             self.last_inbox = now
         self.take_uploads()
         self.run_case_steps()

@@ -133,7 +133,7 @@ if ctx.role == "cec_coordinator":
                 flow3.request_more_data(cid, ctx.actor, pw, need)
                 st.rerun()
             except SignatureRefused as exc:
-                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                 st.error(f"Not sent: {msg}.")
             except Flow3Refused as exc:
                 st.error(f"Not sent: {exc}.")
@@ -172,7 +172,7 @@ if meeting is not None:
                     st.toast("Consensus signed")
                     st.rerun()
                 except SignatureRefused as exc:
-                    msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                    msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                     st.error(f"Not signed: {msg}.")
                 except Flow3Refused as exc:
                     st.error(f"Not signed: {exc}.")

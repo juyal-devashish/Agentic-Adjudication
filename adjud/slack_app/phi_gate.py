@@ -34,7 +34,6 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from adjud.deid.detect import HONORIFIC_WORDS, Finding, KnownValues, _subtract, detect
@@ -42,10 +41,10 @@ from adjud.deid.pagetext import TextUnit
 from adjud.deid.policy import Policy
 from adjud.deid.textmatch import find_all
 from adjud.documents import documents_of, seeded_values
+from adjud.paths import seeded_identities_path
 from adjud.slack_app.core import ROLE_WORDS, Workspace
 
 log = logging.getLogger("adjud.slack_app")
-REPO_DATA = Path(__file__).resolve().parents[2] / "data"  # the kit, for a demo folder
 HOLD_TEXT = "That answer may contain identifiers; open it in the app."
 # Slack mrkdwn marks, read as spaces: `Smith_John.pdf` is checked as "Smith John.pdf"
 _MARKS = str.maketrans(dict.fromkeys("*_`~", " "))
@@ -90,10 +89,8 @@ class PhiGate:
         policy = Policy.for_study(ws.paths.config, ws.study)
         cfg = yaml.safe_load((ws.paths.config / ws.study / "study.yaml").read_text()) or {}
         rel = cfg.get("seeded_identities")  # synthetic data only
-        path = ws.paths.root / rel if rel else None
-        if path and not path.exists():  # a demo folder (data/demo) has no kit of its own
-            path = REPO_DATA / rel
-        identities = json.loads(path.read_text())["subjects"] if path and path.exists() else {}
+        path = seeded_identities_path(ws.paths.root, rel)  # a demo folder: the repo's kit
+        identities = json.loads(path.read_text())["subjects"] if path else {}
         if rel and not identities:  # no kit anywhere: detectors only
             log.warning("seeded_identities %s not found in %s: the PHI gate runs on its "
                         "detectors only", rel, ws.paths.root)  # fmt: skip
@@ -162,15 +159,23 @@ class PhiGate:
 
 def _more_forms(s: dict[str, Any]) -> list[str]:
     """The forms prose takes that `seeded_values` does not list: the date of birth in
-    words or with dots ("24 July 1955", "July 24, 1955", "24.07.1955") and the street
-    of the address without its town and postcode."""
+    words, with ordinals, month first or with dots ("24 July 1955", "July 24, 1955",
+    "24th July 1955", "07/24/1955", "24.07.1955") and the street of the address without
+    its town and postcode."""
     out: list[str] = []
     if s.get("dob"):
         d = date.fromisoformat(s["dob"])
+        th = "th" if 10 <= d.day % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(d.day % 10, "th")
         for month in (d.strftime("%B"), d.strftime("%b")):
             out += [f"{d.day} {month} {d.year}", f"{d.day:02d} {month} {d.year}",
-                    f"{month} {d.day}, {d.year}"]  # fmt: skip
-        out.append(d.strftime("%d.%m.%Y"))
+                    f"{month} {d.day}, {d.year}", f"{month} {d.day} {d.year}",
+                    f"{d.day}{th} {month} {d.year}", f"{d.day}{th} of {month} {d.year}",
+                    f"{month} {d.day}{th}, {d.year}", f"{month} {d.day}{th} {d.year}"]  # fmt: skip
+        # day and month either way round, with slashes, dashes or dots (07/24/1955 is the
+        # US form of 24/07/1955)
+        for a, b in ((d.day, d.month), (d.month, d.day)):
+            for sep in "/-.":
+                out += [f"{a:02d}{sep}{b:02d}{sep}{d.year}", f"{a}{sep}{b}{sep}{d.year}"]
     street = str(s.get("address") or "").split(",")[0].strip()
     if len(street) >= 6:
         out.append(street)

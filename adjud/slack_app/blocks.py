@@ -8,6 +8,7 @@ holds at most 100 blocks, so long lists are cut and the rest counted.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from adjud.slack_app.core import ROLE_ORDER, ROLE_WORDS, Directory, Status, Task, Workspace
@@ -190,6 +191,39 @@ def act_as_modal(people: Directory, current: str | None) -> dict[str, Any]:
     }
 
 
+REST_IN_APP = "…\n_The rest is in the app._"
+
+
+def sections(text: str, limit: int = 2900, most: int = 10) -> list[str]:
+    """Slack-escaped text in sections of at most `limit` characters, split between words
+    (never inside an escaped `&amp;`), at most `most` of them; text beyond that ends
+    with a line saying the rest is in the app."""
+    out: list[str] = []
+    current = ""
+    for token in re.split(r"(\s+)", text):
+        while token:
+            room = limit - len(REST_IN_APP) if len(out) == most - 1 else limit
+            if len(esc(current + token)) <= room:
+                current, token = current + token, ""
+                continue
+            if current.strip():
+                out.append(esc(current.rstrip()))
+            elif len(esc(token)) > room:  # one word longer than a section: cut it
+                cut = room
+                while len(esc(token[:cut])) > room:
+                    cut -= 1
+                out.append(esc(token[:cut]))
+                token = token[cut:]
+            current = ""
+            if len(out) == most:
+                out[-1] += REST_IN_APP
+                return out
+            token = token.lstrip() if not current else token
+    if current.strip():
+        out.append(esc(current.rstrip()))
+    return out
+
+
 def notice(
     note: dict[str, Any],
     who: str,
@@ -213,8 +247,7 @@ def notice(
         body += f"\nNext: {esc(next_step)}"
     blocks: list[dict[str, Any]] = [_text(body)]
     if detail:  # a section holds 3000 characters: a long narrative takes several
-        more = esc(detail)
-        blocks += [_text(more[i : i + 2900]) for i in range(0, min(len(more), 29000), 2900)]
+        blocks += [_text(part) for part in sections(detail)]
     buttons = [open_button(url, action_id="open_app_dm")] if url else []
     if in_slack:
         label = {"type": "plain_text", "text": "Import queued files"}

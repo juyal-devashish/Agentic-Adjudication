@@ -156,7 +156,8 @@ def _reset_demo() -> None:
 with st.sidebar.popover("Reset the demo", icon=":material/restart_alt:"):
     st.caption(
         "Removes every case, document, signature, e-mail record and Slack conversation, "
-        "for everyone using the demo, and queues the AE file again."
+        "for everyone using the demo, and queues the AE file again. The record of AI "
+        "spending is kept."
     )
     if st.button("Reset everything", type="primary", key="reset_demo"):
         _reset_demo()
