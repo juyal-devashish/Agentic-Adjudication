@@ -203,3 +203,23 @@ def test_rahul_is_told_in_slack_when_ae_records_wait_and_imports_from_the_dm(tmp
 
 def store_cases(runner: Runner) -> list[str]:
     return sorted(runner.pipeline.store.list_cases())
+
+
+def test_a_new_file_notice_restarts_the_auto_import_countdown(tmp_path):
+    """A reset from the app leaves the runner going: the queued file gets the full
+    inbox_poll_minutes for the data manager's own import, counted from its notice."""
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    paths = DataPaths(data)
+    reset(paths, only=DEMO_AES)
+    runner = Runner(paths)
+    wait = runner.inbox_poll_seconds
+    runner.tick(0)
+    reset(paths, preload=True, only=DEMO_AES)  # Reset the demo, late in the interval
+    runner.tick(wait - 10)
+    runner.tick(wait + 10)  # the old countdown would have imported here
+    assert not store_cases(runner)
+    runner.tick(2 * wait)
+    assert store_cases(runner) == ["DEMO01-0001", "DEMO01-0002", "DEMO01-0003"]

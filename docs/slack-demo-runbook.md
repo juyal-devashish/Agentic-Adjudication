@@ -107,7 +107,7 @@ If the Agent's AI is off (or has no key), each answer is the person's tasks with
 
 `scripts/share-demo.sh start` opens two public links (Cloudflare quick tunnels, no account; `brew install cloudflared` once): the app and the Mailpit inbox. It then resets and starts the demo so that every *Open in the app* button and e-mail link points at the public app link, and keeps the Mac from idle sleep. Send the two links and invite the person to the Slack workspace; they join the five role channels. Anyone with a link can open it: synthetic data only, never real documents.
 
-The links work only while this Mac is on, awake (lid open, or on power with a display), online and running the demo. They change every time the script starts, so send the new ones. Everyone shares one demo: a reset resets it for all. `scripts/share-demo.sh stop` closes the links and stops the demo.
+The links work only while this Mac is on, awake (lid open, or on power with a display), online and running the demo. They change every time the script starts, so send the new ones. Everyone shares one demo: a reset resets it for all. To start over without new links, use **Reset the demo** at the bottom of the app's sidebar: it does the same reset as the script, the runner and the Slack app keep running, and the AE file waits 5 minutes again for Rahul's import. `scripts/share-demo.sh stop` closes the links and stops the demo.
 
 ## 4. If something goes wrong
 
