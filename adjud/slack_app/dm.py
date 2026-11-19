@@ -6,18 +6,19 @@ A notice goes to the Slack user of each person behind its recipient: their own
 chose someone to act as). People who share one Slack account get one DM naming them all.
 In the demo, a person with a character channel (study.yaml `slack_character_channels`,
 P-58) gets the notice there instead, as a top-level message opening the app as them.
-Same content as the e-mail, except that the site's Site Query DM carries the query
-text (P-58, Q13); never PHI (ADR 0005). A failure is a recorded
-Delivery Attempt (adjud.delivery) and never holds up e-mail or the workflow.
+Same content as the e-mail, except for the two DMs below; never PHI (ADR 0005). A
+failure is a recorded Delivery Attempt (adjud.delivery) and never holds up e-mail or the
+workflow.
 
 Each DM's channel and `ts` are recorded in `data/slack/dm_sent.jsonl` with its case, so
 the DM starts a Conversation: a reply in its thread reaches the Agent with that case as
 context (P-58, Q12).
 
-One DM says more than its e-mail (ADR 0005, Q13): the site's `query_opened` carries the
-signed Site Query's reasons and text when the PHI gate passes them (`QueryInDm`), and the
-site answers by attaching files in its thread. The note in the outbox, and so the
-e-mail, is unchanged. If the gate holds the text, or cannot run, the DM goes without it.
+Two DMs say more than their e-mails (ADR 0005, `NoticeDetail`), when the PHI gate passes
+the text: the site's `query_opened` carries the signed Site Query's reasons and text
+(Q13), and the site answers by attaching files in its thread; the Safety Specialist's
+`qc_review_needed` carries the narrative draft (P-59). The note in the outbox, and so the
+e-mail, is unchanged.
 
 Configuration, from the environment only: NOTIFY_CHANNELS must include `slack`;
 SLACK_BOT_TOKEN (a secret, never logged); APP_BASE_URL for the links.
@@ -36,7 +37,7 @@ from typing import Any, Protocol
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from adjud.delivery import SLACK, ChannelError
-from adjud.flow2 import QUERY_CODES
+from adjud.flow2 import QUERY_CODES, qc_drafts
 from adjud.slack_app.blocks import notice
 from adjud.slack_app.core import ROLE_WORDS, Directory, Workspace
 
@@ -103,7 +104,7 @@ class SlackDmChannel:
     client: PostClient
     # (person, case ID) -> their next step in Task words, e.g. Workspace.next_step (P-57)
     next_step: Callable[[dict[str, Any], str], str] | None = None
-    # note -> what the DM says beyond the e-mail, already PHI-gated (Q13), e.g. QueryInDm
+    # note -> what the DM says beyond the e-mail, already PHI-gated (Q13), e.g. NoticeDetail
     detail: Callable[[dict[str, Any]], str | None] | None = None
     name: str = SLACK
 
@@ -203,35 +204,83 @@ def latest_query(ws: Workspace, case_id: str) -> dict[str, Any] | None:
                  if e["type"] == "query.opened"), None)  # fmt: skip
 
 
+def narrative_now(ws: Workspace, case_id: str) -> tuple[str, dict[str, Any]] | None:
+    """The narrative as it stands in the case's QC review: the Safety Specialist's latest
+    unsigned draft if there is one (`qc_drafts`), else the latest AI or template draft,
+    with that `narrative.drafted` event's data."""
+    events = ws.store.events(case_id)
+    drafted = next((e for e in reversed(events) if e["type"] == "narrative.drafted"), None)
+    if drafted is None:
+        return None
+    edited = qc_drafts(ws.store, case_id).narrative
+    text = edited or ws.store.get_file(case_id, drafted["data"]["draft"]["path"]).decode()
+    return text.strip(), {**drafted["data"], "edited": edited is not None}
+
+
 @dataclass
-class QueryInDm:
-    """The Site Query in the site's `query_opened` DM (P-58, Q13): its reasons and text,
-    read from the case's latest signed `query.opened` when the DM is sent, and only if
-    the PHI gate passes them. Never raises: the DM then goes as the e-mail does."""
+class NoticeDetail:
+    """What a DM says beyond its e-mail (P-58, ADR 0005), read from the case when the DM is
+    sent and posted only if the PHI gate passes it. The note in the outbox, and so the
+    e-mail, is unchanged.
+
+    - the site's `query_opened`: the signed Site Query's reasons and text (Q13);
+    - the Safety Specialist's `qc_review_needed`: the narrative draft, so it can be read
+      and changed in Slack without asking for it (Nirav's review, 2026-11-19, P-59).
+
+    Never raises: without a gate or a text the DM goes as the e-mail does. A narrative the
+    gate holds is replaced by a line saying so."""
 
     ws: Workspace
     gate: Any = None  # a PhiGate; built on first use
 
     def __call__(self, note: dict[str, Any]) -> str | None:
         case_id = note.get("case_id")
-        if note.get("template") != "query_opened" or not case_id:
+        make = {"query_opened": self._query, "qc_review_needed": self._narrative}.get(
+            note.get("template", "")
+        )
+        if make is None or not case_id:
             return None
         try:
-            q = latest_query(self.ws, case_id)
-            if q is None:
+            text = make(case_id)
+            if text is None:
                 return None
-            reasons = ", ".join(QUERY_CODES.get(c, c) for c in q["data"].get("codes") or [])
-            text = f"Query: {reasons}. {q['data'].get('text', '')}".strip()
-            text += "\nAnswer by attaching the files in this thread, or upload them in the app."
             if self.gate is None:
                 from adjud.slack_app.phi_gate import PhiGate
 
                 self.gate = PhiGate.for_workspace(self.ws)
             verdict = self.gate.check(text, {case_id})
         except Exception as exc:  # no gate, no text: the DM goes without it
-            log.warning("the query text for the DM could not be checked: %s", type(exc).__name__)
+            log.warning("the DM text for %s could not be checked: %s", note["template"],
+                        type(exc).__name__)  # fmt: skip
             return None
         if verdict.held:
-            log.info("the query text of %s held from its DM: %s", case_id, verdict.found)
-            return None
+            log.info("the %s text of %s held from its DM: %s", note["template"], case_id,
+                     verdict.found)  # fmt: skip
+            return NARRATIVE_HELD if note["template"] == "qc_review_needed" else None
         return text
+
+    def _query(self, case_id: str) -> str | None:
+        q = latest_query(self.ws, case_id)
+        if q is None:
+            return None
+        reasons = ", ".join(QUERY_CODES.get(c, c) for c in q["data"].get("codes") or [])
+        text = f"Query: {reasons}. {q['data'].get('text', '')}".strip()
+        return text + "\nAnswer by attaching the files in this thread, or upload them in the app."
+
+    def _narrative(self, case_id: str) -> str | None:
+        now = narrative_now(self.ws, case_id)
+        if now is None:
+            return None
+        text, d = now
+        if d["edited"]:
+            source = "your unsigned edit"
+        else:
+            source = {"ai": "drafted by AI", "template": "from the study template"}.get(
+                d.get("source"), "draft"
+            )
+            source += ", simulated" if d.get("simulated") else ""
+        return (f"Narrative draft ({source}, not signed):\n{text}\n\nReply in this thread to "
+                "change it. Sign it, or send a query, in the app.")  # fmt: skip
+
+
+NARRATIVE_HELD = "The narrative draft may contain identifiers, so it is shown only in the app."

@@ -673,6 +673,8 @@ class QcDrafts:
     narrative: str | None = None
     narrative_by: str | None = None
     narrative_at: str | None = None
+    narrative_via: str | None = None  # "slack", "app", or None (before P-59)
+    narrative_round: int | None = None  # earlier than the latest round: carried over
     query_codes: list[str] = field(default_factory=list)
     query_text: str | None = None
     query_by: str | None = None
@@ -681,8 +683,10 @@ class QcDrafts:
 
 
 def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
-    """The latest narrative and query drafts of the latest QC round; drafts of an earlier
-    round (before a query went to the site) never carry over."""
+    """The latest unsigned drafts for the latest QC round. A query draft belongs to its
+    round. The narrative draft carries over: after a Site Query the next round starts from
+    the Safety Specialist's latest narrative, not a new AI draft (Nirav's review,
+    2026-11-19, P-59); `narrative_round` then names the earlier round."""
     events = store.events(case_id)
     rounds = [e for e in events if e["type"] == "qc.checks_completed"]
     if not rounds:
@@ -690,14 +694,17 @@ def qc_drafts(store: FileCaseStore, case_id: str) -> QcDrafts:
     rnd, since = rounds[-1]["data"].get("round"), rounds[-1]["seq"]
     out: dict[str, Any] = {}
     for e in events:
-        if e["seq"] <= since or (e.get("data") or {}).get("round") != rnd:
-            continue
+        data = e.get("data") or {}
+        this_round = e["seq"] > since and data.get("round") == rnd
         if e["type"] == "narrative.draft_edited":
-            out |= {"narrative": store.get_file(case_id, e["data"]["draft"]["path"]).decode(),
+            out |= {"narrative": store.get_file(case_id, data["draft"]["path"]).decode(),
                     "narrative_by": e["actor"], "narrative_at": e["at"],
-                    "latest": "narrative"}  # fmt: skip
-        elif e["type"] == "query.drafted":
-            out |= {"query_codes": list(e["data"].get("codes") or []),
-                    "query_text": e["data"].get("text") or "", "query_by": e["actor"],
+                    "narrative_via": data.get("via"),
+                    "narrative_round": data.get("round")}  # fmt: skip
+            if this_round:
+                out["latest"] = "narrative"
+        elif e["type"] == "query.drafted" and this_round:
+            out |= {"query_codes": list(data.get("codes") or []),
+                    "query_text": data.get("text") or "", "query_by": e["actor"],
                     "query_at": e["at"], "latest": "query"}  # fmt: skip
     return QcDrafts(**out)

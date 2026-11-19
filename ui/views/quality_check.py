@@ -169,10 +169,18 @@ def review_and_sign(latest: dict) -> None:
     # the latest of them chooses the decision.
     drafts = qc_drafts(store, cid)
     drafted_query = drafts.latest == "query"
-    for what, at in (("narrative", drafts.narrative_at), ("Site Query", drafts.query_at)):
-        if at:
-            theme.quiet(f"The {what} below starts from your unsigned draft from Slack, "
-                        f"{theme.date_words(at)} {at[11:16]} UTC.")  # fmt: skip
+    if drafts.narrative_at:
+        at = drafts.narrative_at
+        where = {"slack": " from Slack", "app": ""}.get(drafts.narrative_via or "", " from Slack")
+        before = (" before the query to the site"
+                  if (drafts.narrative_round or 0) < latest["round"] else "")  # fmt: skip
+        theme.quiet(f"The narrative below starts from your unsigned draft{where}{before}, "
+                    f"{theme.date_words(at)} {at[11:16]} UTC. Your edits are saved as you "
+                    "go.")  # fmt: skip
+    if drafts.query_at:
+        at = drafts.query_at
+        theme.quiet(f"The Site Query below starts from your unsigned draft from Slack, "
+                    f"{theme.date_words(at)} {at[11:16]} UTC.")  # fmt: skip
     # Nothing is pre-selected when the Suggested Outcome is "unclear" (AI unsure or off).
     if suggested_query or blocked or drafted_query:
         preselect = options.index("query")
@@ -193,20 +201,32 @@ def review_and_sign(latest: dict) -> None:
         label_visibility="collapsed",
     )
     # The narrative box sits outside the form too, so an edit survives switching the
-    # decision to "query" and back: its text is kept under its own key while hidden.
+    # decision to "query" and back: its text is kept under its own key while hidden. Each
+    # edit is also saved as an unsigned draft (P-59), so it survives a refresh, a new tab
+    # from Slack, and a query to the site: the next round starts from it.
     box, kept = f"narrative_{cid}_{latest['round']}", f"narrative_kept_{cid}_{latest['round']}"
+    current = st.session_state.get(kept, drafts.narrative or draft)
     text = ""
     if decision is None:
-        theme.frozen_text(draft, "Narrative draft")
+        theme.frozen_text(current, "Narrative draft")
         st.write("Choose pass or query to sign.")
         return
     if decision == "query":
-        with st.expander("Narrative draft (dropped if you send the query)"):
-            theme.frozen_text(draft, "Narrative draft")
+        with st.expander("Narrative (kept for when the case comes back)"):
+            theme.frozen_text(current, "Narrative draft")
     else:
+
+        def _save() -> None:
+            new = st.session_state[box]
+            if new.strip() and new.strip() != (drafts.narrative or draft).strip():
+                try:
+                    flow2.save_narrative_draft(cid, ctx.actor, new, via="app")
+                except Flow2Refused as exc:
+                    st.toast(f"Not saved: {exc}.")
+
         if box not in st.session_state:
-            st.session_state[box] = st.session_state.get(kept, drafts.narrative or draft)
-        text = st.text_area("Narrative", height=320, key=box)
+            st.session_state[box] = current
+        text = st.text_area("Narrative", height=320, key=box, on_change=_save)
         st.session_state[kept] = text
     with st.form(f"qc_sign_{cid}_{latest['round']}"):
         codes, message, reason = [], "", ""
