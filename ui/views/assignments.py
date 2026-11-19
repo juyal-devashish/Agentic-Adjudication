@@ -139,7 +139,7 @@ if state == State.CLOSED:
                 st.toast("Re-adjudication started")
                 st.rerun()
             except SignatureRefused as exc:
-                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                 st.error(f"Not started: {msg}.")
             except Flow4Refused as exc:
                 st.error(f"Not started: {exc}.")

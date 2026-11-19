@@ -24,6 +24,7 @@ from urllib.parse import urlencode
 import yaml
 
 from adjud.chain import ChainedLog
+from adjud.documents import documents_of
 from adjud.edc_pull import pull
 from adjud.events import Clock, utc_now
 from adjud.flow3 import Flow3, assigned_cases, current_round
@@ -318,6 +319,11 @@ class Workspace:
                 State.AWAITING_SITE_CONFIRMATION: "Review the redacted pages and sign",
                 State.QUERY_OPEN: "Answer the query: send the files it asks for",
             }
+            if (
+                state == State.AWAITING_SITE_CONFIRMATION
+                and not documents_of(self.store, cid).files
+            ):
+                return Task(cid, "Upload the documents", "documents")  # every file removed
             return Task(cid, site_steps[state], "documents") if state in site_steps else None
         if role == "safety_specialist":
             if state == State.QC_REVIEW:

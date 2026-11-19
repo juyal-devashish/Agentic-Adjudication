@@ -103,6 +103,17 @@ if can_upload:
     # is open. Once every file is verified, during site review the upload stays one click
     # away, so the files and their review come first.
     tucked = cs.state == State.AWAITING_SITE_CONFIRMATION and submission_status(store, cid).ready
+    # The upload_rejected e-mail links here and carries no reason; give it now, outside the
+    # tucked uploader (QA, 2026-11-19). A later upload means the site has acted, so only
+    # refusals since then are shown.
+    refused: list[dict] = []
+    for e in store.events(cid):
+        if e["type"] == "documents.uploaded":
+            refused = []
+        elif e["type"] == "upload.rejected":
+            refused.append(e["data"])
+    for r in refused:
+        st.warning(f"{r['zip']} from the upload folder was not used: {r['reason']}")
     with st.expander("Add more documents") if tucked else st.container():
         # A new uploader key after each upload empties it (st.file_uploader has no reset).
         round_key = f"upload_round_{cid}"
@@ -124,16 +135,6 @@ if can_upload:
             f"Or put one ZIP file with all the documents in this case's upload folder, "
             f"{cid}. It is picked up within a minute."
         )
-        # The upload_rejected e-mail links here and carries no reason; give it now. A later
-        # upload means the site has acted, so only refusals since then are shown.
-        refused: list[dict] = []
-        for e in store.events(cid):
-            if e["type"] == "documents.uploaded":
-                refused = []
-            elif e["type"] == "upload.rejected":
-                refused.append(e["data"])
-        for r in refused:
-            st.warning(f"{r['zip']} from the upload folder was not used: {r['reason']}")
 
 if store.state(cid).state == State.DEIDENTIFYING:
     st.write("Uploads are processed automatically within a few seconds. To see the result now:")
@@ -210,6 +211,15 @@ for name in sorted(docs.files):
         if notes:
             st.caption(f"{name}: the file is an image, not a PDF. It was processed as an image.")
 
+# The same file added twice would be submitted twice (QA, 2026-11-19). It is not refused,
+# since a site may send a file again to answer a query; the site is told instead.
+by_content: dict[str, list[str]] = {}
+for name in sorted(docs.files):
+    by_content.setdefault(docs.files[name].sha256, []).append(name)
+for same in (names for names in by_content.values() if len(names) > 1):
+    st.warning(f"{' and '.join(same)} are the same file. Remove the extra copy unless both "
+               "should be sent.")  # fmt: skip
+
 # --- review -----------------------------------------------------------------------------------
 reviewable = [
     n for n in sorted(docs.files) if docs.processed.get(n) and docs.processed[n].get("output")
@@ -270,7 +280,8 @@ if reviewable:
         if report["residuals"]:
             items = "".join(
                 f"<li>{html.escape(r['category'].replace('_', ' ').lower())}: "
-                f"{html.escape(r['masked'])} ({html.escape(r['source'])})</li>"
+                f"{html.escape(r['masked'])} "
+                f"({html.escape(r['source'].replace('page:', 'page ').replace(':', ' '))})</li>"
                 for r in report["residuals"]
             )
             fix = "Add the missing term below" if is_sheet else "Drag a box over it"
@@ -324,6 +335,9 @@ if reviewable:
                 for _, r in edited.iterrows()
                 if r["Keep"]
             ]
+            if not keep:
+                st.warning("Tick the text to keep in the table first.")
+                st.stop()
             try:
                 apply_change(reason=reason, keep=keep)
             except ReviewRefused as exc:
@@ -343,18 +357,17 @@ if reviewable:
                     apply_change(add_terms=[term])
                 else:
                     st.warning("Type the text to black out first.")
-        if (
-            is_site
-            and cs.state not in SIGNED_STATES
-            and cs.state != State.DEIDENTIFYING
-            and st.button(f"Remove {name}", key=f"rm_r_{name}")
-        ):
-            try:
-                delete_document(store, cid, name, ctx.actor, reason="removed by site")
-            except ReviewRefused as exc:
-                st.warning(f"Not removed: {exc}.")
-            else:
-                st.rerun()
+        # One click deleted the file (QA, 2026-11-19): the removal is confirmed first.
+        if is_site and cs.state not in SIGNED_STATES and cs.state != State.DEIDENTIFYING:
+            with st.popover(f"Remove {name}"):
+                st.write(f"Remove {name} from the case? You can upload it again later.")
+                if st.button("Yes, remove it", key=f"rm_r_{name}"):
+                    try:
+                        delete_document(store, cid, name, ctx.actor, reason="removed by site")
+                    except ReviewRefused as exc:
+                        st.warning(f"Not removed: {exc}.")
+                    else:
+                        st.rerun()
         # Under the other buttons, not under the page (the user, 2026-11-19): the area is
         # dragged on the page on the left and blacked out from here.
         if box and st.button(f"Black out the selected area on page {n}", type="primary"):
@@ -392,7 +405,7 @@ else:
                 st.toast("Signed and submitted")
                 st.rerun()
             except SignatureRefused as exc:
-                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                 st.error(f"Not signed: {msg}. Try again.")
             except ReviewRefused as exc:
                 st.error(f"Not signed: {exc}.")

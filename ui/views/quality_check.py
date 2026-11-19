@@ -260,7 +260,7 @@ def review_and_sign(latest: dict) -> None:
                     st.toast("Query sent to the site")
                 st.rerun()
             except SignatureRefused as exc:
-                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                 st.error(f"Not signed: {msg}. Try again.")
             except Flow2Refused as exc:
                 st.error(f"Not signed: {exc}.")
@@ -448,7 +448,7 @@ elif state == State.NARRATIVE_REVIEW and drafts:
                     st.toast("Narrative signed")
                     st.rerun()
                 except SignatureRefused as exc:
-                    msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                    msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                     st.error(f"Not signed: {msg}. Try again.")
                 except Flow2Refused as exc:
                     st.error(f"Not signed: {exc}.")

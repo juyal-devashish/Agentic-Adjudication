@@ -34,6 +34,8 @@ def sign(
     user: dict[str, Any], password: str, meaning: str, records: list[dict[str, str]]
 ) -> dict[str, Any]:
     """Return the signature block for an event. `records`: [{name, path, sha256}]."""
+    if not password:
+        raise SignatureRefused("enter your password")
     if not check_password(user, password):
         raise SignatureRefused("wrong password")
     body = {"meaning": meaning, "records": sorted(records, key=lambda r: r["path"])}

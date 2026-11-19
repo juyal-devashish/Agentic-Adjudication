@@ -136,7 +136,7 @@ with st.form(f"{key}_sign"):
             st.toast("Review signed")
             st.rerun()
         except SignatureRefused as exc:
-            msg = "the password is wrong" if "password" in str(exc) else str(exc)
+            msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
             st.error(f"Not signed: {msg}. Try again.")
         except Flow3Refused as exc:
             st.error(f"Not signed: {exc}.")
@@ -158,7 +158,7 @@ if slot in ("1", "2") and store.state(cid).state == State.ADJ_REVIEW:
                 flow3.request_more_data(cid, ctx.actor, pw, need)
                 st.rerun()
             except SignatureRefused as exc:
-                msg = "the password is wrong" if "password" in str(exc) else str(exc)
+                msg = "the password is wrong" if str(exc) == "wrong password" else str(exc)
                 st.error(f"Not sent: {msg}.")
             except Flow3Refused as exc:
                 st.error(f"Not sent: {exc}.")
