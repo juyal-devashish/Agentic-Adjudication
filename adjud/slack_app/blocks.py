@@ -12,7 +12,7 @@ from typing import Any
 
 from adjud.slack_app.core import ROLE_ORDER, ROLE_WORDS, Directory, Status, Task, Workspace
 
-SYNTHETIC = "Synthetic data only. No patient or clinical information is shown in Slack."
+SYNTHETIC = "Synthetic data only. No PHI is shown in Slack."
 MAX_ROWS = 30  # per list on App Home, well inside the 100-block view limit
 
 
