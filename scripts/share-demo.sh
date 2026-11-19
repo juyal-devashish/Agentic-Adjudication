@@ -30,7 +30,7 @@ tunnel() {  # $1 port, $2 name: prints the public https link
   nohup cloudflared tunnel --no-autoupdate --url "http://localhost:$1" > "$log" 2>&1 &
   echo $! >> "$PIDS"
   for _ in $(seq 60); do
-    url=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$log" | head -1 || true)
+    url=$(grep -ao 'https://[a-z0-9-]*\.trycloudflare\.com' "$log" | head -1 || true)
     [[ -n "$url" ]] && { echo "$url"; return; }
     sleep 1
   done
