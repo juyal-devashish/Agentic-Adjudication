@@ -64,6 +64,10 @@ def ensure_channels(client: Any, directory: Directory) -> dict[str, str]:
         except Exception as exc:
             log.warning("the Slack channel #%s is not available (%s): its person's notices "
                         "go as DMs", name, _error(exc))  # fmt: skip
-    directory.save_channel_ids(ids)
+    try:
+        directory.save_channel_ids(ids)
+    except OSError as exc:
+        log.warning("slack/channels.json could not be written (%s): notices go as DMs",
+                    type(exc).__name__)  # fmt: skip
     log.info("character channels ready: %s", ", ".join(f"#{n}" for n in ids) or "none")
     return ids
