@@ -48,14 +48,19 @@ seeded_identities: flow1-testkit/identities/identities_SYNTHETIC.json
 # Demo only (P-58): one public Slack channel per character, named by role. Anyone in a
 # channel takes that person's part (simulated, as Acting As). Notices for them go there
 # instead of a DM, and the Agent there acts as them. Real use: each person's own Slack
-# account and the Agent's Messages tab. Empty or absent: DMs only. adjudicator-1 and -2
-# are slots 1 and 2 of DEMO01-0001 when it is the first case assigned after a reset.
+# account and the Agent's Messages tab. Empty or absent: DMs only. adjudicator-1, -2 and
+# -3 are slots 1, 2 and 3 of DEMO01-0001 when it is the first case assigned after a reset
+# (Dr Okafor, adjudicator-1, also chairs the committee). The pharmacovigilance mailbox's
+# channel only receives its notice of a related outcome (P-60).
 slack_character_channels:
   dm.dana: data-manager
   site101.coord: site-user
   ss.anna: safety-specialist
+  cec.sofia: cec-coordinator
   adj.okafor: adjudicator-1
   adj.lindqvist: adjudicator-2
+  adj.reyes: adjudicator-3
+  "mailbox:pharmacovigilance": pharmacovigilance
 slack_phi_gate:              # P-58 (Q17): the check on everything the Slack Agent posts
   allow: [Discharged]        # ordinary words NER takes for a name ("Discharged home ...")
 narrative:                   # plan step 17; checked by code in the narrative gate

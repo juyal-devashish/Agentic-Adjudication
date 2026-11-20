@@ -124,6 +124,127 @@ def test_the_slack_demo_runs_from_the_import_to_the_assignment(tmp_path, monkeyp
     assert not phi_in(client.posts)  # ADR 0005: Clinical Content may go to Slack, PHI never
 
 
+def notices_in_channels(posts: list[dict]) -> list[tuple[str, str]]:
+    """(character channel, task) for each of this case's notices, sorted."""
+    out = []
+    for p in posts:
+        found = re.search(rf"Case {CASE}: (.+?)\*", p["blocks"][0]["text"]["text"])
+        if found:
+            out.append((p["channel"], found.group(1)))
+    return sorted(out)
+
+
+def test_the_demo_case_runs_through_all_four_flows(tmp_path, monkeypatch):
+    """P-60: DEMO01-0001 from the import to CLOSED and through a re-adjudication, as the
+    presenter runs it: each character's notice reaches their own channel, Adjudicator 3,
+    the CEC Coordinator and the pharmacovigilance mailbox included, and the answer sets of
+    `scripts/slack-demo.sh answers` sign the reviews in the demo's own folder."""
+    from adjud.documents import upload
+    from adjud.flow3 import current_round
+    from adjud.slack_app.core import Workspace as Ws
+    from tools import make_flow3_fixtures as fx
+
+    monkeypatch.setenv("ADJUD_AI_MODE", "replay")
+    monkeypatch.setenv("NOTIFY_CHANNELS", "outbox,slack")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test-secret-token")
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    client = FakeClient()
+    monkeypatch.setattr(SlackSettings, "client", lambda self: client)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config").symlink_to(ROOT / "data" / "config")
+    (data / "flow1-testkit").symlink_to(KIT)
+    monkeypatch.setenv("ADJUD_DATA_DIR", str(data))  # as scripts/slack-demo.sh exports it
+    paths = DataPaths(data)
+    reset(paths, preload=True, only=DEMO_AES)
+    ws: Ws = Workspace(paths)
+    names = sorted(set(ws.people.character_channels.values()))
+    ws.people.save_channel_ids({n: f"C-{n}" for n in names})  # as the Slack app makes them
+    runner = Runner(paths)
+    store, f3, f4 = runner.pipeline.store, runner.flow3, runner.flow4
+    seen = 0
+    now = 0
+
+    def step() -> list[tuple[str, str]]:
+        """One runner pass (10 s in the demo); this case's notices it sent."""
+        nonlocal seen, now
+        runner.tick(now)
+        now += 1
+        fresh, seen = client.posts[seen:], len(client.posts)
+        return notices_in_channels(fresh)
+
+    def task(person_id: str) -> str | None:
+        found = [t.words for t in ws.tasks(ws.people.by_id[person_id]) if t.case_id == CASE]
+        return found[0] if found else None
+
+    # Flows 1 and 2, as test_the_slack_demo_runs_from_the_import_to_the_assignment
+    runner.import_inbox()
+    step()
+    folder = data / "demo_uploads" / "documents" / "DEMO01-101-0001_AE-001"
+    upload(store, CASE, [(f.name, f.read_bytes()) for f in sorted(folder.iterdir())],
+           "site101.coord")  # fmt: skip
+    step()
+    submit(store, CASE, "site101.coord", "demo", paths.config)
+    step()
+    step()
+    draft = next(e for e in store.events(CASE) if e["type"] == "narrative.drafted")
+    text = store.get_file(CASE, draft["data"]["draft"]["path"]).decode()
+    runner.flow2.sign_qc_pass(CASE, "ss.anna", "demo", text)
+    step()
+    assert step() == [
+        ("C-adjudicator-1", "an adjudication review is assigned to you"),
+        ("C-adjudicator-2", "an adjudication review is assigned to you"),
+    ]
+
+    # Flow 3: the reviews disagree, Adjudicator 3 settles one field, the committee the other
+    assert fx.apply(CASE, "disputed") == ["Adjudicator 1: Dr. Daniel Okafor",
+                                          "Adjudicator 2: Dr. Elin Lindqvist"]  # fmt: skip
+    assert step() == [("C-adjudicator-3", "disputed fields of an adjudication need your review")]
+    assert task("adj.reyes") == "Review the disputed questions as Adjudicator 3"
+    assert fx.apply(CASE, "disputed") == ["Adjudicator 3: Dr. Marco Reyes"]
+    assert step() == [("C-cec-coordinator", "a case needs the adjudication committee")]
+    assert store.state(CASE).state == State.CEC_MEETING
+    note = next(json.loads(p.read_text()) for p in paths.outbox.glob("*committee_needed*"))
+    assert note["link"].startswith("/committee?")  # straight to the page that records it
+    assert task("cec.sofia") == "Record the committee meeting"
+    f3.record_meeting(CASE, "cec.sofia", held_on="2026-11-05",
+                      attendees=["adj.okafor", "adj.lindqvist", "adj.reyes"],
+                      summary="The committee reviewed the dossier.",
+                      decisions={"related_to_study_drug": "not_related"})  # fmt: skip
+    assert task("cec.sofia") is None  # recorded: the Chair signs next
+    assert task("adj.okafor") == "Sign the committee's consensus"
+    assert step() == [("C-adjudicator-1", "a committee consensus needs your signature")]
+    f3.sign_consensus(CASE, "adj.okafor", "demo",
+                      shown=current_round(store, CASE).meeting["data"]["meeting"])  # fmt: skip
+
+    # Flow 4: outcome, export, the mock EDC's acknowledgement, close
+    sent = step() + step() + step()
+    assert store.state(CASE).state == State.CLOSED
+    assert ("C-cec-coordinator", "adjudication complete") in sent
+    assert ("C-safety-specialist", "adjudication complete") in sent
+    assert (data / "exports" / "edc" / f"{CASE}_round1.csv").exists()
+
+    # Re-adjudication: round 2 with the same adjudicators, related → pharmacovigilance
+    f4.start_readjudication(CASE, "cec.sofia", "demo", "The sponsor found a later ECG")
+    assert step() == [  # the runner assigns the new round in the same pass
+        ("C-adjudicator-1", "an adjudication review is assigned to you"),
+        ("C-adjudicator-2", "an adjudication review is assigned to you"),
+        ("C-safety-specialist", "re-adjudication started"),
+    ]
+    assert len(fx.apply(CASE, "related")) == 2
+    sent = step() + step() + step() + step()
+    assert store.state(CASE).state == State.CLOSED
+    assert ("C-pharmacovigilance",
+            "an adjudication outcome needs pharmacovigilance attention") in sent  # fmt: skip
+    assert (data / "exports" / "edc" / f"{CASE}_round2.csv").exists()
+
+    assert not phi_in(client.posts)  # ADR 0005: no PHI in Slack on the way
+    from adjud.integrity import rebuild_all, verify_all
+
+    assert all(r.ok for r in verify_all(paths))
+    assert not any(r.changed for r in rebuild_all(paths, write=False))
+
+
 def test_a_reset_of_a_separate_demo_folder_brings_its_config_and_spares_data(tmp_path):
     """P-57: the demo runs in its own folder (ADJUD_DATA_DIR=data/demo), so starting over
     never touches the presenter's ./data. The committed config is copied into a folder
