@@ -10,6 +10,12 @@ committee's decisions, and the route the case should take:
                 → outcome straight away
     disputed    the reviews disagree on the MI type and on relatedness; Adjudicator 3
                 matches one review on the MI type, not on relatedness → committee
+    related     both reviews agree the MI is related to the study drug → outcome, and
+                the pharmacovigilance mailbox is told (P-50)
+
+In the running demo (scripts/slack-demo.sh), sign with the demo's own data folder:
+
+    scripts/slack-demo.sh answers disputed            # DEMO01-0001 by default
 
 `--apply` signs the open reviews of a case with a scenario's answers, as the assigned
 demo adjudicators (password `demo`), so a presenter need not fill every form by hand.
@@ -53,6 +59,19 @@ SCENARIOS = {
         },  # fmt: skip
         "adjudicator_3": {"mi_type": "type_1", "related_to_study_drug": "unable_to_assess"},
         "committee": {"related_to_study_drug": "not_related"},
+    },
+    "related": {
+        "route": "agreed, related to the study drug → outcome and a notice to pharmacovigilance",
+        "adjudicator_1": {
+            **BASE,
+            "related_to_study_drug": "related",
+            "rationale": "Onset two weeks after the dose increase; no other trigger found.",
+        },  # fmt: skip
+        "adjudicator_2": {
+            **BASE,
+            "related_to_study_drug": "related",
+            "rationale": "Temporal link to the study drug; type 1 MI.",
+        },  # fmt: skip
     },
 }
 

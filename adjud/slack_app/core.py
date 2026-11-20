@@ -333,7 +333,11 @@ class Workspace:
                 return Task(cid, "Check and sign the narrative", "qc")
             return None
         if role == "cec_coordinator" and state == State.CEC_MEETING:
-            return Task(cid, "Record the committee meeting", "committee")
+            rnd = current_round(self.store, cid)
+            meeting = rnd.meeting if rnd else None
+            if meeting is None or not meeting["data"]["quorum_met"]:
+                return Task(cid, "Record the committee meeting", "committee")
+            return None  # recorded: the Chair signs next
         if role == "adjudicator":
             rnd = current_round(self.store, cid)
             slot = self.flow3.slot_of(cid, person["id"])

@@ -1,6 +1,6 @@
-# Slack demo runbook (P-57, P-58)
+# Slack demo runbook (P-57, P-58, P-60)
 
-This runbook takes one case, DEMO01-0001, from a new AE record to its assignment to two adjudicators (the start of Flow 3). Each person does their work by talking to the **Agent**: one Claude agent that acts as that person, with that person's tools only. In the demo each character has a Slack channel, and one Slack account works in all of them (section 3). Signatures stay in the app, which the Agent opens with an *Open in the app* button. Every notice also goes out by e-mail. The demo takes about 10 minutes.
+This runbook takes one case, DEMO01-0001, through all four flows: from a new AE record, through de-identification and the Quality Check, to two blind reviews, Adjudicator 3, the committee, the outcome, the export to the EDC and a re-adjudication. Each person does their work by talking to the **Agent**: one Claude agent that acts as that person, with that person's tools only. In the demo each character has a Slack channel, and one Slack account works in all of them (section 3). Signatures stay in the app, which the Agent opens with an *Open in the app* button. Every notice also goes out by e-mail. Flows 1 and 2 take about 10 minutes, Flows 3 and 4 about 10 more.
 
 Use synthetic data only. Slack may now show anything without PHI ([ADR 0005](adr/0005-phi-never-leaves-the-app-slack-mirrors-teams.md)): the AE term, event dates, the subject ID, Checks, the AI Suggestion, the narrative and query text. Names, dates of birth, record numbers, addresses and the like never go to Slack: every reply the Agent writes is checked by the same detectors de-identification uses, and a reply with a finding is held back with *Open in the app*. Slack here stands in for Microsoft Teams; real data waits for Teams or a Slack plan with a BAA. This is the user's decision for the synthetic demo, not an approval from compliance or IT, so say so if asked.
 
@@ -63,7 +63,7 @@ Then open these:
 
 - **The app:** <http://localhost:8501>
 - **E-mail (Mailpit):** <http://localhost:8025>
-- **Slack:** your demo workspace, with the five character channels starred (section 3).
+- **Slack:** your demo workspace, with the eight character channels starred (section 3).
 
 Every demo person signs with the password `demo`.
 
@@ -82,14 +82,17 @@ Every demo person signs with the password `demo`.
 | `#data-manager` | Rahul Mehta, data manager |
 | `#site-user` | Priya Nair, site 101 |
 | `#safety-specialist` | Dr Anna Weber, Safety Specialist |
-| `#adjudicator-1` | Dr Daniel Okafor, Adjudicator 1 of DEMO01-0001 |
+| `#cec-coordinator` | Sofia Marques, CEC Coordinator |
+| `#adjudicator-1` | Dr Daniel Okafor, Adjudicator 1 of DEMO01-0001, and the committee's Chair |
 | `#adjudicator-2` | Dr Elin Lindqvist, Adjudicator 2 of DEMO01-0001 |
+| `#adjudicator-3` | Dr Marco Reyes, Adjudicator 3 of DEMO01-0001 |
+| `#pharmacovigilance` | The pharmacovigilance mailbox: notices only, nobody to talk to |
 
-Once, after the first start with the current manifest: in Slack, **join** the five channels (they are public: *Browse channels*, or type `/join #site-user` and so on) and star them. That survives resets. Then do section 2 once more (reset and start): on the very first start the runner may send the first notice before the Slack app has made the channels, and it would go as a DM. If the workspace does not let apps create channels, create the five by hand, then restart: the app finds them by name and joins them. Then the demo is: click a character's channel and work there. Each notice for that character arrives in their channel as a new message, and the Agent answers every message written there as that character, whoever you are signed in as and whatever *Switch person* says. Reply in the thread of a notice: a reply in a notice's thread is about that notice's case. Its *Open in the app* buttons open the app as that character.
+Once, after the first start with the current manifest: in Slack, **join** the eight channels (they are public: *Browse channels*, or type `/join #site-user` and so on) and star them. That survives resets. Then do section 2 once more (reset and start): on the very first start the runner may send the first notice before the Slack app has made the channels, and it would go as a DM. If the workspace does not let apps create channels, create the eight by hand, then restart: the app finds them by name and joins them. Then the demo is: click a character's channel and work there. Each notice for that character arrives in their channel as a new message, and the Agent answers every message written there as that character, whoever you are signed in as and whatever *Switch person* says. Reply in the thread of a notice: a reply in a notice's thread is about that notice's case. Its *Open in the app* buttons open the app as that character.
 
-This is a demo simulation, like Acting As: anyone in a channel takes that person's part, and nothing is enforced. Say so. In real use each person has their own Slack account and talks to the Agent in its **Messages** tab. People without a channel (Sofia Marques, Dr Reyes) still get DMs, which reach the account that chose them, or the last account to choose anyone, with *Switch person*. If a channel could not be created or joined (see `docker compose --profile slack logs slack`), that character's notices go as DMs as before and the Messages tab with *Switch person* still works.
+This is a demo simulation, like Acting As: anyone in a channel takes that person's part, and nothing is enforced. Say so. In real use each person has their own Slack account and talks to the Agent in its **Messages** tab. People without a channel (e.g. the site 102 user) still get DMs, which reach the account that chose them, or the last account to choose anyone, with *Switch person*. If a channel could not be created or joined (see `docker compose --profile slack logs slack`), that character's notices go as DMs as before and the Messages tab with *Switch person* still works.
 
-Adjudicators 1 and 2 are given round robin, so `#adjudicator-1` is Dr Okafor's only when DEMO01-0001 is the first case assigned after a reset, as in this script.
+Adjudicators 1, 2 and 3 are given round robin, so the channels match the slots only when DEMO01-0001 is the first case assigned after a reset, as in this script.
 
 | # | In Slack | In the app | Talking point |
 |---|---|---|---|
@@ -99,13 +102,20 @@ Adjudicators 1 and 2 are given round robin, so `#adjudicator-1` is Dr Okafor's o
 | 4 | About 10 to 15 s later, in **#site-user**: *redacted documents are ready for your review. Next: Review the redacted pages and sign.* Ask in its thread **what was removed?**: counts per file. Then **Open in the app**. | Every file shows *Verified*. Look at a redacted page, then enter the password `demo` and click **Sign and submit**. | Identifiers are removed destructively and checked again from scratch. Anything still found blocks signing. The signature happens only in the app: Slack must not ask for passwords. |
 | 5 | *submission received* in **#site-user**; *documents received, ready for QC* and, about 10 s later, *a quality check needs your review … suggested: pass* in **#safety-specialist**. | (none) | The handoff to Flow 2 contains only the redacted files and their hashes. |
 | 6 | In **#safety-specialist**, in the thread of *a quality check needs your review*, ask **what does the QC say for 0001?**: the six checks, the AI Suggestion and the suggested outcome. Then **change the last sentence of the narrative to "…"**: the Agent edits the draft (unsigned). Then **Open in the app**. | On the Quality check page the edited narrative is pre-filled. Check it, enter `demo` and click **Sign the pass and the narrative**. | The AI prepares and a person decides ([ADR 0001](adr/0001-ai-is-decision-support-at-quality-check.md)). The Agent drafts; one signature in the app covers the pass and the narrative. |
-| 7 | Within 10 to 20 s: *case ready for adjudication* in **#safety-specialist**, then *an adjudication review is assigned to you* in **#adjudicator-1** and **#adjudicator-2**. In either, ask **status of 0001**. | (none) | The case is assigned to two independent adjudicators, never from the case's site. **The demo stops here.** Flow 3 continues in the app. |
+| 7 | Within 10 to 20 s: *case ready for adjudication* in **#safety-specialist**, then *an adjudication review is assigned to you* in **#adjudicator-1** and **#adjudicator-2**. In either, ask **status of 0001**. | (none) | The case is assigned to two independent adjudicators, never from the case's site. |
+| 8 | In **#adjudicator-1**, **Open in the app** on the assignment notice. | On the Adjudication page, read the dossier and the signed narrative beside the form. Fill the form, enter `demo` and click **Sign my review**. For Dr Lindqvist, run `scripts/slack-demo.sh answers disputed` in a terminal (Docker: `docker compose run --rm runner python -m tools.make_flow3_fixtures --apply disputed --case DEMO01-0001`): it signs the review still open with prepared answers that disagree. To show the whole form twice, fill it by hand from **#adjudicator-2** instead. | Two blind, independent reviews. Neither adjudicator sees the other's answers, and AI proposes nothing on the form. If you signed Dr Okafor's review by hand, the answer set signs only Dr Lindqvist's. |
+| 9 | Within 10 s, in **#adjudicator-3**: *disputed fields of an adjudication need your review*. | Run `scripts/slack-demo.sh answers disputed` again (or **Open in the app** and answer the disputed questions only). | Code compares the answers field by field. Adjudicator 3 sees only the disputed questions, not the earlier answers. |
+| 10 | Within 10 s, in **#cec-coordinator**: *a case needs the adjudication committee*. **Open in the app**. | The Committee page opens. Record the meeting: today's date, all three adjudicators as attendees, a short summary, and the decision on relatedness. | Adjudicator 3 settled the MI type. Relatedness is still open, so it goes to the committee. The meeting is held outside the tool and recorded here, and code checks the quorum. |
+| 11 | In **#adjudicator-1**: *a committee consensus needs your signature*. **Open in the app**. | As Dr Okafor, the Chair, enter `demo` and **Sign the consensus**. | Only the Chair signs, and only the record he saw. |
+| 12 | About 30 s later, in **#cec-coordinator** and **#safety-specialist**: *adjudication complete*. | On the Case record, *Adjudication and outcome* shows each final value and where it came from. `exports/edc/DEMO01-0001_round1.csv` was sent, and the mock EDC acknowledged it before the case closed. | Code derives the outcome from signed answers only, and closes the case only after the EDC acknowledges it. |
+| 13 | In **#cec-coordinator**, **Open in the app** on *adjudication complete*. | Go to Sofia's **Assignments** page. Under **Re-adjudicate**, give a reason, enter `demo` and click **Sign and start re-adjudication**. | Nothing earlier is changed. Round 2 starts with the same adjudicators. |
+| 14 | *re-adjudication started* in **#safety-specialist**, and new assignments in **#adjudicator-1** and **#adjudicator-2**. Run `scripts/slack-demo.sh answers related`. About 40 s later, in **#pharmacovigilance**: *an adjudication outcome needs pharmacovigilance attention*. | The Case record shows round 1's outcome as superseded and round 2's as current. The round 2 export is marked as a correction. | A related outcome tells pharmacovigilance, by e-mail and in its channel, with no clinical content in the e-mail. |
 
 If the Agent's AI is off (or has no key), each answer is the person's tasks with their buttons: the demo still runs, with the buttons in the Agent's reply in the character's channel and **Open in the app** for each step. The Case record page, under *Notifications*, shows each notice's e-mail and Slack status.
 
 ## 3a. Let someone use it from their own computer (public links)
 
-`scripts/share-demo.sh start` opens two public links (Cloudflare quick tunnels, no account; `brew install cloudflared` once): the app and the Mailpit inbox. It then resets and starts the demo so that every *Open in the app* button and e-mail link points at the public app link, and keeps the Mac from idle sleep. Send the two links and invite the person to the Slack workspace; they join the five role channels. Anyone with a link can open it: synthetic data only, never real documents.
+`scripts/share-demo.sh start` opens two public links (Cloudflare quick tunnels, no account; `brew install cloudflared` once): the app and the Mailpit inbox. It then resets and starts the demo so that every *Open in the app* button and e-mail link points at the public app link, and keeps the Mac from idle sleep. Send the two links and invite the person to the Slack workspace; they join the eight role channels. Anyone with a link can open it: synthetic data only, never real documents.
 
 The links work only while this Mac is on, awake (lid open, or on power with a display), online and running the demo. They change every time the script starts, so send the new ones. Everyone shares one demo: a reset resets it for all. To start over without new links, use **Reset the demo** at the bottom of the app's sidebar: it does the same reset as the script, the runner and the Slack app keep running, and the AE file waits 5 minutes again for Rahul's import. `scripts/share-demo.sh stop` closes the links and stops the demo.
 
@@ -128,8 +138,8 @@ To check the audit trail after a run, use `docker compose run --rm runner python
 ## 5. Out of scope for this demo
 
 - Signing in Slack, ever.
-- Flows 3 and 4 through the Agent: adjudicators and the CEC Coordinator get tasks and status only.
+- Flows 3 and 4 work done by the Agent: adjudicators, the Chair and the CEC Coordinator get their notices, tasks and status in Slack, and do every step in the app, since each one is signed or records a decision.
 - Teams, which needs IT approval.
 - Real data of any kind.
 
-These are recorded in plan P-57 and P-58.
+These are recorded in plan P-57, P-58 and P-60.

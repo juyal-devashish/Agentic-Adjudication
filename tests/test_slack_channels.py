@@ -50,8 +50,10 @@ def in_channel(text: str, channel: str, ts: str = "1700000100.000100", **kw) -> 
 def test_the_demo_names_one_channel_per_character_by_role(ws):
     assert ws.people.character_channels == {
         "dm.dana": "data-manager", "site101.coord": "site-user",
-        "ss.anna": "safety-specialist", "adj.okafor": "adjudicator-1",
-        "adj.lindqvist": "adjudicator-2"}  # fmt: skip
+        "ss.anna": "safety-specialist", "cec.sofia": "cec-coordinator",
+        "adj.okafor": "adjudicator-1", "adj.lindqvist": "adjudicator-2",
+        "adj.reyes": "adjudicator-3",
+        "mailbox:pharmacovigilance": "pharmacovigilance"}  # fmt: skip
     assert ws.people.channel_of("site101.coord") is None  # the app has not made them yet
     with_channels(ws)
     assert ws.people.channel_of("site101.coord") == "C0SITE"
@@ -107,9 +109,18 @@ def test_existing_channels_are_joined_and_missing_ones_created(ws):
     slack = Channels({"general": "C0GEN", "site-user": "C0SITE", "data-manager": "C0DM",
                       "random": "C0RND"})  # fmt: skip
     ids = ensure_channels(slack, ws.people)
-    assert slack.created == ["adjudicator-1", "adjudicator-2", "safety-specialist"]
-    assert ids == {"adjudicator-1": "C0NEW1", "adjudicator-2": "C0NEW2", "data-manager": "C0DM",
-                   "safety-specialist": "C0NEW3", "site-user": "C0SITE"}  # fmt: skip
+    assert slack.created == [
+        "adjudicator-1",
+        "adjudicator-2",
+        "adjudicator-3",
+        "cec-coordinator",
+        "pharmacovigilance",
+        "safety-specialist",
+    ]
+    assert ids == {"adjudicator-1": "C0NEW1", "adjudicator-2": "C0NEW2",
+                   "adjudicator-3": "C0NEW3", "cec-coordinator": "C0NEW4",
+                   "data-manager": "C0DM", "pharmacovigilance": "C0NEW5",
+                   "safety-specialist": "C0NEW6", "site-user": "C0SITE"}  # fmt: skip
     assert sorted(slack.joined) == sorted(ids.values())
     assert ws.people.channel_ids() == ids
 
@@ -117,7 +128,8 @@ def test_existing_channels_are_joined_and_missing_ones_created(ws):
 def test_a_channel_slack_refuses_is_left_out_and_its_person_gets_dms(ws, caplog):
     slack = Channels({"site-user": "C0SITE"}, fail={"create:safety-specialist", "join:C0SITE"})
     ids = ensure_channels(slack, ws.people)
-    assert set(ids) == {"adjudicator-1", "adjudicator-2", "data-manager"}
+    assert set(ids) == {"adjudicator-1", "adjudicator-2", "adjudicator-3", "cec-coordinator",
+                        "data-manager", "pharmacovigilance"}  # fmt: skip
     assert "missing_scope" in caplog.text
     ws.people.act_as(ME, "site101.coord")
     note = Outbox(ws.paths, "DEMO01").queue("DEMO01-0001", "site:101", "documents_requested")
@@ -129,7 +141,7 @@ def test_a_channel_slack_refuses_is_left_out_and_its_person_gets_dms(ws, caplog)
 
 def test_without_the_list_scope_every_channel_is_still_tried(ws):
     ids = ensure_channels(Channels({}, fail={"list"}), ws.people)
-    assert len(ids) == 5
+    assert len(ids) == 8
 
 
 def test_no_mapping_calls_nothing(ws, tmp_path):

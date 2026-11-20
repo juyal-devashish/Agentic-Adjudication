@@ -4,6 +4,10 @@
 #   scripts/slack-demo.sh start   stop anything it started, reset the demo folder, start
 #                                 the runner, the UI (:8501) and the Slack app
 #   scripts/slack-demo.sh stop    stop them
+#   scripts/slack-demo.sh answers agree|disputed|related [CASE]
+#                                 sign the case's open adjudicator reviews with a prepared
+#                                 answer set, in the demo's folder (Flow 3, P-52, P-60);
+#                                 CASE defaults to DEMO01-0001
 #
 # The demo lives in its own folder, data/demo by default (DEMO_DIR=... to change), so
 # starting over never touches ./data. Settings and secrets come from .env (SLACK_*,
@@ -71,8 +75,15 @@ start() {
   echo "Import from Rahul's App Home within 5 minutes, or the runner imports by itself."
 }
 
+answers() {
+  local scenario="${1:-}" case_id="${2:-DEMO01-0001}"
+  [[ -n "$scenario" ]] || { echo "usage: $0 answers agree|disputed|related [CASE]"; exit 2; }
+  uv run python -m tools.make_flow3_fixtures --apply "$scenario" --case "$case_id"
+}
+
 case "${1:-}" in
   start) start ;;
   stop) stop; echo "Stopped." ;;
-  *) echo "usage: $0 start|stop"; exit 2 ;;
+  answers) shift; answers "$@" ;;
+  *) echo "usage: $0 start|stop|answers agree|disputed|related [CASE]"; exit 2 ;;
 esac

@@ -204,7 +204,8 @@ class Flow3:
         role = None
         if to.startswith("user:"):
             role = self.users()[to.removeprefix("user:")]["role"]
-        page = "committee" if template == "consensus_to_sign" else None  # the Chair signs there
+        # The Chair signs and the Coordinator records the meeting on the Committee page
+        page = "committee" if template in ("consensus_to_sign", "committee_needed") else None
         note = self.outbox.queue(case_id, to, template, role, page)
         self._event(case_id, "notification.queued", actor,
                     {"to": to, "template": template, "id": note["id"]})  # fmt: skip
