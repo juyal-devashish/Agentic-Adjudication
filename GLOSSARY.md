@@ -2,6 +2,20 @@
 
 Getting an adverse event from the trial database to a package an adjudication committee can review (documents collected from the site, identifiers removed, quality-checked and summarised), then adjudicating it and reporting the outcome back to the trial database.
 
+## Delivery
+
+**Proof of Concept**:
+What is built so far: Flows 1 to 4 on synthetic data only, roles simulated, not validated. It shows the mechanics and is the base for the production requirements.
+_Avoid_: MVP (spec.md uses it for Release 1), prototype, pilot
+
+**Release 1**:
+The first production release: validated, real study data, one pilot study, real sign-in for every user.
+_Avoid_: MVP, go-live (for the release itself), version 1
+
+**Later Release**:
+Any production release after Release 1, e.g. several studies at once and the features Release 1 leaves out.
+_Avoid_: phase 2, production (for one release only)
+
 ## Safety review
 
 **Quality Check**:
