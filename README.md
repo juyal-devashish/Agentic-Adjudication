@@ -312,3 +312,7 @@ This repository demonstrates mechanics, not a validated system.
 - **Roles:** blinding and roles are shown in the UI, not enforced.
 - **Before real data:** the system would need IT and privacy review, a restricted production setup, provider data-processing terms, and validation.
 - **AI-1** sends unredacted page images to the AI provider. It is for synthetic data only and never replaces the rule-based detectors.
+
+## License
+
+[MIT](LICENSE) © 2026 Devashish Juyal. Synthetic data only; see the compliance notes above before any real use.
